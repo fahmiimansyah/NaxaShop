@@ -1,6 +1,7 @@
 'use client'; // MANTRA WAJIB BUAT INTERAKSI
 
 import { useState } from 'react';
+import Swal from 'sweetalert2';
 
 export default function FormKasir({ dataGame }) {
   const [produkDipilih, setProdukDipilih] = useState(null);
@@ -9,44 +10,111 @@ export default function FormKasir({ dataGame }) {
   const [isProsesBeli, setIsProsesBeli] = useState(false);
 
   const handleBeli = async () => {
+    // 1. SATPAM DEPAN (Cek Inputan Kosong)
     if (!inputUserId) {
-      alert("Woy bre! User ID-nya diisi dulu dong!");
+      Swal.fire({ title: 'Waduh!', text: 'ID-nya isi dulu!', icon: 'warning', background: '#1f2937', color: '#fff', confirmButtonColor: '#3b82f6' });
       return;
     }
-    // Asumsi ID 1 itu Mobile Legends yang butuh Zone ID
     if (dataGame.id === 1 && !inputZoneId) {
-      alert("Eits! Zone ID-nya isi dulu yaa");
+      Swal.fire({ title: 'Waduh!', text: 'Zone Id nya isi bree', icon: 'warning', background: '#1f2937', color: '#fff', confirmButtonColor: '#3b82f6' });
       return;
     }
 
     setIsProsesBeli(true);
-    
-    // CATATAN: Nanti rute POST ini harus kita bikin juga di Next.js
-    // Buat sekarang, UI-nya aja dulu yang kita rapihin
+
     try {
-      const respon = await fetch('http://localhost:3000/api/beli', {
+      // ==========================================
+      // FASE 1: TEMBAK RADAR CEK NICKNAME DULU
+      // ==========================================
+      const responCek = await fetch('/api/cekId', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          game_id: dataGame.id,
-          produk_id: produkDipilih.id,
-          kode_produk: produkDipilih.kode_produk,
           id_player: inputUserId,
-          zone_player: dataGame.id === 1 ? inputZoneId : "",
+          server_player: inputZoneId, 
+          kode_game: dataGame.kode_game
         })
       });
-      const dataSistem = await respon.json();
-      if (respon.ok) {
-        window.location.href = dataSistem.link_bayar
-      } else {
-        alert(`GAGAL BRE: ${dataSistem.error?.error_msg || dataSistem.pesan}`)
-        console.log("Errorna:", dataSistem)
+
+      const dataCek = await responCek.json();
+
+      // Kalau ID Ngasal / Gak Ketemu, Stop di Sini!
+      if (!responCek.ok) {
+        Swal.fire({ icon: 'error', title: 'ID Gak Ketemu! 😭', text: dataCek.pesan, background: '#1f2937', color: '#fff', confirmButtonColor: '#ef4444' });
+        setIsProsesBeli(false);
+        return; 
       }
+
+      // ==========================================
+      // FASE 2: MUNCULIN STRUK KONFIRMASI (Kalo ID Bener)
+      // ==========================================
+      const yakin = await Swal.fire({
+        title: 'Konfirmasi Pesanan 🛒',
+        html: `
+          <div class="text-left text-sm space-y-2 mt-4 bg-gray-900 p-4 rounded-xl border border-gray-700">
+            <p class="text-gray-400">Tujuan:</p>
+            <p class="text-xl font-black text-cyan-400">${dataCek.nickname}</p>
+            <p class="text-gray-300">ID: ${inputUserId} ${inputZoneId ? `(${inputZoneId})` : ''}</p>
+            <hr class="border-gray-700 my-3" />
+            <p class="text-gray-400">Item:</p>
+            <p class="font-bold text-white">${produkDipilih.nama_produk}</p>
+            <p class="font-bold text-green-400 mt-1">Rp ${produkDipilih.harga.toLocaleString('id-ID')}</p>
+          </div>
+        `,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#06b6d4',
+        cancelButtonColor: '#374151',
+        confirmButtonText: 'Gas Bayar! 🔥',
+        cancelButtonText: 'Batal',
+        background: '#1f2937',
+        color: '#fff'
+      });
+
+      // ==========================================
+      // FASE 3: KALO USER KLIK "GAS BAYAR" -> PROSES!
+      // ==========================================
+      if (yakin.isConfirmed) {
+        
+        // Munculin Loading pas OTW Kasir
+        Swal.fire({
+          title: 'Meneruskan ke Kasir...',
+          text: 'Tunggu bentar ya bre, jangan di-close!',
+          background: '#1f2937',
+          color: '#fff',
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+
+        // Tembak API Beli Asli lu
+        const responBeli = await fetch('http://localhost:3000/api/beli', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            game_id: dataGame.id,
+            produk_id: produkDipilih.id,
+            kode_produk: produkDipilih.kode_produk,
+            id_player: inputUserId,
+            zone_player: dataGame.id === 1 ? inputZoneId : "",
+          })
+        });
+
+        const dataSistem = await responBeli.json();
+
+        if (responBeli.ok) {
+          window.location.href = dataSistem.link_bayar; // Lempar ke Midtrans
+        } else {
+          Swal.fire({ title: 'Gagal bre', text: dataSistem.error, icon: 'error', background: '#1f2937', color: '#fff', confirmButtonColor: '#ef4444' });
+        }
+      }
+
     } catch (error) {
       console.error("Error:", error);
-      alert("Dapur belum siap nerima pesenan! (Rute POST belum dibikin)");
+      Swal.fire({ icon: 'error', title: 'Waduh', text: 'Dapur belum siap nerima pesenan! (Atau Radar Error)', background: '#1f2937', color: '#fff' });
     } finally {
-      setIsProsesBeli(false);
+      setIsProsesBeli(false); // Matiin loading di tombol
     }
   };
 

@@ -1,0 +1,187 @@
+"use client"
+
+import Link from "next/link"
+import { useState } from "react"
+import { AnimatePresence, motion } from "framer-motion"
+import Swal from 'sweetalert2'
+import { signOut } from "next-auth/react" // Jurus panggil Satpam buat Logout
+
+export default function NavbarUI({ session }) { // <--- TERIMA DATA DARI SERVER
+  const [open, setOpen] = useState(false)
+
+  const menuItems = [
+    { name: "Home", href: "/" },
+    { name: "Games", href: "/games" },
+    { name: "Contact", href: "/contact" },
+  ]
+
+  return (
+    <>
+      {/* NAVBAR */}
+      <nav className="sticky top-0 z-50 backdrop-blur-xl bg-gray-900/70 border-b border-gray-800">
+        <div className="max-w-7xl mx-auto px-4">
+          
+          <div className="h-16 flex items-center justify-between">
+
+            {/* LEFT */}
+            <div className="flex items-center gap-4">
+
+              {/* HAMBURGER */}
+              <button
+                onClick={() => setOpen(!open)}
+                className="w-11 h-11 rounded-xl bg-gray-800/80 border border-gray-700 flex flex-col justify-center items-center gap-1.5 hover:border-blue-500 transition-all duration-300 group"
+              >
+                <motion.span
+                  animate={open ? { rotate: 45, y: 7 } : { rotate: 0, y: 0 }}
+                  className="w-5 h-[2px] bg-white rounded-full"
+                />
+
+                <motion.span
+                  animate={open ? { opacity: 0 } : { opacity: 1 }}
+                  className="w-5 h-[2px] bg-white rounded-full"
+                />
+
+                <motion.span
+                  animate={open ? { rotate: -45, y: -7 } : { rotate: 0, y: 0 }}
+                  className="w-5 h-[2px] bg-white rounded-full"
+                />
+              </button>
+
+              {/* LOGO */}
+              <Link href="/">
+                <h1 className="text-2xl font-black tracking-tight">
+                  <span className="text-blue-500">NaXa</span>
+                  <span className="text-white">Shop</span>
+                </h1>
+              </Link>
+            </div>
+
+            {/* RIGHT (BAGIAN VIP) */}
+            <div className="flex items-center gap-3">
+              {session ? (
+                // JIKA UDAH LOGIN
+                <>
+                  <span className="text-cyan-400 font-bold hidden md:block text-sm mr-2">
+                    Halo, {session.user.name}!
+                  </span>
+                 <button 
+                 onClick={() => {
+                   Swal.fire({
+                     title: 'Yakin mau cabut bre? 😢',
+                     text: "Nanti kalo mau top up harus login lagi lho!",
+                     icon: 'warning',
+                     showCancelButton: true,
+                     confirmButtonColor: '#ef4444', // Warna merah Tailwind
+                     cancelButtonColor: '#374151', // Warna abu-abu Tailwind
+                     confirmButtonText: 'Gas, Cabut!',
+                     cancelButtonText: 'Eh, gajadi',
+                     background: '#1f2937', // Background gelap biar nyatu sama web lu
+                     color: '#fff' // Tulisan putih
+                   }).then((result) => {
+                     if (result.isConfirmed) {
+                       signOut({ callbackUrl: '/' });
+                     }
+                   })
+                 }} 
+                 className="bg-red-500/10 border border-red-500/50 hover:bg-red-500 text-red-500 hover:text-white text-sm font-semibold px-4 h-10 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(239,68,68,0.5)]"
+               >
+                 Logout
+               </button>
+                </>
+              ) : (
+                // JIKA BELUM LOGIN
+                <Link 
+                  href="/login" 
+                  className="bg-blue-500 hover:bg-blue-400 flex items-center justify-center text-white text-sm font-semibold px-4 h-10 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)]"
+                >
+                  Login
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* SIDEBAR LU YANG KEREN DIBIARIN AJA */}
+      <AnimatePresence>
+        {open && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setOpen(false)}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+            />
+
+            <motion.div
+              initial={{ x: -300 }}
+              animate={{ x: 0 }}
+              exit={{ x: -300 }}
+              transition={{ type: "spring", damping: 25, stiffness: 250 }}
+              className="fixed top-0 left-0 h-screen w-[280px] bg-gray-900 border-r border-gray-800 z-50 p-6 shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-10">
+                <h2 className="text-2xl font-black">
+                  <span className="text-blue-500">NaXa</span>
+                  <span className="text-white">Shop</span>
+                </h2>
+                <button
+                  onClick={() => setOpen(false)}
+                  className="w-10 h-10 rounded-xl bg-gray-800 hover:bg-gray-700 transition-all duration-300 text-white text-xl"
+                >
+                  ✕
+                </button>
+              </div>
+              {session && (
+                <motion.div 
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-8 p-4 bg-gray-800/50 rounded-2xl border border-cyan-500/30 flex flex-col gap-1"
+                >
+                  <p className="text-xs text-gray-400 font-medium">Halo </p>
+                  <p className="text-xl font-bold text-cyan-400 truncate">{session.user.name}</p>
+                </motion.div>
+              )}
+
+              <div className="flex flex-col gap-3">
+                {menuItems.map((item, index) => (
+                  <motion.div
+                    key={item.name}
+                    initial={{ opacity: 0, x: -30 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.08 }}
+                  >
+                    <Link
+                      href={item.href}
+                      onClick={() => setOpen(false)}
+                      className="group flex items-center justify-between bg-gray-800/70 hover:bg-blue-500 rounded-2xl px-5 py-4 transition-all duration-300 border border-gray-700 hover:border-blue-400"
+                    >
+                      <span className="font-medium text-white text-lg">
+                        {item.name}
+                      </span>
+                      <span className="text-gray-400 group-hover:text-white transition-colors duration-300">
+                        →
+                      </span>
+                    </Link>
+                  </motion.div>
+                ))}
+              </div>
+
+              <div className="absolute bottom-6 left-6 right-6">
+                <div className="bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-500/20 rounded-2xl p-4 backdrop-blur-xl">
+                  <p className="text-white font-semibold">
+                    Next Evolution Edition 🔥
+                  </p>
+                  <p className="text-gray-400 text-sm mt-1">
+                    Top Up Game Modern UI
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </>
+  )
+}
