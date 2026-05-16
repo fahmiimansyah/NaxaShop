@@ -8,7 +8,6 @@ export async function POST(request) {
     const notif = await request.json();
 
     // 2. CEK KEAMANAN (Biar ga ada hacker yang pura-pura lunas)
-    // Rumus Midtrans: SHA512(order_id + status_code + gross_amount + ServerKey)
     const serverKey = process.env.MIDTRANS_SERVER_KEY;
     const stringToHash = `${notif.order_id}${notif.status_code}${notif.gross_amount}${serverKey}`;
     const signatureKita = crypto.createHash('sha512').update(stringToHash).digest('hex');
@@ -20,8 +19,8 @@ export async function POST(request) {
     // 3. KALAU BENERAN LUNAS (Settlement)
     if (notif.transaction_status === 'settlement' || notif.transaction_status === 'capture') {
       
-      // Update status di Kulkas jadi "Lunas"
-      await db.query("UPDATE transaksi SET status = 'Lunas' WHERE order_id = ?", [notif.order_id]);
+      // 🔥 UPDATE KULKAS BARU: Status Bayar jadi SUKSES
+      await db.query("UPDATE transaksi SET status_bayar = 'sukses' WHERE order_id = ?", [notif.order_id]);
 
       // --- WAKTUNYA NELPON APIGAMES! ---
       
@@ -30,14 +29,13 @@ export async function POST(request) {
       if (dataTrx.length === 0) return NextResponse.json({ pesan: "Data ga ketemu di kulkas" });
       const trx = dataTrx[0];
 
-      // B. Ambil kode_produk (misal "ML14") dari tabel produk
-      const [dataProduk] = await db.query("SELECT kode_produk FROM produk WHERE id = ?", [trx.produk_id]);
-      const kodeProduk = dataProduk[0].kode_produk;
+      // B. Ambil kode_produk (Gak perlu query tabel produk lagi, karena udah ada di tabel transaksi lu!)
+      const kodeProduk = trx.kode_produk; 
 
       // C. Racik bumbu APIGames
       const merchantId = process.env.APIGAMES_MERCHANT_ID;
       const secretKey = process.env.APIGAMES_SECRET;
-      const refId = notif.order_id; // Pake order_id Midtrans biar gampang ngelacaknya
+      const refId = notif.order_id; 
       
       const signatureApiGames = crypto.createHash('md5')
         .update(`${merchantId}:${secretKey}:${refId}`)
@@ -58,16 +56,20 @@ export async function POST(request) {
       });
 
       const hasilPabrik = await responPabrik.json();
-      console.log("CCTV WEBHOOK APIGAMES:", hasilPabrik); // Buat mantau dari terminal lu
+      console.log("CCTV WEBHOOK APIGAMES:", hasilPabrik); 
 
-    } else if (notif.transaction_status === 'cancel' || notif.transaction_status === 'expire') {
-      // Kalo usernya ga jadi bayar / kelamaan
-      await db.query("UPDATE transaksi SET status = 'Gagal' WHERE order_id = ?", [notif.order_id]);
+      // 🔥 UPDATE KULKAS BARU: Kalo APIGames udah dihubungi, status topup jadi SUKSES
+      // (Biar struk pembeli lu otomatis berubah jadi Ijo!)
+      await db.query("UPDATE transaksi SET status_topup = 'sukses' WHERE order_id = ?", [notif.order_id]);
+
+    } 
+    // Kalo user ga jadi bayar / kelamaan
+    else if (notif.transaction_status === 'cancel' || notif.transaction_status === 'expire' || notif.transaction_status === 'deny') {
+      await db.query("UPDATE transaksi SET status_bayar = 'gagal', status_topup = 'gagal' WHERE order_id = ?", [notif.order_id]);
     }
 
     // 4. BILANG MAKASIH KE MIDTRANS
-    // Kalo lu ga balikin 200 OK, Midtrans bakal nelponin Dapur lu terus-terusan
-    return NextResponse.json({ pesan: "Sip, Webhook Diterima!" });
+    return NextResponse.json({ pesan: "Sip, Webhook Diterima!" }, { status: 200 });
 
   } catch (error) {
     console.error("Error Webhook:", error);

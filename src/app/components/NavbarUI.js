@@ -12,6 +12,7 @@ export default function NavbarUI({ session }) { // <--- TERIMA DATA DARI SERVER
   const menuItems = [
     { name: "Home", href: "/" },
     { name: "Games", href: "/games" },
+    { name: "Cek Pesanan", href: "/lacak" },
     { name: "Contact", href: "/contact" },
   ]
 

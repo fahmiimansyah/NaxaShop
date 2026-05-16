@@ -1,5 +1,3 @@
-import Navbar from '../../components/Navbar';
-import Footer from '../../components/Footer';
 import FormKasir from '../../components/Kasir';
 
 export default async function HalamanTopUp({ params }) {
@@ -12,7 +10,6 @@ export default async function HalamanTopUp({ params }) {
   if (!respon.ok) {
     return (
       <div className="min-h-screen bg-slate-950 text-white">
-        <Navbar />
 
         <main className="flex min-h-[70vh] items-center justify-center px-4">
           <div className="rounded-3xl border border-red-500/20 bg-red-500/10 px-8 py-6 text-center shadow-2xl">
@@ -24,8 +21,6 @@ export default async function HalamanTopUp({ params }) {
             </p>
           </div>
         </main>
-
-        <Footer />
       </div>
     );
   }
@@ -34,7 +29,6 @@ export default async function HalamanTopUp({ params }) {
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
-      <Navbar />
 
       <main className="mx-auto w-full max-w-6xl px-4 py-6 md:px-6 md:py-10">
         {/* HERO GAME */}
@@ -122,8 +116,6 @@ export default async function HalamanTopUp({ params }) {
           </aside>
         </section>
       </main>
-
-      <Footer />
     </div>
   );
 }
