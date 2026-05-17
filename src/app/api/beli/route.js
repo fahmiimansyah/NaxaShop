@@ -1,83 +1,222 @@
 import { NextResponse } from 'next/server';
-import db from '../../lib/db'; 
+import crypto from 'crypto';
+import db from '../../lib/db';
+
+const METODE_BAYAR_VALID = ['qris', 'bca_va'];
+
+function bikinOrderId() {
+  const random = crypto.randomBytes(4).toString('hex').toUpperCase();
+  return `NX-${Date.now()}-${random}`;
+}
 
 export async function POST(request) {
   try {
     const pesanan = await request.json();
 
+    // 1. VALIDASI INPUT DASAR
+    if (!pesanan.kode_produk || !pesanan.id_player || !pesanan.metode_bayar) {
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan: 'Data pesanan belum lengkap bre!'
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!METODE_BAYAR_VALID.includes(pesanan.metode_bayar)) {
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan: 'Metode bayar gak valid bre!'
+        },
+        { status: 400 }
+      );
+    }
+
+    // 2. AMBIL PRODUK DARI DATABASE
+    // Jangan percaya produk_id/game_id dari frontend.
     const [dataProduk] = await db.query(
-      "SELECT harga, nama_produk FROM produk WHERE kode_produk = ?", 
+      `SELECT id, game_id, kode_produk, nama_produk, harga
+       FROM produk
+       WHERE kode_produk = ?
+       LIMIT 1`,
       [pesanan.kode_produk]
     );
 
-    if (dataProduk.length === 0) return NextResponse.json({ pesan: "Barang gaib bre!" }, { status: 400 });
-    
-    const hargaAsli = dataProduk[0].harga;
-    // Bikin nomor resi
-    const orderId = `NX-${Date.now()}`;
-
-    // 2. CATET KE KULKAS PAKE STRUKTUR BARU
-    await db.query(
-      `INSERT INTO transaksi 
-      (order_id, game_id, produk_id, kode_produk, id_player, zone_player, harga, payment_type, status_bayar, status_topup) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        orderId, 
-        pesanan.game_id, 
-        pesanan.produk_id, 
-        pesanan.kode_produk, // Nyimpen ML_86 / HSR_60
-        pesanan.id_player, 
-        pesanan.zone_player || "", // Nampung Zone ID (ML) atau Server (Honkai)
-        hargaAsli, // Nyimpen harga saat transaksi terjadi
-        pesanan.metode_bayar, // Nyimpen 'qris' atau 'bca_va'
-        'pending', // Status bayar awal
-        'pending'  // Status topup awal
-      ]
-    );
-
-    const SERVER_KEY = process.env.MIDTRANS_SERVER_KEY; 
-    const authString = Buffer.from(`${SERVER_KEY}:`).toString('base64');
-
-    // PAYLOAD DASAR
-    let payload = {
-      transaction_details: { order_id: orderId, gross_amount: hargaAsli },
-      customer_details: { first_name: "Player", last_name: pesanan.id_player }
-    };
-
-    // LOGIC PERCABANGAN METODE BAYAR
-    if (pesanan.metode_bayar === 'qris') {
-      payload.payment_type = "qris";
-    } else if (pesanan.metode_bayar === 'bca_va') {
-      payload.payment_type = "bank_transfer";
-      payload.bank_transfer = { bank: "bca" };
+    if (dataProduk.length === 0) {
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan: 'Barang gaib bre!'
+        },
+        { status: 400 }
+      );
     }
 
-    // Tembak Midtrans
+    const produk = dataProduk[0];
+    const hargaAsli = Number(produk.harga);
+
+    if (!hargaAsli || hargaAsli <= 0) {
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan: 'Harga produk gak valid bre!'
+        },
+        { status: 400 }
+      );
+    }
+
+    // 3. CEK SERVER KEY MIDTRANS
+    const SERVER_KEY = process.env.MIDTRANS_SERVER_KEY;
+
+    if (!SERVER_KEY) {
+      console.error('MIDTRANS_SERVER_KEY belum ada di env');
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan: 'Konfigurasi payment belum siap bre!'
+        },
+        { status: 500 }
+      );
+    }
+
+    const orderId = bikinOrderId();
+    const authString = Buffer.from(`${SERVER_KEY}:`).toString('base64');
+
+    // 4. BIKIN PAYLOAD MIDTRANS
+    const payload = {
+      transaction_details: {
+        order_id: orderId,
+        gross_amount: hargaAsli
+      },
+      customer_details: {
+        first_name: 'Player',
+        last_name: String(pesanan.id_player)
+      }
+    };
+
+    if (pesanan.metode_bayar === 'qris') {
+      payload.payment_type = 'qris';
+    }
+
+    if (pesanan.metode_bayar === 'bca_va') {
+      payload.payment_type = 'bank_transfer';
+      payload.bank_transfer = {
+        bank: 'bca'
+      };
+    }
+
+    // 5. TEMBAK MIDTRANS DULU
     const response = await fetch('https://api.sandbox.midtrans.com/v2/charge', {
       method: 'POST',
       headers: {
-        'Accept': 'application/json',
+        Accept: 'application/json',
         'Content-Type': 'application/json',
-        'Authorization': `Basic ${authString}`
+        Authorization: `Basic ${authString}`
       },
       body: JSON.stringify(payload)
     });
 
     const data = await response.json();
 
-    if (response.ok) {
-      // Bales ke Kasir Frontend sesuai metode yang dipilih
-      if (pesanan.metode_bayar === 'qris') {
-        return NextResponse.json({ sukses: true, tipe: 'qris', qris_url: data.actions[0].url, harga: hargaAsli });
-      } else if (pesanan.metode_bayar === 'bca_va') {
-        return NextResponse.json({ sukses: true, tipe: 'va', bank: 'BCA', va_number: data.va_numbers[0].va_number, harga: hargaAsli });
-      }
-    } else {
-      return NextResponse.json({ sukses: false, pesan: data.status_message }, { status: 400 });
+    if (!response.ok) {
+      console.error('Midtrans gagal:', data);
+
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan: data.status_message || 'Gagal bikin tagihan Midtrans'
+        },
+        { status: 400 }
+      );
     }
 
+    // 6. KALAU MIDTRANS SUKSES, BARU CATAT TRANSAKSI
+    await db.query(
+      `INSERT INTO transaksi
+      (order_id, game_id, produk_id, kode_produk, id_player, zone_player, harga, payment_type, status_bayar, status_topup)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        orderId,
+        produk.game_id,
+        produk.id,
+        produk.kode_produk,
+        pesanan.id_player,
+        pesanan.zone_player || '',
+        hargaAsli,
+        pesanan.metode_bayar,
+        'pending',
+        'pending'
+      ]
+    );
+
+    // 7. BALIKIN DATA KE FRONTEND
+    if (pesanan.metode_bayar === 'qris') {
+      const qrisAction = data.actions?.find((action) =>
+        action.name === 'generate-qr-code' || action.url
+      );
+
+      if (!qrisAction?.url) {
+        return NextResponse.json(
+          {
+            sukses: false,
+            pesan: 'QRIS dari Midtrans gak kebaca bre!'
+          },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
+        sukses: true,
+        order_id: orderId,
+        tipe: 'qris',
+        qris_url: qrisAction.url,
+        harga: hargaAsli,
+        nama_produk: produk.nama_produk
+      });
+    }
+
+    if (pesanan.metode_bayar === 'bca_va') {
+      const vaNumber = data.va_numbers?.[0]?.va_number;
+
+      if (!vaNumber) {
+        return NextResponse.json(
+          {
+            sukses: false,
+            pesan: 'Nomor VA dari Midtrans gak kebaca bre!'
+          },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
+        sukses: true,
+        order_id: orderId,
+        tipe: 'va',
+        bank: 'BCA',
+        va_number: vaNumber,
+        harga: hargaAsli,
+        nama_produk: produk.nama_produk
+      });
+    }
+
+    return NextResponse.json(
+      {
+        sukses: false,
+        pesan: 'Metode bayar belum didukung bre!'
+      },
+      { status: 400 }
+    );
   } catch (error) {
-    console.error("Dapur kebakaran:", error);
-    return NextResponse.json({ sukses: false, pesan: "Gagal bikin tagihan" }, { status: 500 });
+    console.error('Dapur beli kebakaran:', error);
+
+    return NextResponse.json(
+      {
+        sukses: false,
+        pesan: 'Gagal bikin tagihan'
+      },
+      { status: 500 }
+    );
   }
 }

@@ -1,36 +1,120 @@
 import { NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs'; // Alat pengacak password
-import db from '../../lib/db'; // Colokan Kulkas
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+import db from '../../lib/db';
+import { kirimEmailVerifikasi } from '../../lib/mailer';
+
+function bersihinText(value) {
+  return String(value || '').trim();
+}
+
+function emailValid(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function hashToken(token) {
+  return crypto
+    .createHash('sha256')
+    .update(token)
+    .digest('hex');
+}
 
 export async function POST(request) {
   try {
-    const { nama, email, password } = await request.json();
+    const body = await request.json();
+
+    const nama = bersihinText(body.nama);
+    const email = bersihinText(body.email).toLowerCase();
+    const password = String(body.password || '');
 
     if (!nama || !email || !password) {
-      return NextResponse.json({ pesan: "Data belum lengkap bre!" }, { status: 400 });
-    }
-    if (password.length < 8) {
-      return NextResponse.json({ pesan: "Password lu kependekan bre! Minimal 8 karakter." }, { status: 400 });
-    }
-    // 1. Cek dulu, emailnya udah pernah dipake belum?
-    const [userLama] = await db.query("SELECT * FROM users WHERE email = ?", [email]);
-    if (userLama.length > 0) {
-      return NextResponse.json({ pesan: "Wah, email lu udah pernah didaftarin bre!" }, { status: 400 });
+      return NextResponse.json(
+        { sukses: false, pesan: 'Data belum lengkap bre!' },
+        { status: 400 }
+      );
     }
 
-    // 2. Acak passwordnya pake jurus Bcrypt (Level kekuatannya 10)
+    if (nama.length < 2 || nama.length > 50) {
+      return NextResponse.json(
+        { sukses: false, pesan: 'Nama harus 2-50 karakter bre!' },
+        { status: 400 }
+      );
+    }
+
+    if (!emailValid(email)) {
+      return NextResponse.json(
+        { sukses: false, pesan: 'Format email gak valid bre!' },
+        { status: 400 }
+      );
+    }
+
+    if (password.length < 8) {
+      return NextResponse.json(
+        { sukses: false, pesan: 'Password lu kependekan bre! Minimal 8 karakter.' },
+        { status: 400 }
+      );
+    }
+
+    if (password.length > 72) {
+      return NextResponse.json(
+        { sukses: false, pesan: 'Password kepanjangan bre! Maksimal 72 karakter.' },
+        { status: 400 }
+      );
+    }
+
+    const [userLama] = await db.query(
+      `SELECT id, email_verified FROM users WHERE email = ? LIMIT 1`,
+      [email]
+    );
+
+    if (userLama.length > 0) {
+      return NextResponse.json(
+        { sukses: false, pesan: 'Wah, email lu udah pernah didaftarin bre!' },
+        { status: 400 }
+      );
+    }
+
     const passwordRahasia = await bcrypt.hash(password, 10);
 
-    // 3. Masukin ke Kulkas
-    await db.query(
-      "INSERT INTO users (nama, email, password) VALUES (?, ?, ?)",
-      [nama, email, passwordRahasia]
-    );
-    
-    return NextResponse.json({ pesan: "Welcome" }, { status: 201 });
+    const tokenMentah = crypto.randomBytes(32).toString('hex');
+    const tokenRahasia = hashToken(tokenMentah);
 
+    const expires = new Date(Date.now() + 1000 * 60 * 60); // 1 jam
+    const verificationLink = `${process.env.NEXTAUTH_URL}/api/verify-email?token=${tokenMentah}`;
+
+    await db.query(
+      `INSERT INTO users
+       (nama, email, password, email_verified, verification_token, verification_expires)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [nama, email, passwordRahasia, 0, tokenRahasia, expires]
+    );
+
+    await kirimEmailVerifikasi({
+      to: email,
+      nama,
+      link: verificationLink,
+    });
+
+    return NextResponse.json(
+      {
+        sukses: true,
+        pesan: 'Akun berhasil dibuat! Cek email lu buat verifikasi dulu bre.',
+      },
+      { status: 201 }
+    );
   } catch (error) {
-    console.error("Dapur pendaftaran error:", error);
-    return NextResponse.json({ pesan: "Sistem dapur error" }, { status: 500 });
+    console.error('Dapur pendaftaran error:', error);
+
+    if (error.code === 'ER_DUP_ENTRY') {
+      return NextResponse.json(
+        { sukses: false, pesan: 'Email ini udah terdaftar bre!' },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      { sukses: false, pesan: 'Sistem dapur error' },
+      { status: 500 }
+    );
   }
 }

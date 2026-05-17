@@ -1,7 +1,8 @@
 import './globals.css';
 import { Montserrat } from 'next/font/google';
 import Navbar from '../app/components/Navbar';
-import Footer from '../app/components/Footer'; 
+import Footer from '../app/components/Footer';
+import AuthProvider from '../app/components/Authprovider'  
 
 // 1. SETTING FONT MONTSERRAT BIAR ELEGAN & KENCENG
 const montserrat = Montserrat({
@@ -66,7 +67,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="id" className={montserrat.className}>
       <body className="bg-slate-950 text-white antialiased flex flex-col min-h-screen">
-        
+        <AuthProvider>
         {/* Navbar otomatis muncul di paling atas semua halaman */}
         <Navbar />
 
@@ -77,7 +78,7 @@ export default function RootLayout({ children }) {
 
         {/* Footer otomatis nangkring di paling bawah */}
         <Footer />
-
+        </AuthProvider>
       </body>
     </html>
   );

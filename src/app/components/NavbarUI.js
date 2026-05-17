@@ -30,7 +30,7 @@ export default function NavbarUI({ session }) { // <--- TERIMA DATA DARI SERVER
               {/* HAMBURGER */}
               <button
                 onClick={() => setOpen(!open)}
-                className="w-11 h-11 rounded-xl bg-gray-800/80 border border-gray-700 flex flex-col justify-center items-center gap-1.5 hover:border-blue-500 transition-all duration-300 group"
+                className="w-11 h-11 rounded-xl bg-gray-800/80 border border-gray-700 flex flex-col justify-center items-center gap-1.5 hover:border-blue-500 transition-all duration-300 group cursor-pointer"
               >
                 <motion.span
                   animate={open ? { rotate: 45, y: 7 } : { rotate: 0, y: 0 }}
@@ -65,29 +65,38 @@ export default function NavbarUI({ session }) { // <--- TERIMA DATA DARI SERVER
                   <span className="text-cyan-400 font-bold hidden md:block text-sm mr-2">
                     Halo, {session.user.name}!
                   </span>
-                 <button 
-                 onClick={() => {
-                   Swal.fire({
-                     title: 'Yakin mau cabut bre? 😢',
-                     text: "Nanti kalo mau top up harus login lagi lho!",
-                     icon: 'warning',
-                     showCancelButton: true,
-                     confirmButtonColor: '#ef4444', // Warna merah Tailwind
-                     cancelButtonColor: '#374151', // Warna abu-abu Tailwind
-                     confirmButtonText: 'Gas, Cabut!',
-                     cancelButtonText: 'Eh, gajadi',
-                     background: '#1f2937', // Background gelap biar nyatu sama web lu
-                     color: '#fff' // Tulisan putih
-                   }).then((result) => {
-                     if (result.isConfirmed) {
-                       signOut({ callbackUrl: '/' });
-                     }
-                   })
-                 }} 
-                 className="bg-red-500/10 border border-red-500/50 hover:bg-red-500 text-red-500 hover:text-white text-sm font-semibold px-4 h-10 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(239,68,68,0.5)]"
-               >
-                 Logout
-               </button>
+
+                  {/* 🔥 TOMBOL RAHASIA CEO (CUMA MUNCUL KALO EMAILNYA COCOK) 🔥 */}
+                  {session?.user?.email === 'fahmiimansyah28@gmail.com' && (
+                    <Link href="/admin" className="hidden sm:flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition-all mr-1 border border-blue-400 shadow-[0_0_10px_rgba(37,99,235,0.4)]">
+                      Ruang CEO 💼
+                    </Link>
+                  )}
+
+                  {/* TOMBOL LOGOUT */}
+                  <button 
+                    onClick={() => {
+                      Swal.fire({
+                        title: 'Yakin mau cabut bre? 😢',
+                        text: "Nanti kalo mau top up harus login lagi lho!",
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#ef4444', 
+                        cancelButtonColor: '#374151', 
+                        confirmButtonText: 'Gas, Cabut!',
+                        cancelButtonText: 'Eh, gajadi',
+                        background: '#1f2937', 
+                        color: '#fff' 
+                      }).then((result) => {
+                        if (result.isConfirmed) {
+                          signOut({ callbackUrl: '/' });
+                        }
+                      })
+                    }} 
+                    className="bg-red-500/10 border border-red-500/50 hover:bg-red-500 text-red-500 hover:text-white text-sm font-semibold px-4 h-10 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(239,68,68,0.5)]"
+                  >
+                    Logout
+                  </button>
                 </>
               ) : (
                 // JIKA BELUM LOGIN
@@ -134,6 +143,7 @@ export default function NavbarUI({ session }) { // <--- TERIMA DATA DARI SERVER
                   ✕
                 </button>
               </div>
+              
               {session && (
                 <motion.div 
                   initial={{ opacity: 0, y: -20 }}
@@ -142,6 +152,13 @@ export default function NavbarUI({ session }) { // <--- TERIMA DATA DARI SERVER
                 >
                   <p className="text-xs text-gray-400 font-medium">Halo </p>
                   <p className="text-xl font-bold text-cyan-400 truncate">{session.user.name}</p>
+                  
+                  {/* 🔥 TOMBOL RAHASIA CEO DI DALAM SIDEBAR HP 🔥 */}
+                  {session?.user?.email === 'fahmiimansyah28@gmail.com' && (
+                    <Link href="/admin" onClick={() => setOpen(false)} className="mt-3 text-center py-2 bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white text-xs font-bold rounded-lg transition-all border border-blue-500/50">
+                      Masuk Ruang CEO 💼
+                    </Link>
+                  )}
                 </motion.div>
               )}
 

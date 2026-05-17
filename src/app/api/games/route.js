@@ -1,16 +1,24 @@
-// File: src/app/api/games/route.js
 import { NextResponse } from 'next/server';
-import db from '../../lib/db'; // Manggil colokan kulkas yang tadi kita bikin
+import db from '../../lib/db';
 
 export async function GET() {
   try {
-    // Jurus ngambil semua data game dari kulkas
-    const [hasil] = await db.query("SELECT * FROM games");
-    
-    // Balikin datanya ke kasir dalam bentuk JSON
+    const [hasil] = await db.query(
+      `SELECT *
+       FROM games
+       ORDER BY id ASC`
+    );
+
     return NextResponse.json(hasil);
   } catch (error) {
-    console.error("Kulkas error bre:", error);
-    return NextResponse.json({ pesan: "Gagal nyambung ke Kulkas" }, { status: 500 });
+    console.error('Kulkas games error:', error);
+
+    return NextResponse.json(
+      {
+        sukses: false,
+        pesan: 'Gagal nyambung ke Kulkas'
+      },
+      { status: 500 }
+    );
   }
 }
