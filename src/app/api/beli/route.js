@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import db from '../../lib/db';
+import { rateLimit } from '../../lib/rate-limit';
 
 const METODE_BAYAR_VALID = ['qris', 'bca_va'];
 
@@ -11,6 +12,21 @@ function bikinOrderId() {
 
 export async function POST(request) {
   try {
+    const limit = rateLimit(request, {
+  key: 'beli',
+  limit: 5,
+  windowMs: 60_000
+});
+
+if (!limit.allowed) {
+  return NextResponse.json(
+    {
+      sukses: false,
+      pesan: `Terlalu sering checkout bre. Coba lagi ${limit.retryAfter} detik lagi.`
+    },
+    { status: 429 }
+  );
+}
     const pesanan = await request.json();
 
     // 1. VALIDASI INPUT DASAR
@@ -37,10 +53,18 @@ export async function POST(request) {
     // 2. AMBIL PRODUK DARI DATABASE
     // Jangan percaya produk_id/game_id dari frontend.
     const [dataProduk] = await db.query(
-      `SELECT id, game_id, kode_produk, nama_produk, harga
-       FROM produk
-       WHERE kode_produk = ?
-       LIMIT 1`,
+        `SELECT 
+            p.id,
+            p.game_id,
+            p.kode_produk,
+            p.nama_produk,
+            p.harga
+        FROM produk p
+        JOIN games g ON p.game_id = g.id
+        WHERE p.kode_produk = ?
+        AND p.status_produk = 'aktif'
+        AND g.status_game = 'aktif'
+        LIMIT 1`,
       [pesanan.kode_produk]
     );
 

@@ -1,33 +1,61 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { rateLimit } from '../../lib/rate-limit';
+
+const GAME_SUPPORT_CEK_NICKNAME = [
+  'mobilelegend',
+  'mobile_legends',
+  'mobile-legends',
+  'ml',
+  'freefire',
+  'free-fire',
+  'ff'
+];
 
 function bersihinText(value) {
   return String(value || '').trim();
 }
 
 function inputAman(value) {
-  // Angka, huruf, underscore, strip.
-  // Cukup aman buat ID player, server, dan kode game.
   return /^[a-zA-Z0-9_-]+$/.test(value);
 }
 
 function bikinSignatureApigames(merchantId, secretKey) {
-  // Gua pertahankan format signature yang lu pakai sebelumnya.
   return crypto
     .createHash('md5')
     .update(merchantId + secretKey)
     .digest('hex');
 }
 
+function gameBisaCekNickname(kodeGame) {
+  return GAME_SUPPORT_CEK_NICKNAME.includes(String(kodeGame || '').toLowerCase());
+}
+
 export async function POST(request) {
   try {
+    // RATE LIMIT: maksimal 10 cek nickname / menit / IP
+    const limit = rateLimit(request, {
+      key: 'cek-nickname',
+      limit: 10,
+      windowMs: 60_000
+    });
+
+    if (!limit.allowed) {
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan: `Terlalu sering cek ID bre. Coba lagi ${limit.retryAfter} detik lagi.`
+        },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
 
     const idPlayer = bersihinText(body.id_player);
     const serverPlayer = bersihinText(body.server_player);
     const kodeGame = bersihinText(body.kode_game).toLowerCase();
 
-    // 1. VALIDASI INPUT WAJIB
     if (!idPlayer || !kodeGame) {
       return NextResponse.json(
         {
@@ -38,7 +66,19 @@ export async function POST(request) {
       );
     }
 
-    // 2. VALIDASI FORMAT INPUT
+    // INI FIX GENSHIN / HSR / DLL
+    // Kalau game gak support cek nickname, jangan tembak APIGames.
+    if (!gameBisaCekNickname(kodeGame)) {
+      return NextResponse.json(
+        {
+          sukses: false,
+          support_cek_nickname: false,
+          pesan: 'Game ini belum support cek nickname otomatis. Lanjut checkout manual aja bre, pastikan ID dan server sudah benar.'
+        },
+        { status: 200 }
+      );
+    }
+
     if (!inputAman(idPlayer)) {
       return NextResponse.json(
         {
@@ -69,7 +109,6 @@ export async function POST(request) {
       );
     }
 
-    // 3. BATAS PANJANG BIAR GAK DIKIRIM INPUT NGACO
     if (idPlayer.length > 40 || serverPlayer.length > 30 || kodeGame.length > 50) {
       return NextResponse.json(
         {
@@ -80,7 +119,6 @@ export async function POST(request) {
       );
     }
 
-    // 4. CEK ENV APIGAMES
     const merchantId = process.env.APIGAMES_MERCHANT_ID;
     const secretKey = process.env.APIGAMES_SECRET;
 
@@ -98,22 +136,17 @@ export async function POST(request) {
 
     const signature = bikinSignatureApigames(merchantId, secretKey);
 
-    // 5. GABUNG ID + SERVER KALAU ADA
-    // Buat ML biasanya ID + Zone digabung.
-    // Kalau FF gak ada server_player, ya cuma idPlayer doang.
     let finalUserId = idPlayer;
 
     if (serverPlayer) {
       finalUserId = `${idPlayer}${serverPlayer}`;
     }
 
-    // 6. BIKIN URL APIGAMES DENGAN ENCODE
     const urlPabrik =
       `https://v1.apigames.id/merchant/${encodeURIComponent(merchantId)}/cek-username/${encodeURIComponent(kodeGame)}` +
       `?user_id=${encodeURIComponent(finalUserId)}` +
       `&signature=${encodeURIComponent(signature)}`;
 
-    // 7. KASIH TIMEOUT BIAR GAK GANTUNG
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
 
@@ -127,11 +160,11 @@ export async function POST(request) {
 
     const hasilPabrik = await responPabrik.json();
 
-    // 8. HANDLE KALAU APIGAMES BALIKIN ERROR
     if (!responPabrik.ok || hasilPabrik.status === 0 || !hasilPabrik.data) {
       return NextResponse.json(
         {
           sukses: false,
+          support_cek_nickname: true,
           pesan:
             hasilPabrik.error_msg ||
             hasilPabrik.message ||
@@ -141,7 +174,6 @@ export async function POST(request) {
       );
     }
 
-    // 9. AMBIL NICKNAME DARI BEBERAPA KEMUNGKINAN FORMAT
     const nickname =
       typeof hasilPabrik.data === 'string'
         ? hasilPabrik.data
@@ -153,6 +185,7 @@ export async function POST(request) {
       return NextResponse.json(
         {
           sukses: false,
+          support_cek_nickname: true,
           pesan: 'Nickname gak kebaca dari APIGames bre!'
         },
         { status: 404 }
@@ -162,6 +195,7 @@ export async function POST(request) {
     return NextResponse.json(
       {
         sukses: true,
+        support_cek_nickname: true,
         nickname
       },
       { status: 200 }

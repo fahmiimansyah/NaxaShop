@@ -31,9 +31,9 @@ export async function GET() {
 
   try {
     const [daftarProduk] = await db.query(
-      `SELECT id, kode_produk, nama_produk, harga, game_id
-       FROM produk
-       ORDER BY id DESC`
+      `SELECT id, kode_produk, nama_produk, harga, game_id, status_produk
+      FROM produk
+      ORDER BY id DESC`
     );
 
     return NextResponse.json({
@@ -52,7 +52,9 @@ export async function GET() {
 
 export async function POST(request) {
   const adminValid = await cekAdmin();
-
+  const status_produk = ['aktif', 'nonaktif'].includes(dataBaru.status_produk)
+  ? dataBaru.status_produk
+  : 'aktif';
   if (!adminValid) {
     return NextResponse.json(
       { sukses: false, pesan: 'Akses ditolak bre! Lu bukan admin.' },
@@ -107,10 +109,10 @@ export async function POST(request) {
     }
 
     await db.query(
-      `INSERT INTO produk (kode_produk, nama_produk, harga, game_id)
-       VALUES (?, ?, ?, ?)`,
-      [kode_produk, nama_produk, hargaAngka, game_id]
-    );
+  `INSERT INTO produk (kode_produk, nama_produk, harga, game_id, status_produk)
+   VALUES (?, ?, ?, ?, ?)`,
+  [kode_produk, nama_produk, hargaAngka, game_id, status_produk]
+);
 
     return NextResponse.json({
       sukses: true,
@@ -128,7 +130,6 @@ export async function POST(request) {
 
 export async function PATCH(request) {
   const adminValid = await cekAdmin();
-
   if (!adminValid) {
     return NextResponse.json(
       { sukses: false, pesan: 'Akses ditolak bre! Lu bukan admin.' },
@@ -144,7 +145,9 @@ export async function PATCH(request) {
     const kode_produk = bersihinText(body.kode_produk);
     const nama_produk = bersihinText(body.nama_produk);
     const harga = Number(body.harga);
-
+    const status_produk = ['aktif', 'nonaktif'].includes(body.status_produk)
+    ? body.status_produk
+    : 'aktif';
     if (!id || !game_id || !kode_produk || !nama_produk || !harga) {
       return NextResponse.json(
         { sukses: false, pesan: 'Data produk belum lengkap bre!' },
@@ -198,11 +201,12 @@ export async function PATCH(request) {
     await db.query(
       `UPDATE produk
        SET game_id = ?,
-           kode_produk = ?,
-           nama_produk = ?,
-           harga = ?
-       WHERE id = ?`,
-      [game_id, kode_produk, nama_produk, harga, id]
+          kode_produk = ?,
+          nama_produk = ?,
+          harga = ?,
+          status_produk = ?
+      WHERE id = ?`,
+      [game_id, kode_produk, nama_produk, harga, status_produk, id]
     );
 
     return NextResponse.json({

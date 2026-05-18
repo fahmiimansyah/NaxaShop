@@ -31,9 +31,9 @@ export async function GET() {
 
   try {
     const [games] = await db.query(
-      `SELECT id, nama, publisher, gambar, zone_id, server_game, kode_game
-       FROM games
-       ORDER BY id DESC`
+      `SELECT id, nama, publisher, gambar, zone_id, server_game, kode_game, status_game
+      FROM games
+      ORDER BY id DESC`
     );
 
     return NextResponse.json({
@@ -52,7 +52,9 @@ export async function GET() {
 
 export async function POST(request) {
   const adminValid = await cekAdmin();
-
+  const status_game = ['aktif', 'nonaktif'].includes(body.status_game)
+  ? body.status_game
+  : 'aktif';
   if (!adminValid) {
     return NextResponse.json(
       { sukses: false, pesan: 'Akses ditolak bre! Lu bukan admin.' },
@@ -103,9 +105,9 @@ export async function POST(request) {
     }
 
     await db.query(
-      `INSERT INTO games (nama, publisher, gambar, zone_id, server_game, kode_game)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [nama, publisher, gambar, zone_id, server_game, kode_game]
+      `INSERT INTO games (nama, publisher, gambar, zone_id, server_game, kode_game, status_game)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [nama, publisher, gambar, zone_id, server_game, kode_game, status_game]
     );
 
     return NextResponse.json({
@@ -131,7 +133,6 @@ export async function POST(request) {
 
 export async function PATCH(request) {
   const adminValid = await cekAdmin();
-
   if (!adminValid) {
     return NextResponse.json(
       { sukses: false, pesan: 'Akses ditolak bre! Lu bukan admin.' },
@@ -149,6 +150,9 @@ export async function PATCH(request) {
     const kode_game = bersihinText(body.kode_game);
     const server_game = bersihinText(body.server_game) || null;
     const zone_id = Number(body.zone_id) === 1 ? 1 : 0;
+    const status_game = ['aktif', 'nonaktif'].includes(body.status_game)
+    ? body.status_game
+    : 'aktif';
 
     if (!id) {
       return NextResponse.json(
@@ -189,16 +193,17 @@ export async function PATCH(request) {
     }
 
     await db.query(
-      `UPDATE games
-       SET nama = ?,
-           publisher = ?,
-           gambar = ?,
-           zone_id = ?,
-           server_game = ?,
-           kode_game = ?
-       WHERE id = ?`,
-      [nama, publisher, gambar, zone_id, server_game, kode_game, id]
-    );
+  `UPDATE games
+   SET nama = ?,
+       publisher = ?,
+       gambar = ?,
+       zone_id = ?,
+       server_game = ?,
+       kode_game = ?,
+       status_game = ?
+   WHERE id = ?`,
+  [nama, publisher, gambar, zone_id, server_game, kode_game, status_game, id]
+);
 
     return NextResponse.json({
       sukses: true,

@@ -25,6 +25,7 @@ export async function GET(request, { params }) {
       `SELECT *
        FROM games
        WHERE id = ?
+       AND status_game = 'aktif'
        LIMIT 1`,
       [gameId]
     );
@@ -44,6 +45,7 @@ export async function GET(request, { params }) {
       `SELECT *
        FROM produk
        WHERE game_id = ?
+       AND status_produk = 'aktif'
        ORDER BY harga ASC`,
       [gameId]
     );

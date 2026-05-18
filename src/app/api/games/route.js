@@ -6,6 +6,7 @@ export async function GET() {
     const [hasil] = await db.query(
       `SELECT *
        FROM games
+       WHERE status_game = 'aktif'
        ORDER BY id ASC`
     );
 

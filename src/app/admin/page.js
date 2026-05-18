@@ -51,9 +51,69 @@ export default function DashboardAdmin() {
   const [loadingGameForm, setLoadingGameForm] = useState(false);
   const [loadingHapus, setLoadingHapus] = useState(null);
   const [loadingHapusGame, setLoadingHapusGame] = useState(null);
+  // State Transaksi Admin
+  const [daftarTransaksi, setDaftarTransaksi] = useState([]);
+  const [loadingTransaksi, setLoadingTransaksi] = useState(false);
+  const [loadingAksiTransaksi, setLoadingAksiTransaksi] = useState(null);
+  const [filterProdukGame, setFilterProdukGame] = useState('all');
 
+  const [filterTransaksi, setFilterTransaksi] = useState({
+    search: '',
+    status_bayar: 'all',
+    status_topup: 'all',
+    page: 1,
+    limit: 20
+  });
+
+  const [paginationTransaksi, setPaginationTransaksi] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPage: 1
+  });
   const cariNamaGame = (gameId) => {
     return daftarGame.find((game) => String(game.id) === String(gameId))?.nama || `Game ID: ${gameId}`;
+  };
+  const produkTerfilter =
+    filterProdukGame === 'all'
+      ? daftarProduk
+      : daftarProduk.filter((item) => String(item.game_id) === String(filterProdukGame));
+
+  const namaFilterProduk =
+    filterProdukGame === 'all'
+      ? 'Semua Game'
+      : cariNamaGame(filterProdukGame);
+  const formatRupiah = (angka) => {
+  return `Rp ${Number(angka || 0).toLocaleString('id-ID')}`;
+  };
+
+  const escapeHtml = (value) => {
+    return String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  };
+
+  const potongText = (value, max = 700) => {
+    const text = String(value || '');
+    return text.length > max ? `${text.slice(0, max)}...` : text;
+  };
+
+  const warnaStatusBayar = (status) => {
+    if (status === 'sukses') return 'bg-green-500/10 text-green-400 border-green-500/20';
+    if (status === 'pending') return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
+    if (status === 'gagal') return 'bg-red-500/10 text-red-400 border-red-500/20';
+    return 'bg-gray-800 text-gray-400 border-gray-700';
+  };
+
+  const warnaStatusTopup = (status) => {
+    if (status === 'sukses') return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+    if (status === 'proses') return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+    if (status === 'pending') return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
+    if (status === 'gagal') return 'bg-red-500/10 text-red-400 border-red-500/20';
+    return 'bg-gray-800 text-gray-400 border-gray-700';
   };
 
   const resetFormGame = () => {
@@ -120,9 +180,314 @@ export default function DashboardAdmin() {
     }
   };
 
+
+  // --- FUNGSI AMBIL TRANSAKSI ---
+const ambilTransaksi = async (filterManual = filterTransaksi) => {
+  setLoadingTransaksi(true);
+
+  try {
+    const params = new URLSearchParams();
+
+    if (filterManual.search) params.set('search', filterManual.search);
+    if (filterManual.status_bayar) params.set('status_bayar', filterManual.status_bayar);
+    if (filterManual.status_topup) params.set('status_topup', filterManual.status_topup);
+
+    params.set('page', filterManual.page || 1);
+    params.set('limit', filterManual.limit || 20);
+
+    const respon = await fetch(`/api/admin/transaksi?${params.toString()}`);
+    const hasil = await respon.json();
+
+    if (hasil.sukses) {
+      setDaftarTransaksi(hasil.data || []);
+      setPaginationTransaksi(hasil.pagination || {
+        page: 1,
+        limit: 20,
+        total: 0,
+        totalPage: 1
+      });
+    } else {
+      Swal.fire({
+        title: 'GAGAL AMBIL TRANSAKSI ❌',
+        text: hasil.pesan,
+        icon: 'error',
+        background: '#1f2937',
+        color: '#fff'
+      });
+    }
+  } catch (error) {
+    Swal.fire({
+      title: 'ERROR SERVER!',
+      text: 'Gagal ambil transaksi bre',
+      icon: 'error',
+      background: '#1f2937',
+      color: '#fff'
+    });
+  } finally {
+    setLoadingTransaksi(false);
+  }
+};
+
+const handleCariTransaksi = (e) => {
+  e.preventDefault();
+
+  const filterBaru = {
+    ...filterTransaksi,
+    page: 1
+  };
+
+  setFilterTransaksi(filterBaru);
+  ambilTransaksi(filterBaru);
+};
+
+const handleGantiFilterTransaksi = (field, value) => {
+  const filterBaru = {
+    ...filterTransaksi,
+    [field]: value,
+    page: 1
+  };
+
+  setFilterTransaksi(filterBaru);
+  ambilTransaksi(filterBaru);
+};
+
+const handleGantiHalamanTransaksi = (pageBaru) => {
+  const filterBaru = {
+    ...filterTransaksi,
+    page: pageBaru
+  };
+
+  setFilterTransaksi(filterBaru);
+  ambilTransaksi(filterBaru);
+};
+
+const handleDetailTransaksi = (trx) => {
+  Swal.fire({
+    title: 'Detail Transaksi 🧾',
+    width: 720,
+    background: '#1f2937',
+    color: '#fff',
+    confirmButtonColor: '#06b6d4',
+    html: `
+      <div style="text-align:left; font-size:13px; line-height:1.7;">
+        <div style="background:#111827; padding:14px; border-radius:14px; margin-bottom:12px;">
+          <b>Order ID:</b><br/>
+          <code>${escapeHtml(trx.order_id)}</code>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div style="background:#111827; padding:12px; border-radius:12px;">
+            <b>Game</b><br/>
+            ${escapeHtml(trx.nama_game)}
+          </div>
+
+          <div style="background:#111827; padding:12px; border-radius:12px;">
+            <b>Produk</b><br/>
+            ${escapeHtml(trx.nama_produk || trx.kode_produk)}
+          </div>
+
+          <div style="background:#111827; padding:12px; border-radius:12px;">
+            <b>ID Player</b><br/>
+            ${escapeHtml(trx.id_player)}
+          </div>
+
+          <div style="background:#111827; padding:12px; border-radius:12px;">
+            <b>Zone / Server</b><br/>
+            ${escapeHtml(trx.zone_player || '-')}
+          </div>
+
+          <div style="background:#111827; padding:12px; border-radius:12px;">
+            <b>Harga</b><br/>
+            ${formatRupiah(trx.harga)}
+          </div>
+
+          <div style="background:#111827; padding:12px; border-radius:12px;">
+            <b>Payment</b><br/>
+            ${escapeHtml(trx.payment_type || '-')}
+          </div>
+
+          <div style="background:#111827; padding:12px; border-radius:12px;">
+            <b>Status Bayar</b><br/>
+            ${escapeHtml(trx.status_bayar)}
+          </div>
+
+          <div style="background:#111827; padding:12px; border-radius:12px;">
+            <b>Status Topup</b><br/>
+            ${escapeHtml(trx.status_topup)}
+          </div>
+        </div>
+
+        <div style="background:#111827; padding:12px; border-radius:12px; margin-top:10px;">
+          <b>Catatan Admin</b><br/>
+          <pre style="white-space:pre-wrap; color:#d1d5db;">${escapeHtml(trx.catatan_admin || '-')}</pre>
+        </div>
+
+        <div style="background:#111827; padding:12px; border-radius:12px; margin-top:10px;">
+          <b>Response APIGames</b><br/>
+          <pre style="white-space:pre-wrap; color:#d1d5db; max-height:180px; overflow:auto;">${escapeHtml(potongText(trx.apigames_response || '-'))}</pre>
+        </div>
+      </div>
+    `
+  });
+};
+
+const handleUpdateTransaksi = async (trx, payload, teksKonfirmasi) => {
+  const konfirmasi = await Swal.fire({
+    title: 'Update transaksi?',
+    text: teksKonfirmasi,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Iya, update!',
+    cancelButtonText: 'Batal',
+    background: '#1f2937',
+    color: '#fff',
+    confirmButtonColor: '#06b6d4',
+    cancelButtonColor: '#374151'
+  });
+
+  if (!konfirmasi.isConfirmed) return;
+
+  setLoadingAksiTransaksi(`${trx.order_id}-update`);
+
+  try {
+    const respon = await fetch('/api/admin/transaksi', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        order_id: trx.order_id,
+        ...payload
+      })
+    });
+
+    const hasil = await respon.json();
+
+    if (respon.ok) {
+      Swal.fire({
+        title: 'BERHASIL! ✅',
+        text: hasil.pesan,
+        icon: 'success',
+        background: '#1f2937',
+        color: '#fff'
+      });
+
+      ambilDataSultan();
+      ambilTransaksi();
+    } else {
+      Swal.fire({
+        title: 'GAGAL UPDATE ❌',
+        text: hasil.pesan,
+        icon: 'error',
+        background: '#1f2937',
+        color: '#fff'
+      });
+    }
+  } catch (error) {
+    Swal.fire({
+      title: 'ERROR SERVER!',
+      text: 'Gagal update transaksi bre',
+      icon: 'error',
+      background: '#1f2937',
+      color: '#fff'
+    });
+  } finally {
+    setLoadingAksiTransaksi(null);
+  }
+};
+
+const handleRetryTopup = async (trx) => {
+  const konfirmasi = await Swal.fire({
+    title: 'Retry top-up?',
+    html: `
+      <b>${escapeHtml(trx.order_id)}</b><br/>
+      <small>Ini bakal nembak ulang APIGames. Jangan retry kalau top-up sebenarnya sudah masuk.</small>
+    `,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Retry sekarang!',
+    cancelButtonText: 'Batal',
+    background: '#1f2937',
+    color: '#fff',
+    confirmButtonColor: '#7c3aed',
+    cancelButtonColor: '#374151'
+  });
+
+  if (!konfirmasi.isConfirmed) return;
+
+  setLoadingAksiTransaksi(`${trx.order_id}-retry`);
+
+  try {
+    const respon = await fetch('/api/admin/transaksi/retry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        order_id: trx.order_id
+      })
+    });
+
+    const hasil = await respon.json();
+
+    if (respon.ok) {
+      Swal.fire({
+        title: 'RETRY TERKIRIM! 🚀',
+        text: hasil.pesan,
+        icon: 'success',
+        background: '#1f2937',
+        color: '#fff'
+      });
+
+      ambilDataSultan();
+      ambilTransaksi();
+    } else {
+      Swal.fire({
+        title: 'RETRY GAGAL ❌',
+        text: hasil.pesan,
+        icon: 'error',
+        background: '#1f2937',
+        color: '#fff'
+      });
+
+      ambilTransaksi();
+    }
+  } catch (error) {
+    Swal.fire({
+      title: 'ERROR SERVER!',
+      text: 'Gagal retry top-up bre',
+      icon: 'error',
+      background: '#1f2937',
+      color: '#fff'
+    });
+  } finally {
+    setLoadingAksiTransaksi(null);
+  }
+};
+
+const handleEditCatatan = async (trx) => {
+  const hasilInput = await Swal.fire({
+    title: 'Catatan Admin 📝',
+    input: 'textarea',
+    inputValue: trx.catatan_admin || '',
+    inputPlaceholder: 'Contoh: customer sudah chat WA, topup diretry...',
+    showCancelButton: true,
+    confirmButtonText: 'Simpan',
+    cancelButtonText: 'Batal',
+    background: '#1f2937',
+    color: '#fff',
+    confirmButtonColor: '#06b6d4',
+    cancelButtonColor: '#374151'
+  });
+
+  if (!hasilInput.isConfirmed) return;
+
+  await handleUpdateTransaksi(
+    trx,
+    { catatan_admin: hasilInput.value || '' },
+    'Simpan catatan admin untuk transaksi ini?'
+  );
+};
   useEffect(() => {
     if (session?.user?.email === EMAIL_CEO) {
       ambilDataSultan();
+      ambilTransaksi();
     }
   }, [session]);
 
@@ -257,6 +622,71 @@ export default function DashboardAdmin() {
   };
 
   // --- MODE EDIT GAME ---
+  const handleToggleGame = async (game) => {
+  const statusBaru = game.status_game === 'aktif' ? 'nonaktif' : 'aktif';
+
+  const konfirmasi = await Swal.fire({
+    title: `${statusBaru === 'aktif' ? 'Aktifkan' : 'Nonaktifkan'} game ini?`,
+    text: `${game.nama} akan jadi ${statusBaru}.`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Iya, lanjut!',
+    cancelButtonText: 'Batal',
+    background: '#1f2937',
+    color: '#fff',
+    confirmButtonColor: statusBaru === 'aktif' ? '#16a34a' : '#dc2626',
+    cancelButtonColor: '#374151'
+  });
+
+  if (!konfirmasi.isConfirmed) return;
+
+  try {
+    const respon = await fetch('/api/admin/games', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: game.id,
+        nama: game.nama,
+        publisher: game.publisher,
+        gambar: game.gambar,
+        zone_id: game.zone_id,
+        server_game: game.server_game || '',
+        kode_game: game.kode_game,
+        status_game: statusBaru
+      })
+    });
+
+    const hasil = await respon.json();
+
+    if (respon.ok) {
+      Swal.fire({
+        title: 'BERHASIL! ✅',
+        text: `Game berhasil jadi ${statusBaru}.`,
+        icon: 'success',
+        background: '#1f2937',
+        color: '#fff'
+      });
+
+      ambilDataSultan();
+    } else {
+      Swal.fire({
+        title: 'GAGAL! ❌',
+        text: hasil.pesan,
+        icon: 'error',
+        background: '#1f2937',
+        color: '#fff'
+      });
+    }
+  } catch (error) {
+    Swal.fire({
+      title: 'ERROR SERVER!',
+      text: 'Gagal ubah status game bre',
+      icon: 'error',
+      background: '#1f2937',
+      color: '#fff'
+    });
+  }
+};
   const handleEditGame = (game) => {
     setTabAktif('game');
     setModeEditGame(true);
@@ -420,7 +850,71 @@ export default function DashboardAdmin() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // --- FUNGSI HAPUS PRODUK ---
+  // --- FUNGSI Set status PRODUK ---
+  const handleToggleProduk = async (item) => {
+  const statusBaru = item.status_produk === 'aktif' ? 'nonaktif' : 'aktif';
+
+  const konfirmasi = await Swal.fire({
+    title: `${statusBaru === 'aktif' ? 'Aktifkan' : 'Nonaktifkan'} produk ini?`,
+    text: `${item.nama_produk} akan jadi ${statusBaru}.`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Iya, lanjut!',
+    cancelButtonText: 'Batal',
+    background: '#1f2937',
+    color: '#fff',
+    confirmButtonColor: statusBaru === 'aktif' ? '#16a34a' : '#dc2626',
+    cancelButtonColor: '#374151'
+  });
+
+  if (!konfirmasi.isConfirmed) return;
+
+  try {
+    const respon = await fetch('/api/admin/produk', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: item.id,
+        game_id: item.game_id,
+        kode_produk: item.kode_produk,
+        nama_produk: item.nama_produk,
+        harga: item.harga,
+        status_produk: statusBaru
+      })
+    });
+
+    const hasil = await respon.json();
+
+    if (respon.ok) {
+      Swal.fire({
+        title: 'BERHASIL! ✅',
+        text: `Produk berhasil jadi ${statusBaru}.`,
+        icon: 'success',
+        background: '#1f2937',
+        color: '#fff'
+      });
+
+      ambilDataSultan();
+    } else {
+      Swal.fire({
+        title: 'GAGAL! ❌',
+        text: hasil.pesan,
+        icon: 'error',
+        background: '#1f2937',
+        color: '#fff'
+      });
+    }
+  } catch (error) {
+    Swal.fire({
+      title: 'ERROR SERVER!',
+      text: 'Gagal ubah status produk bre',
+      icon: 'error',
+      background: '#1f2937',
+      color: '#fff'
+    });
+  }
+};
+// FUNGSI HAPUS PRODUK
   const handleHapusProduk = async (item) => {
     const konfirmasi = await Swal.fire({
       title: 'Hapus produk ini?',
@@ -508,7 +1002,7 @@ export default function DashboardAdmin() {
   if (loadingData) {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center font-bold animate-pulse">
-        Menyiapkan Ruang Kerja CEO...
+        Kalem Heula
       </div>
     );
   }
@@ -538,7 +1032,16 @@ export default function DashboardAdmin() {
             >
               📊 Statistik
             </button>
-
+            <button
+              onClick={() => setTabAktif('transaksi')}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                tabAktif === 'transaksi'
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              🧾 Kelola Transaksi
+            </button>
             <button
               onClick={() => setTabAktif('game')}
               className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
@@ -680,7 +1183,277 @@ export default function DashboardAdmin() {
             </div>
           </div>
         )}
+        {/* TAB TRANSAKSI */}
+        {tabAktif === 'transaksi' && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
 
+            {/* FILTER */}
+            <div className="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl">
+              <div className="flex flex-col lg:flex-row justify-between gap-4 mb-6">
+                <div>
+                  <h2 className="text-xl font-black">🧾 Kelola Transaksi</h2>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Cari order nyangkut, retry top-up, dan update status manual.
+                  </p>
+                </div>
+
+                <div className="text-right">
+                  <p className="text-xs text-gray-500 font-bold uppercase">Total Data</p>
+                  <h3 className="text-2xl font-black text-emerald-400">
+                    {paginationTransaksi.total}
+                  </h3>
+                </div>
+              </div>
+
+              <form onSubmit={handleCariTransaksi} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">
+                    Search
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Order ID / ID Player / Kode Produk"
+                    value={filterTransaksi.search}
+                    onChange={(e) => setFilterTransaksi({ ...filterTransaksi, search: e.target.value })}
+                    className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">
+                    Status Bayar
+                  </label>
+                  <select
+                    value={filterTransaksi.status_bayar}
+                    onChange={(e) => handleGantiFilterTransaksi('status_bayar', e.target.value)}
+                    className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-emerald-500 font-bold"
+                  >
+                    <option value="all">Semua</option>
+                    <option value="pending">Pending</option>
+                    <option value="sukses">Sukses</option>
+                    <option value="gagal">Gagal</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">
+                    Status Topup
+                  </label>
+                  <select
+                    value={filterTransaksi.status_topup}
+                    onChange={(e) => handleGantiFilterTransaksi('status_topup', e.target.value)}
+                    className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-emerald-500 font-bold"
+                  >
+                    <option value="all">Semua</option>
+                    <option value="pending">Pending</option>
+                    <option value="proses">Proses</option>
+                    <option value="sukses">Sukses</option>
+                    <option value="gagal">Gagal</option>
+                  </select>
+                </div>
+
+                <button
+                  type="submit"
+                  className="md:col-span-4 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black transition-all"
+                >
+                  🔍 Cari Transaksi
+                </button>
+              </form>
+            </div>
+
+            {/* TABLE */}
+            <div className="bg-gray-900 border border-gray-800 rounded-3xl shadow-xl overflow-hidden">
+              <div className="p-6 border-b border-gray-800 flex justify-between items-center gap-4">
+                <div>
+                  <h2 className="text-xl font-black">Daftar Order</h2>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Page {paginationTransaksi.page} dari {paginationTransaksi.totalPage || 1}
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => ambilTransaksi()}
+                  disabled={loadingTransaksi}
+                  className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-white text-xs font-black disabled:opacity-50"
+                >
+                  {loadingTransaksi ? 'Refresh...' : '🔄 Refresh'}
+                </button>
+              </div>
+
+              {loadingTransaksi ? (
+                <div className="p-10 text-center text-gray-400 font-bold animate-pulse">
+                  Ngambil transaksi dari kulkas...
+                </div>
+              ) : daftarTransaksi.length === 0 ? (
+                <div className="p-10 text-center text-gray-500 font-bold">
+                  Transaksi gak ada bre.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-950 text-gray-400 text-xs uppercase tracking-wider font-bold">
+                        <th className="p-4">Order</th>
+                        <th className="p-4">Customer</th>
+                        <th className="p-4">Produk</th>
+                        <th className="p-4">Harga</th>
+                        <th className="p-4">Status</th>
+                        <th className="p-4">Waktu</th>
+                        <th className="p-4 min-w-[280px]">Aksi</th>
+                      </tr>
+                    </thead>
+
+                    <tbody className="divide-y divide-gray-800 text-sm">
+                      {daftarTransaksi.map((trx) => (
+                        <tr key={trx.id} className="hover:bg-gray-800/40 align-top">
+                          <td className="p-4">
+                            <p className="font-mono font-black text-gray-200">{trx.order_id}</p>
+                            <p className="text-[11px] text-gray-500 mt-1">{trx.payment_type || '-'}</p>
+                          </td>
+
+                          <td className="p-4">
+                            <p className="font-black text-white">{trx.id_player}</p>
+                            <p className="text-xs text-gray-500">{trx.zone_player || '-'}</p>
+                          </td>
+
+                          <td className="p-4">
+                            <p className="font-bold text-white">{trx.nama_produk || trx.kode_produk}</p>
+                            <p className="text-xs text-emerald-400 font-mono">{trx.kode_produk}</p>
+                            <p className="text-[11px] text-gray-500">{trx.nama_game}</p>
+                          </td>
+
+                          <td className="p-4">
+                            <p className="font-black text-green-400">{formatRupiah(trx.harga)}</p>
+                          </td>
+
+                          <td className="p-4">
+                            <div className="flex flex-col gap-2">
+                              <span className={`px-2 py-1 rounded-md text-[10px] font-black border w-fit ${warnaStatusBayar(trx.status_bayar)}`}>
+                                Bayar: {trx.status_bayar}
+                              </span>
+
+                              <span className={`px-2 py-1 rounded-md text-[10px] font-black border w-fit ${warnaStatusTopup(trx.status_topup)}`}>
+                                Topup: {trx.status_topup}
+                              </span>
+                            </div>
+                          </td>
+
+                          <td className="p-4">
+                            <p className="text-xs text-gray-400">
+                              {trx.created_at ? new Date(trx.created_at).toLocaleString('id-ID') : '-'}
+                            </p>
+                            {trx.updated_at && (
+                              <p className="text-[11px] text-gray-600 mt-1">
+                                Update: {new Date(trx.updated_at).toLocaleString('id-ID')}
+                              </p>
+                            )}
+                          </td>
+
+                          <td className="p-4">
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                onClick={() => handleDetailTransaksi(trx)}
+                                className="px-3 py-2 rounded-xl bg-gray-800 text-gray-200 text-xs font-black hover:bg-gray-700 transition-all"
+                              >
+                                👁️ Detail
+                              </button>
+
+                              <button
+                                onClick={() => handleEditCatatan(trx)}
+                                className="px-3 py-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-black hover:bg-indigo-600 hover:text-white transition-all"
+                              >
+                                📝 Catatan
+                              </button>
+
+                              <button
+                                onClick={() => handleRetryTopup(trx)}
+                                disabled={
+                                  trx.status_bayar !== 'sukses' ||
+                                  trx.status_topup === 'sukses' ||
+                                  loadingAksiTransaksi === `${trx.order_id}-retry`
+                                }
+                                className="px-3 py-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 text-xs font-black hover:bg-purple-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                {loadingAksiTransaksi === `${trx.order_id}-retry` ? 'Retry...' : '🚀 Retry'}
+                              </button>
+
+                              <button
+                                onClick={() =>
+                                  handleUpdateTransaksi(
+                                    trx,
+                                    { status_bayar: 'sukses' },
+                                    'Tandai pembayaran transaksi ini jadi sukses?'
+                                  )
+                                }
+                                disabled={trx.status_bayar === 'sukses'}
+                                className="px-3 py-2 rounded-xl bg-green-500/10 text-green-400 border border-green-500/20 text-xs font-black hover:bg-green-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                💰 Bayar OK
+                              </button>
+
+                              <button
+                                onClick={() =>
+                                  handleUpdateTransaksi(
+                                    trx,
+                                    { status_topup: 'sukses' },
+                                    'Tandai top-up transaksi ini jadi sukses manual?'
+                                  )
+                                }
+                                disabled={trx.status_topup === 'sukses'}
+                                className="px-3 py-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs font-black hover:bg-blue-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                ✅ Topup OK
+                              </button>
+
+                              <button
+                                onClick={() =>
+                                  handleUpdateTransaksi(
+                                    trx,
+                                    { status_topup: 'gagal' },
+                                    'Tandai top-up transaksi ini gagal?'
+                                  )
+                                }
+                                disabled={trx.status_topup === 'gagal'}
+                                className="px-3 py-2 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-black hover:bg-red-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                ❌ Gagal
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* PAGINATION */}
+              <div className="p-4 border-t border-gray-800 flex flex-col sm:flex-row justify-between items-center gap-3">
+                <p className="text-xs text-gray-500 font-bold">
+                  Total {paginationTransaksi.total} transaksi
+                </p>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleGantiHalamanTransaksi(Math.max(1, paginationTransaksi.page - 1))}
+                    disabled={paginationTransaksi.page <= 1}
+                    className="px-4 py-2 rounded-xl bg-gray-800 text-white text-xs font-black hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    ← Prev
+                  </button>
+
+                  <button
+                    onClick={() => handleGantiHalamanTransaksi(paginationTransaksi.page + 1)}
+                    disabled={paginationTransaksi.page >= paginationTransaksi.totalPage}
+                    className="px-4 py-2 rounded-xl bg-gray-800 text-white text-xs font-black hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         {/* TAB GAME */}
         {tabAktif === 'game' && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -859,6 +1632,13 @@ export default function DashboardAdmin() {
                           }`}>
                             {Number(game.zone_id) === 1 ? 'BUTUH ZONE' : 'NO ZONE'}
                           </span>
+                          <span className={`text-[10px] font-black px-2 py-1 rounded-md ${
+                            game.status_game === 'aktif'
+                              ? 'text-green-400 bg-green-500/10'
+                              : 'text-red-400 bg-red-500/10'
+                          }`}>
+                            {game.status_game === 'aktif' ? 'AKTIF' : 'NONAKTIF'}
+                          </span>
                         </div>
 
                         <h4 className="font-black text-white truncate">{game.nama}</h4>
@@ -870,14 +1650,23 @@ export default function DashboardAdmin() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 mt-4">
+                    <div className="grid grid-cols-3 gap-3 mt-4">
                       <button
                         onClick={() => handleEditGame(game)}
                         className="px-3 py-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs font-black hover:bg-amber-600 hover:text-white hover:border-amber-500 transition-all"
                       >
                         ✏️ Edit
                       </button>
-
+                      <button
+                        onClick={() => handleToggleGame(game)}
+                        className={`px-3 py-2 rounded-xl border text-xs font-black transition-all ${
+                          game.status_game === 'aktif'
+                            ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-600 hover:text-white'
+                            : 'bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-600 hover:text-white'
+                        }`}
+                      >
+                        {game.status_game === 'aktif' ? '⛔ Nonaktifkan' : '✅ Aktifkan'}
+                      </button>
                       <button
                         onClick={() => handleHapusGame(game)}
                         disabled={loadingHapusGame === game.id}
@@ -996,21 +1785,54 @@ export default function DashboardAdmin() {
             </div>
 
             <div className="lg:col-span-2 bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl">
-              <h2 className="text-xl font-black mb-6 border-b border-gray-800 pb-4">
-                📦 Etalase Produk Aktif
-              </h2>
+              <div className="mb-6 border-b border-gray-800 pb-4 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-black">📦 Etalase Produk Aktif</h2>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Menampilkan <span className="text-cyan-400 font-bold">{produkTerfilter.length}</span> produk dari{' '}
+                      <span className="text-white font-bold">{namaFilterProduk}</span>
+                    </p>
+                  </div>
+
+                  <div className="w-full md:w-64">
+                    <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">
+                      Filter Game
+                    </label>
+                    <select
+                      value={filterProdukGame}
+                      onChange={(e) => setFilterProdukGame(e.target.value)}
+                      className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-cyan-500 font-bold"
+                    >
+                      <option value="all">Semua Game</option>
+                      {daftarGame.map((game) => (
+                        <option key={game.id} value={game.id}>
+                          {game.nama}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {daftarProduk.map((item) => (
+                {produkTerfilter.map((item) => (
                   <div
                     key={item.id}
                     className="bg-gray-950 border border-gray-800 p-4 rounded-2xl hover:border-cyan-500/50 transition-all group"
                   >
                     <div className="flex justify-between items-start gap-4">
-                      <div className="min-w-0">
-                        <span className="text-[10px] font-black text-cyan-500 bg-cyan-500/10 px-2 py-1 rounded-md mb-2 inline-block">
-                          {cariNamaGame(item.game_id)}
-                        </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-warp gap-2 mb-2">
+                          <span className="text-[10px] font-black text-cyan-500 bg-cyan-500/10 px-2 py-1 rounded-md mb-2 inline-block">
+                            {cariNamaGame(item.game_id)}
+                          </span>
+                          <span className={`text-[10px] font-black px-2 py-1 rounded-md inline-block mb-2 ml-2 ${
+                            item.status_produk === 'aktif'
+                              ? 'text-green-400 bg-green-500/10'
+                              : 'text-red-400 bg-red-500/10'
+                          }`}>
+                            {item.status_produk === 'aktif' ? 'AKTIF' : 'NONAKTIF'}
+                          </span>
+                        </div>
                         <h4 className="font-bold text-white truncate">{item.nama_produk}</h4>
                         <p className="text-xs text-gray-500 font-mono mt-1 truncate">{item.kode_produk}</p>
                       </div>
@@ -1027,7 +1849,16 @@ export default function DashboardAdmin() {
                       >
                         ✏️ Edit
                       </button>
-
+                        <button
+                          onClick={() => handleToggleProduk(item)}
+                          className={`px-3 py-2 rounded-xl border text-xs font-black transition-all ${
+                            item.status_produk === 'aktif'
+                              ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-600 hover:text-white'
+                              : 'bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-600 hover:text-white'
+                          }`}
+                        >
+                          {item.status_produk === 'aktif' ? '⛔ Nonaktifkan' : '✅ Aktifkan'}
+                        </button>
                       <button
                         onClick={() => handleHapusProduk(item)}
                         disabled={loadingHapus === item.id}
@@ -1039,9 +1870,11 @@ export default function DashboardAdmin() {
                   </div>
                 ))}
 
-                {daftarProduk.length === 0 && (
+                {produkTerfilter.length === 0 && (
                   <div className="col-span-2 text-center py-10 text-gray-500 font-bold">
-                    Kulkas lu masih kosong bre. Tambahin produk di sebelah kiri!
+                    {filterProdukGame === 'all'
+                      ? 'Kulkas lu masih kosong bre. Tambahin produk di sebelah kiri!'
+                      : `Belum ada produk buat ${namaFilterProduk} bre.`}
                   </div>
                 )}
               </div>

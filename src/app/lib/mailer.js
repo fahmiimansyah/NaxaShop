@@ -38,3 +38,38 @@ export async function kirimEmailVerifikasi({ to, nama, link }) {
     `,
   });
 }
+export async function kirimEmailAdmin({ subject, title, message, orderId, detail }) {
+  const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_SERVER_USER;
+
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM || process.env.EMAIL_SERVER_USER,
+    to: adminEmail,
+    subject,
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+        <h2>${title}</h2>
+
+        <p>${message}</p>
+
+        ${
+          orderId
+            ? `<p><b>Order ID:</b><br/><code>${orderId}</code></p>`
+            : ''
+        }
+
+        ${
+          detail
+            ? `
+              <p><b>Detail:</b></p>
+              <pre style="background:#111827;color:#e5e7eb;padding:12px;border-radius:10px;white-space:pre-wrap;">${detail}</pre>
+            `
+            : ''
+        }
+
+        <p style="font-size:12px;color:#666;">
+          Email otomatis dari NaXaShop Admin System.
+        </p>
+      </div>
+    `,
+  });
+}

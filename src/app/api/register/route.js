@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import db from '../../lib/db';
 import { kirimEmailVerifikasi } from '../../lib/mailer';
-
+import { rateLimit } from '../../lib/rate-limit';
 function bersihinText(value) {
   return String(value || '').trim();
 }
@@ -20,6 +20,21 @@ function hashToken(token) {
 }
 
 export async function POST(request) {
+  const limit = rateLimit(request, {
+  key: 'register',
+  limit: 3,
+  windowMs: 60_000
+});
+
+if (!limit.allowed) {
+  return NextResponse.json(
+    {
+      sukses: false,
+      pesan: `Terlalu sering daftar bre. Coba lagi ${limit.retryAfter} detik lagi.`
+    },
+    { status: 429 }
+  );
+}
   try {
     const body = await request.json();
 

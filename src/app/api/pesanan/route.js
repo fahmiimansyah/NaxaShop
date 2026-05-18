@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import db from '../../lib/db';
-
+import { rateLimit } from '../../lib/rate-limit';
 function formatOrderId(id) {
   return String(id || '').trim().toUpperCase();
 }
@@ -16,6 +16,21 @@ function orderIdValid(orderId) {
 
 export async function GET(request) {
   try {
+    const limit = rateLimit(request, {
+  key: 'lacak-order',
+  limit: 20,
+  windowMs: 60_000
+});
+
+if (!limit.allowed) {
+  return NextResponse.json(
+    {
+      sukses: false,
+      pesan: `Terlalu sering cek order bre. Coba lagi ${limit.retryAfter} detik lagi.`
+    },
+    { status: 429 }
+  );
+}
     const { searchParams } = new URL(request.url);
     const orderId = formatOrderId(searchParams.get('id'));
 
@@ -49,6 +64,8 @@ export async function GET(request) {
         t.payment_type,
         t.status_bayar,
         t.status_topup,
+        t.created_at,
+        t.updated_at,
         COALESCE(p.nama_produk, t.kode_produk) AS nama_produk
        FROM transaksi t
        LEFT JOIN produk p ON t.produk_id = p.id
@@ -80,7 +97,9 @@ export async function GET(request) {
         harga: trx.harga_transaksi,
         payment_type: trx.payment_type,
         status_bayar: trx.status_bayar,
-        status_topup: trx.status_topup
+        status_topup: trx.status_topup,
+        created_at: trx.created_at,
+        updated_at: trx.updated_at
       }
     });
   } catch (error) {
