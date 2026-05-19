@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 export default function CekOrderPage() {
+  const searchParams = useSearchParams();
   const [orderId, setOrderId] = useState('');
   const [dataOrder, setDataOrder] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -108,42 +110,65 @@ export default function CekOrderPage() {
     await navigator.clipboard.writeText(dataOrder.order_id);
   };
 
-  const handleCekOrder = async (e) => {
-    e.preventDefault();
+ const cekOrder = async (idOrder) => {
+  const idBersih = String(idOrder || '').trim();
 
-    const idBersih = orderId.trim();
+  if (!idBersih) {
+    setPesanError('Masukin Order ID dulu bre.');
+    setDataOrder(null);
+    return;
+  }
 
-    if (!idBersih) {
-      setPesanError('Masukin Order ID dulu bre.');
-      setDataOrder(null);
+  setLoading(true);
+  setPesanError('');
+  setDataOrder(null);
+
+  try {
+    const respon = await fetch(`${API_STATUS}?id=${encodeURIComponent(idBersih)}`, {
+      cache: 'no-store'
+    });
+
+    const hasil = await respon.json();
+
+    if (!respon.ok || !hasil.sukses) {
+      setPesanError(hasil.pesan || 'Order gak ketemu bre.');
       return;
     }
 
-    setLoading(true);
-    setPesanError('');
-    setDataOrder(null);
+    setDataOrder(hasil.data);
+  } catch (error) {
+    setPesanError('Server lagi ngadat bre, coba lagi bentar.');
+  } finally {
+    setLoading(false);
+  }
+};
 
-    try {
-      const respon = await fetch(`${API_STATUS}?id=${encodeURIComponent(idBersih)}`, {
-        cache: 'no-store'
-      });
+const handleCekOrder = async (e) => {
+  e.preventDefault();
+  cekOrder(orderId);
+};
+  useEffect(() => {
+  const idDariUrl =
+    searchParams.get('order_id') ||
+    searchParams.get('id');
 
-      const hasil = await respon.json();
+  if (!idDariUrl) return;
 
-      if (!respon.ok || !hasil.sukses) {
-        setPesanError(hasil.pesan || 'Order gak ketemu bre.');
-        return;
-      }
-
-      setDataOrder(hasil.data);
-    } catch (error) {
-      setPesanError('Server lagi ngadat bre, coba lagi bentar.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  setOrderId(idDariUrl);
+  cekOrder(idDariUrl);
+}, [searchParams]);
   const status = statusUtama(dataOrder);
+  const nomorAdmin = process.env.NEXT_PUBLIC_ADMIN_WHATSAPP;
+
+const linkChatAdmin = () => {
+  if (!nomorAdmin || !dataOrder) return '#';
+
+  const pesan = encodeURIComponent(
+    `Halo admin NaXaShop, saya butuh bantuan.\n\nOrder ID: ${dataOrder.order_id}\nProduk: ${dataOrder.nama_produk || dataOrder.kode_produk}\nID Player: ${dataOrder.id_player}\nZone/Server: ${dataOrder.zone_player || '-'}\nStatus Bayar: ${dataOrder.status_bayar}\nStatus Top-up: ${dataOrder.status_topup}`
+  );
+
+  return `https://wa.me/${nomorAdmin}?text=${pesan}`;
+};
 
   return (
     <main className="min-h-screen bg-slate-950 text-white px-4 py-6 flex items-center justify-center">
@@ -288,7 +313,16 @@ export default function CekOrderPage() {
                     </div>
                   )}
                 </div>
-
+                  {nomorAdmin && dataOrder.status_topup !== 'sukses' && (
+                  <a
+                    href={linkChatAdmin()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full text-center py-3 rounded-2xl bg-green-500 hover:bg-green-400 text-white text-sm font-black transition-all"
+                  >
+                    💬 Chat Admin
+                  </a>
+                )}
                 {/* FOOTER STRUK */}
                 <div className="bg-gray-900/80 px-4 py-3 border-t border-gray-800 flex items-center justify-between gap-3">
                   <p className="text-[10px] text-gray-500 font-bold">

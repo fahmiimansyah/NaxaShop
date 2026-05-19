@@ -2,10 +2,31 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import db from '../../lib/db';
 import { rateLimit } from '../../lib/rate-limit';
-
 const METODE_BAYAR_VALID = ['qris', 'bca_va'];
+  function bersihinText(value) {
+  return String(value || '').trim();
+}
+
+function bersihinWhatsapp(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\s/g, '')
+    .replace(/-/g, '')
+    .replace(/\+/g, '');
+}
+
+function whatsappValid(value) {
+  if (!value) return true; // opsional
+  return /^62[0-9]{8,15}$/.test(value);
+}
+
+function emailValid(value) {
+  if (!value) return true; // opsional
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
 
 function bikinOrderId() {
+
   const random = crypto.randomBytes(4).toString('hex').toUpperCase();
   return `NX-${Date.now()}-${random}`;
 }
@@ -28,6 +49,28 @@ if (!limit.allowed) {
   );
 }
     const pesanan = await request.json();
+    const customerWhatsapp = bersihinWhatsapp(pesanan.customer_whatsapp);
+const customerEmail = bersihinText(pesanan.customer_email).toLowerCase();
+
+if (customerWhatsapp && !whatsappValid(customerWhatsapp)) {
+  return NextResponse.json(
+    {
+      sukses: false,
+      pesan: 'Nomor WhatsApp gak valid bre! Pakai format 628xxxx.'
+    },
+    { status: 400 }
+  );
+}
+
+if (customerEmail && !emailValid(customerEmail)) {
+  return NextResponse.json(
+    {
+      sukses: false,
+      pesan: 'Format email pembeli gak valid bre!'
+    },
+    { status: 400 }
+  );
+}
 
     // 1. VALIDASI INPUT DASAR
     if (!pesanan.kode_produk || !pesanan.id_player || !pesanan.metode_bayar) {
@@ -115,9 +158,11 @@ if (!limit.allowed) {
         gross_amount: hargaAsli
       },
       customer_details: {
-        first_name: 'Player',
-        last_name: String(pesanan.id_player)
-      }
+  first_name: 'Player',
+  last_name: String(pesanan.id_player),
+  email: customerEmail || undefined,
+  phone: customerWhatsapp || undefined
+}
     };
 
     if (pesanan.metode_bayar === 'qris') {
@@ -157,24 +202,41 @@ if (!limit.allowed) {
     }
 
     // 6. KALAU MIDTRANS SUKSES, BARU CATAT TRANSAKSI
-    await db.query(
-      `INSERT INTO transaksi
-      (order_id, game_id, produk_id, kode_produk, id_player, zone_player, harga, payment_type, status_bayar, status_topup)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        orderId,
-        produk.game_id,
-        produk.id,
-        produk.kode_produk,
-        pesanan.id_player,
-        pesanan.zone_player || '',
-        hargaAsli,
-        pesanan.metode_bayar,
-        'pending',
-        'pending'
-      ]
-    );
-
+await db.query(
+  `INSERT INTO transaksi
+  (
+    order_id,
+    game_id,
+    produk_id,
+    kode_produk,
+    id_player,
+    zone_player,
+    harga,
+    payment_type,
+    status_bayar,
+    status_topup,
+    customer_whatsapp,
+    customer_email
+  )
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ,
+  
+  [
+    orderId,
+    produk.game_id,
+    produk.id,
+    produk.kode_produk,
+    bersihinText(pesanan.id_player),
+    bersihinText(pesanan.zone_player),
+    hargaAsli,
+    pesanan.metode_bayar,
+    'pending',
+    'pending',
+    customerWhatsapp || null,
+    customerEmail || null
+    
+  ]
+)  
     // 7. BALIKIN DATA KE FRONTEND
     if (pesanan.metode_bayar === 'qris') {
       const qrisAction = data.actions?.find((action) =>

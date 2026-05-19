@@ -14,6 +14,7 @@ export default function NavbarUI({ session }) { // <--- TERIMA DATA DARI SERVER
     { name: "Games", href: "/games" },
     { name: "Cek Pesanan", href: "/lacak" },
     { name: "Contact", href: "/contact" },
+    { name: "Bantuan", href: '/bantuan'}
   ]
 
   return (
@@ -186,7 +187,7 @@ export default function NavbarUI({ session }) { // <--- TERIMA DATA DARI SERVER
                 ))}
               </div>
 
-              <div className="absolute bottom-6 left-6 right-6">
+              {/* <div className="absolute bottom-6 left-6 right-6">
                 <div className="bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-500/20 rounded-2xl p-4 backdrop-blur-xl">
                   <p className="text-white font-semibold">
                     Next Evolution Edition 🔥
@@ -195,7 +196,7 @@ export default function NavbarUI({ session }) { // <--- TERIMA DATA DARI SERVER
                     Top Up Game Modern UI
                   </p>
                 </div>
-              </div>
+              </div> */}
             </motion.div>
           </>
         )}

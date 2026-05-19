@@ -12,13 +12,142 @@ export default function FormKasir({ dataGame }) {
   const [inputZoneId, setInputZoneId] = useState(''); 
   const [metodeBayar, setMetodeBayar] = useState(''); // <-- KOSONG, GAK ADA YANG BIRU DULUAN
   const [isProsesBeli, setIsProsesBeli] = useState(false);
-
+  const [setujuAturan, setSetujuAturan] = useState(false);
+  const [customerWhatsapp, setCustomerWhatsapp] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
   // LOGIC SULTAN BACA DATABASE LANGSUNG
   // Kalo zone_id di database = 1, berarti butuh (Misal: MLBB)
   const butuhZoneId = dataGame.zone_id === 1; 
   // Kalo server_game di database ada isinya (kayak 'hsr' atau 'gi'), berarti butuh dropdown server
   const butuhServer = dataGame.server_game && dataGame.server_game.trim() !== '';
+  const formatRupiah = (angka) => {
+  return `Rp ${Number(angka || 0).toLocaleString('id-ID')}`;
+};
 
+const namaMetodeBayar = {
+  qris: 'QRIS',
+  bca_va: 'BCA Virtual Account'
+};
+
+const checkoutDisabled =
+  !produkDipilih ||
+  !inputUserId ||
+  (butuhZoneId && !inputZoneId) ||
+  (butuhServer && !inputZoneId) ||
+  !metodeBayar ||
+  !setujuAturan ||
+  isProsesBeli;
+
+  const kodeGame = String(dataGame.kode_game || dataGame.server_game || '').toLowerCase();
+
+const gameSupportAutoCheck = ['mobilelegend', 'mobile_legends', 'mobile-legends', 'ml', 'freefire', 'free-fire', 'ff']
+  .includes(kodeGame);
+
+const getPanduanGame = () => {
+  if (kodeGame.includes('mobile') || kodeGame === 'ml' || kodeGame.includes('legend')) {
+    return {
+      title: 'Cara isi ID Mobile Legends',
+      badge: 'Auto Check Nickname',
+      type: 'auto',
+      items: [
+        'Buka Mobile Legends.',
+        'Klik profil di pojok kiri atas.',
+        'Salin User ID dan Zone ID.',
+        'Contoh format: User ID 123456789, Zone ID 1234.'
+      ],
+      contoh: '123456789 (1234)'
+    };
+  }
+
+  if (kodeGame.includes('free') || kodeGame === 'ff') {
+    return {
+      title: 'Cara isi ID Free Fire',
+      badge: 'Auto Check Nickname',
+      type: 'auto',
+      items: [
+        'Buka Free Fire.',
+        'Klik profil akun.',
+        'Salin Player ID / UID.',
+        'Free Fire biasanya tidak butuh Zone ID.'
+      ],
+      contoh: '123456789'
+    };
+  }
+
+  if (kodeGame.includes('genshin') || kodeGame.includes('gi')) {
+    return {
+      title: 'Cara isi UID Genshin Impact',
+      badge: 'Verifikasi Manual',
+      type: 'manual',
+      items: [
+        'Buka Genshin Impact.',
+        'UID ada di pojok kanan bawah layar.',
+        'Pilih server sesuai akun: Asia, America, Europe, atau TW/HK/MO.',
+        'Pastikan UID dan server benar sebelum bayar.'
+      ],
+      contoh: 'UID 800xxxxxxx - Server Asia'
+    };
+  }
+
+  if (kodeGame.includes('hsr') || kodeGame.includes('honkai') || kodeGame.includes('star')) {
+    return {
+      title: 'Cara isi UID Honkai: Star Rail',
+      badge: 'Verifikasi Manual',
+      type: 'manual',
+      items: [
+        'Buka Honkai: Star Rail.',
+        'UID ada di bagian profil / pojok layar.',
+        'Pilih server sesuai akun.',
+        'Pastikan UID dan server benar sebelum checkout.'
+      ],
+      contoh: 'UID 800xxxxxxx - Server Asia'
+    };
+  }
+
+  if (kodeGame.includes('wuwa') || kodeGame.includes('wuthering')) {
+    return {
+      title: 'Cara isi UID Wuthering Waves',
+      badge: 'Verifikasi Manual',
+      type: 'manual',
+      items: [
+        'Buka Wuthering Waves.',
+        'Masuk ke profil akun.',
+        'Salin UID dengan teliti.',
+        'Jika ada pilihan server, pastikan server sesuai akun.'
+      ],
+      contoh: 'UID akun game'
+    };
+  }
+
+  if (kodeGame.includes('zzz') || kodeGame.includes('zenless')) {
+    return {
+      title: 'Cara isi UID Zenless Zone Zero',
+      badge: 'Verifikasi Manual',
+      type: 'manual',
+      items: [
+        'Buka Zenless Zone Zero.',
+        'Cek UID di profil akun.',
+        'Pilih server sesuai akun.',
+        'Pastikan data benar sebelum pembayaran.'
+      ],
+      contoh: 'UID akun game'
+    };
+  }
+
+  return {
+    title: 'Panduan isi data akun',
+    badge: gameSupportAutoCheck ? 'Auto Check Nickname' : 'Verifikasi Manual',
+    type: gameSupportAutoCheck ? 'auto' : 'manual',
+    items: [
+      'Masukkan User ID sesuai yang muncul di dalam game.',
+      'Jika game membutuhkan server atau zone, pastikan pilih dengan benar.',
+      'Kesalahan input bisa menyebabkan top-up gagal atau masuk ke akun lain.'
+    ],
+    contoh: 'User ID / UID akun game'
+  };
+};
+
+const panduanGame = getPanduanGame();
   const handleBeli = async () => {
   // 1. SATPAM DEPAN
   if (!produkDipilih) {
@@ -203,7 +332,9 @@ export default function FormKasir({ dataGame }) {
         kode_produk: produkDipilih.kode_produk,
         id_player: inputUserId,
         zone_player: inputZoneId,
-        metode_bayar: metodeBayar
+        metode_bayar: metodeBayar,
+          customer_whatsapp: customerWhatsapp,
+  customer_email: customerEmail
       })
     });
 
@@ -236,7 +367,8 @@ export default function FormKasir({ dataGame }) {
 };
 
   return (
-    <div className="mt-8 space-y-6">
+      <div className="mt-8 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6 items-start">
+    <div className="space-y-6">
       
       
 
@@ -247,7 +379,7 @@ export default function FormKasir({ dataGame }) {
           <h2 className="text-xl font-bold text-white">Pilih Nominal</h2>
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-4">
           {dataGame.produk.map((item) => (
             <div 
               key={item.id} 
@@ -274,7 +406,45 @@ export default function FormKasir({ dataGame }) {
           <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-black text-sm">2</div>
           <h2 className="text-xl font-bold text-white">Masukkan User ID</h2>
         </div>
-        
+        <div className={`mb-4 rounded-2xl p-4 border ${
+  panduanGame.type === 'auto'
+    ? 'bg-green-500/10 border-green-500/20'
+    : 'bg-yellow-500/10 border-yellow-500/20'
+}`}>
+  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+    <h3 className="text-sm font-black text-white">
+      {panduanGame.title}
+    </h3>
+
+    <span className={`w-fit px-3 py-1 rounded-full text-[10px] font-black border ${
+      panduanGame.type === 'auto'
+        ? 'text-green-400 bg-green-500/10 border-green-500/20'
+        : 'text-yellow-300 bg-yellow-500/10 border-yellow-500/20'
+    }`}>
+      {panduanGame.badge}
+    </span>
+  </div>
+
+  <ul className="space-y-1 text-xs text-gray-300 leading-relaxed">
+    {panduanGame.items.map((item) => (
+      <li key={item} className="flex gap-2">
+        <span className={panduanGame.type === 'auto' ? 'text-green-400' : 'text-yellow-300'}>
+          •
+        </span>
+        <span>{item}</span>
+      </li>
+    ))}
+  </ul>
+
+  <div className="mt-3 bg-gray-950/60 border border-gray-700 rounded-xl px-3 py-2">
+    <p className="text-[10px] text-gray-500 font-black uppercase tracking-wider">
+      Contoh
+    </p>
+    <p className="text-xs text-gray-200 font-mono mt-1">
+      {panduanGame.contoh}
+    </p>
+  </div>
+</div>
         <div className="flex gap-4">
           <input 
             type="text" 
@@ -346,20 +516,169 @@ export default function FormKasir({ dataGame }) {
           </div>
         </div>
       </div>
+      <div className="bg-gray-800 p-6 rounded-3xl border border-gray-700 shadow-lg">
+  <div className="flex items-center gap-3 mb-4">
+    <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-black text-sm">4</div>
+    <h2 className="text-xl font-bold text-white">Kontak Pembeli</h2>
+  </div>
 
-      {/* 4. TOMBOL BELI */}
-      <button 
-        disabled={!produkDipilih || !metodeBayar || isProsesBeli}
-        className={`w-full py-4 rounded-2xl font-bold text-lg transition-all duration-300 ${
-          !produkDipilih || !metodeBayar || isProsesBeli
-            ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-            : 'bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:-translate-y-1' 
-        }`}
-        onClick={handleBeli}
-      >
-        {isProsesBeli ? 'Kalem Bre...' : 'Beli Sekarang 🔥'}
-      </button>
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <input
+      type="text"
+      placeholder="WhatsApp aktif, contoh: 62812xxxx"
+      value={customerWhatsapp}
+      onChange={(e) => setCustomerWhatsapp(e.target.value)}
+      className="w-full bg-gray-900 text-white px-5 py-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 border border-gray-700 transition-all"
+    />
 
-    </div>
-  );
+    <input
+      type="email"
+      placeholder="Email opsional"
+      value={customerEmail}
+      onChange={(e) => setCustomerEmail(e.target.value)}
+      className="w-full bg-gray-900 text-white px-5 py-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 border border-gray-700 transition-all"
+    />
+  </div>
+
+  <p className="text-xs text-gray-400 mt-3">
+    Kontak dipakai kalau order butuh pengecekan admin. Bukan buat spam.
+  </p>
+</div>
+      {/* Checkbok user */}
+      <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl p-4">
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={setujuAturan}
+            onChange={(e) => setSetujuAturan(e.target.checked)}
+            className="mt-1 w-4 h-4 accent-cyan-500"
+          />
+          <span className="text-xs text-yellow-100/90 leading-relaxed">
+            Saya sudah memastikan User ID, Zone ID, dan Server benar. Saya paham kesalahan input bisa menyebabkan top-up gagal
+            atau masuk ke akun lain.
+          </span>
+        </label>
+      </div>
+          </div>
+
+    {/* RINGKASAN PESANAN STICKY */}
+    <aside className="xl:sticky xl:top-24 bg-gray-800 border border-gray-700 rounded-3xl shadow-2xl overflow-hidden">
+      <div className="p-5 border-b border-gray-700 bg-gradient-to-r from-blue-600/20 to-cyan-500/10">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs text-gray-400 font-black uppercase tracking-wider">
+              Checkout
+            </p>
+            <h2 className="text-xl font-black text-white">
+              Ringkasan Pesanan
+            </h2>
+          </div>
+
+          <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-2xl">
+            🧾
+          </div>
+        </div>
+      </div>
+
+      <div className="p-5 space-y-4">
+        <div className="bg-gray-900 border border-gray-700 rounded-2xl p-4">
+          <p className="text-[10px] text-gray-500 font-black uppercase tracking-wider mb-1">
+            Game
+          </p>
+          <p className="text-white font-black">
+            {dataGame.nama}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            {dataGame.publisher || 'NaXaShop'}
+          </p>
+        </div>
+
+        <div className="space-y-3 text-sm">
+          <div className="flex justify-between gap-4 border-b border-dashed border-gray-700 pb-3">
+            <span className="text-gray-400">Produk</span>
+            <span className="text-white font-bold text-right">
+              {produkDipilih?.nama_produk || 'Belum pilih'}
+            </span>
+          </div>
+
+          <div className="flex justify-between gap-4 border-b border-dashed border-gray-700 pb-3">
+            <span className="text-gray-400">User ID</span>
+            <span className="text-white font-bold text-right break-all">
+              {inputUserId || '-'}
+            </span>
+          </div>
+
+          <div className="flex justify-between gap-4 border-b border-dashed border-gray-700 pb-3">
+            <span className="text-gray-400">
+              {butuhServer ? 'Server' : 'Zone'}
+            </span>
+            <span className="text-white font-bold text-right">
+              {inputZoneId || '-'}
+            </span>
+          </div>
+
+          <div className="flex justify-between gap-4 border-b border-dashed border-gray-700 pb-3">
+            <span className="text-gray-400">Pembayaran</span>
+            <span className="text-white font-bold text-right">
+              {namaMetodeBayar[metodeBayar] || '-'}
+            </span>
+          </div>
+        </div>
+
+        <div className="bg-gray-950 border border-gray-700 rounded-2xl p-4">
+          <div className="flex justify-between items-end gap-4">
+            <div>
+              <p className="text-xs text-gray-500 font-black uppercase tracking-wider">
+                Total
+              </p>
+              <p className="text-[11px] text-gray-500 mt-1">
+                Belum termasuk perubahan dari payment gateway jika ada.
+              </p>
+            </div>
+
+            <p className="text-2xl font-black text-green-400 text-right">
+              {produkDipilih ? formatRupiah(produkDipilih.harga) : 'Rp 0'}
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl p-4">
+          <p className="text-xs text-yellow-100/90 leading-relaxed">
+            Pastikan User ID, Zone ID, atau Server sudah benar sebelum lanjut bayar.
+            Kesalahan input bisa menyebabkan top-up gagal atau masuk ke akun lain.
+          </p>
+        </div>
+
+        <button
+          disabled={checkoutDisabled}
+          className={`w-full py-4 rounded-2xl font-black text-lg transition-all duration-300 ${
+            checkoutDisabled
+              ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+              : 'bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:-translate-y-1'
+          }`}
+          onClick={handleBeli}
+        >
+          {isProsesBeli ? 'Kalem Bre...' : 'Beli Sekarang 🔥'}
+        </button>
+
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-3">
+            <p className="text-lg">🔒</p>
+            <p className="text-[10px] text-gray-400 font-bold mt-1">Aman</p>
+          </div>
+
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-3">
+            <p className="text-lg">⚡</p>
+            <p className="text-[10px] text-gray-400 font-bold mt-1">Cepat</p>
+          </div>
+
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-3">
+            <p className="text-lg">🧾</p>
+            <p className="text-[10px] text-gray-400 font-bold mt-1">Resi</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+);
 }

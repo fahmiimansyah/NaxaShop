@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/route';
 import db from '../../../lib/db';
+import { kirimEmailTopupSukses } from '../../../lib/mailer';
 
 const EMAIL_CEO = 'fahmiimansyah28@gmail.com';
 
@@ -98,6 +99,8 @@ export async function GET(request) {
         t.payment_type,
         t.status_bayar,
         t.status_topup,
+        t.customer_whatsapp,
+        t.customer_email,
         t.apigames_response,
         t.catatan_admin,
         t.created_at,
@@ -159,9 +162,20 @@ export async function PATCH(request) {
     }
 
     const [cekTrx] = await db.query(
-      `SELECT id, order_id FROM transaksi WHERE order_id = ? LIMIT 1`,
-      [orderId]
-    );
+  `SELECT 
+     t.id,
+     t.order_id,
+     t.customer_email,
+     t.harga,
+     t.payment_type,
+     t.kode_produk,
+     COALESCE(p.nama_produk, t.kode_produk) AS nama_produk
+   FROM transaksi t
+   LEFT JOIN produk p ON t.produk_id = p.id
+   WHERE t.order_id = ?
+   LIMIT 1`,
+  [orderId]
+);
 
     if (cekTrx.length === 0) {
       return NextResponse.json(
@@ -217,6 +231,21 @@ export async function PATCH(request) {
        WHERE order_id = ?`,
       values
     );
+    const trx = cekTrx[0];
+
+if (statusTopup === 'sukses' && trx.customer_email) {
+  try {
+    await kirimEmailTopupSukses({
+      to: trx.customer_email,
+      orderId: trx.order_id,
+      namaProduk: trx.nama_produk || trx.kode_produk,
+      harga: trx.harga,
+      paymentType: trx.payment_type
+    });
+  } catch (error) {
+    console.error('Gagal kirim email top-up sukses:', error);
+  }
+}
 
     return NextResponse.json({
       sukses: true,

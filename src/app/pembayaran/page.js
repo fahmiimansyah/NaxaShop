@@ -7,7 +7,8 @@ export default function HalamanPembayaran() {
   const [dataBayar, setDataBayar] = useState(null);
   const [waktuMundur, setWaktuMundur] = useState(900); // 15 Menit = 900 Detik
   const [sudahSalin, setSudahSalin] = useState(false);
-
+  const [loadingSync, setLoadingSync] = useState(false);
+const [pesanSync, setPesanSync] = useState('');
   // 1. NGAMBIL DATA DARI MEMORI BROWSER
   useEffect(() => {
     const simpenan = sessionStorage.getItem('dataTagihan');
@@ -44,7 +45,51 @@ export default function HalamanPembayaran() {
   };
 
   if (!dataBayar) return <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center font-bold animate-pulse">Menyiapkan Ruang Kasir...</div>;
+  const cekPembayaran = async () => {
+  if (!dataBayar?.order_id) return;
 
+  setLoadingSync(true);
+  setPesanSync('');
+
+  try {
+    const respon = await fetch('/api/payment/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_id: dataBayar.order_id })
+    });
+
+    const hasil = await respon.json();
+
+    if (!respon.ok || !hasil.sukses) {
+      setPesanSync(hasil.pesan || 'Gagal cek pembayaran bre.');
+      return;
+    }
+
+    const statusBayar = hasil.data?.status_bayar;
+    const statusTopup = hasil.data?.status_topup;
+
+    if (statusBayar === 'pending') {
+      setPesanSync('Pembayaran belum kebaca lunas. Tunggu sebentar lalu cek lagi.');
+      return;
+    }
+
+    if (statusBayar === 'gagal') {
+      setPesanSync('Pembayaran gagal atau expired. Silakan buat order baru.');
+      return;
+    }
+
+    if (statusBayar === 'sukses') {
+      sessionStorage.setItem('lastOrderId', dataBayar.order_id);
+      sessionStorage.removeItem('dataTagihan');
+
+      router.push(`/sukses?order_id=${encodeURIComponent(dataBayar.order_id)}&topup=${encodeURIComponent(statusTopup || 'proses')}`);
+    }
+  } catch (error) {
+    setPesanSync('Server lagi ngadat pas cek pembayaran bre.');
+  } finally {
+    setLoadingSync(false);
+  }
+};
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center py-6 sm:py-12 px-4">
       <div className="w-full max-w-md">
@@ -151,16 +196,26 @@ export default function HalamanPembayaran() {
             </p>
           </div>
 
-          <button 
-            onClick={() => {
-               sessionStorage.removeItem('dataTagihan'); 
-               router.push('/sukses'); 
-            }} 
-            className="mt-6 w-full py-4 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white rounded-xl font-bold shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:-translate-y-1 transition-all duration-300"
-          >
-            Gua Udah Bayar! 🔥
-          </button>
+          {pesanSync && (
+  <div className="mt-5 bg-yellow-500/10 border border-yellow-500/20 text-yellow-300 rounded-2xl p-4 text-xs font-bold">
+    {pesanSync}
+  </div>
+)}
 
+<button 
+  onClick={cekPembayaran}
+  disabled={loadingSync}
+  className="mt-6 w-full py-4 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white rounded-xl font-bold shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+>
+  {loadingSync ? 'Ngecek Pembayaran...' : 'Gua Udah Bayar, Cek Sekarang 🔥'}
+</button>
+
+<button
+  onClick={() => router.push(`/lacak?order_id=${encodeURIComponent(dataBayar.order_id)}`)}
+  className="mt-3 w-full py-3 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-xl font-bold transition-all"
+>
+  Lihat Status / Struk 🧾
+</button>
         </div>
       </div>
     </div>
