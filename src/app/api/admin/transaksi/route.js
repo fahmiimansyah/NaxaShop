@@ -161,10 +161,12 @@ export async function PATCH(request) {
       );
     }
 
-    const [cekTrx] = await db.query(
+const [cekTrx] = await db.query(
   `SELECT 
      t.id,
      t.order_id,
+     t.status_bayar,
+     t.status_topup,
      t.customer_email,
      t.harga,
      t.payment_type,
@@ -178,6 +180,32 @@ export async function PATCH(request) {
 );
 
     if (cekTrx.length === 0) {
+      const trx = cekTrx[0];
+
+const statusBayarAkhir = statusBayar !== undefined ? statusBayar : trx.status_bayar;
+
+if (
+  (statusTopup === 'proses' || statusTopup === 'sukses') &&
+  statusBayarAkhir !== 'sukses'
+) {
+  return NextResponse.json(
+    {
+      sukses: false,
+      pesan: 'Pembayaran belum sukses, jangan update top-up dulu bre!'
+    },
+    { status: 400 }
+  );
+}
+
+if (statusBayar === 'gagal' && trx.status_topup === 'sukses') {
+  return NextResponse.json(
+    {
+      sukses: false,
+      pesan: 'Top-up sudah sukses, jangan ubah pembayaran jadi gagal bre!'
+    },
+    { status: 400 }
+  );
+}
       return NextResponse.json(
         { sukses: false, pesan: 'Transaksi gak ketemu bre!' },
         { status: 404 }
@@ -222,7 +250,7 @@ export async function PATCH(request) {
         { status: 400 }
       );
     }
-
+    fields.push(`updated_at = NOW()`);
     values.push(orderId);
 
     await db.query(
@@ -231,9 +259,12 @@ export async function PATCH(request) {
        WHERE order_id = ?`,
       values
     );
-    const trx = cekTrx[0];
 
-if (statusTopup === 'sukses' && trx.customer_email) {
+if (
+  statusTopup === 'sukses' &&
+  trx.status_topup !== 'sukses' &&
+  trx.customer_email
+) {
   try {
     await kirimEmailTopupSukses({
       to: trx.customer_email,

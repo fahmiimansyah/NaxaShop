@@ -6,6 +6,17 @@ import { useSearchParams } from 'next/navigation';
 
 export default function CekOrderPage() {
   const searchParams = useSearchParams();
+  const fromPage = searchParams.get('from');
+
+const linkBalik =
+  fromPage === 'payment'
+    ? '/pembayaran'
+    : '/';
+
+const teksBalik =
+  fromPage === 'payment'
+    ? '← Balik ke Pembayaran'
+    : '← Balik ke Beranda';
   const [orderId, setOrderId] = useState('');
   const [dataOrder, setDataOrder] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -174,8 +185,8 @@ const linkChatAdmin = () => {
     <main className="min-h-screen bg-slate-950 text-white px-4 py-6 flex items-center justify-center">
       <div className="w-full max-w-xl">
         <div className="mb-4">
-          <Link href="/" className="text-xs text-cyan-400 hover:text-cyan-300 font-black">
-            ← Balik
+          <Link href={linkBalik} className="text-xs text-cyan-400 hover:text-cyan-300 font-black">
+            {teksBalik}
           </Link>
         </div>
 

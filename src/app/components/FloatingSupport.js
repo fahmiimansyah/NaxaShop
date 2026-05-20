@@ -1,9 +1,22 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
+
 export default function FloatingSupport() {
+  const pathname = usePathname();
   const nomorAdmin = process.env.NEXT_PUBLIC_ADMIN_WHATSAPP;
 
   if (!nomorAdmin) return null;
+
+  const halamanTanpaFloatingSupport =
+    pathname.startsWith('/topup') ||
+    pathname.startsWith('/pembayaran') ||
+    pathname.startsWith('/lacak') ||
+    pathname.startsWith('/admin') ||
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/register');
+
+  if (halamanTanpaFloatingSupport) return null;
 
   const pesan = encodeURIComponent(
     'Halo admin NaXaShop, saya butuh bantuan terkait order/top-up.'

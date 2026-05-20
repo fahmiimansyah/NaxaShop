@@ -57,7 +57,6 @@ if (!limit.allowed) {
     const [dataTransaksi] = await db.query(
       `SELECT 
         t.order_id,
-        t.kode_produk,
         t.id_player,
         t.zone_player,
         t.harga AS harga_transaksi,
@@ -86,22 +85,28 @@ if (!limit.allowed) {
 
     const trx = dataTransaksi[0];
 
-    return NextResponse.json({
-      sukses: true,
-      data: {
-        order_id: trx.order_id,
-        nama_produk: trx.nama_produk,
-        kode_produk: trx.kode_produk,
-        id_player: trx.id_player,
-        zone_player: trx.zone_player || '',
-        harga: trx.harga_transaksi,
-        payment_type: trx.payment_type,
-        status_bayar: trx.status_bayar,
-        status_topup: trx.status_topup,
-        created_at: trx.created_at,
-        updated_at: trx.updated_at
-      }
-    });
+    return NextResponse.json(
+  {
+    sukses: true,
+    data: {
+      order_id: trx.order_id,
+      nama_produk: trx.nama_produk,
+      id_player: trx.id_player,
+      zone_player: trx.zone_player || '',
+      harga: trx.harga_transaksi,
+      payment_type: trx.payment_type,
+      status_bayar: trx.status_bayar,
+      status_topup: trx.status_topup,
+      created_at: trx.created_at,
+      updated_at: trx.updated_at
+    }
+  },
+  {
+    headers: {
+      'Cache-Control': 'no-store'
+    }
+  }
+);
   } catch (error) {
     console.error('Dapur Lacak meledak:', error);
 

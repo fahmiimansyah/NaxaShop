@@ -47,18 +47,21 @@ async function getStatusMidtrans(orderId) {
   }
 
   const authString = Buffer.from(`${serverKey}:`).toString('base64');
-
-  const response = await fetch(
-    `https://api.sandbox.midtrans.com/v2/${encodeURIComponent(orderId)}/status`,
-    {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Basic ${authString}`
-      },
-      cache: 'no-store'
-    }
-  );
+  const midtransBaseUrl =
+  process.env.MIDTRANS_IS_PRODUCTION === 'true'
+    ? 'https://api.midtrans.com'
+    : 'https://api.sandbox.midtrans.com';
+const response = await fetch(
+  `${midtransBaseUrl}/v2/${encodeURIComponent(orderId)}/status`,
+  {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Basic ${authString}`
+    },
+    cache: 'no-store'
+  }
+);
 
   const data = await response.json();
 
@@ -240,7 +243,18 @@ export async function POST(request) {
     }
 
     // Kalau pembayaran gagal / expired
+    
     if (pembayaranGagal(statusMidtrans.data)) {
+      if (trx.status_bayar === 'sukses') {
+  return NextResponse.json({
+    sukses: true,
+    pesan: 'Pembayaran sudah sukses sebelumnya, status gagal dari sync diabaikan.',
+    data: {
+      status_bayar: trx.status_bayar,
+      status_topup: trx.status_topup
+    }
+  });
+}
       await db.query(
         `UPDATE transaksi
          SET status_bayar = 'gagal',
@@ -323,7 +337,36 @@ export async function POST(request) {
       });
     }
 
-    const hasilApiGames = await tembakApiGames(trx);
+    let hasilApiGames;
+
+try {
+  hasilApiGames = await tembakApiGames(trx);
+} catch (error) {
+  await db.query(
+    `UPDATE transaksi
+     SET status_topup = 'gagal',
+         catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nPayment sync gagal tembak APIGames pada ', NOW(), ': ', ?)
+     WHERE order_id = ?`,
+    [error.message || 'Unknown APIGames error', orderId]
+  );
+
+  await kirimNotifAman({
+    subject: `🚨 APIGames Error via Payment Sync - ${orderId}`,
+    title: 'APIGames Error dari Payment Sync',
+    message: 'Pembayaran sukses, tapi sistem gagal menembak APIGames. Cek dashboard admin.',
+    orderId,
+    detail: error.message || String(error)
+  });
+
+  return NextResponse.json({
+    sukses: true,
+    pesan: 'Pembayaran sukses, tapi top-up gagal diproses. Admin sudah dinotifikasi.',
+    data: {
+      status_bayar: 'sukses',
+      status_topup: 'gagal'
+    }
+  });
+}
 
     if (hasilApiGames.gagal) {
       await db.query(

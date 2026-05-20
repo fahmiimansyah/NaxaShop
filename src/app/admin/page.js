@@ -1238,7 +1238,7 @@ const handleEditCatatan = async (trx) => {
 
         {/* TAB TRANSAKSI */}
         {tabAktif === 'transaksi' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 grid grid-cols-1 2xl:grid-cols-[420px_minmax(0,1fr)] gap-6 items-start">
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 grid grid-cols-1 xl:grid-cols-[380px_minmax(0,1fr)] gap-6 items-start">
             <aside className="2xl:sticky 2xl:top-24 2xl:max-h-[calc(100vh-7rem)] 2xl:overflow-y-auto">
                     {/* PUSAT TINDAKAN */}
                     <div className="bg-gray-900 border border-gray-800 rounded-3xl shadow-xl overflow-hidden">
@@ -1259,7 +1259,7 @@ const handleEditCatatan = async (trx) => {
                         </button>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6">
+                      <div className="grid grid-cols-1 gap-3 p-6">
                         <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4">
                           <p className="text-xs text-red-300 font-black uppercase">Top-up Gagal</p>
                           <h3 className="text-3xl font-black text-red-400 mt-1">
@@ -1292,7 +1292,7 @@ const handleEditCatatan = async (trx) => {
 
                               <div className="space-y-3">
                                 {alerts.topupGagal.map((trx) => (
-                                  <div key={trx.order_id} className="bg-slate-950 border border-gray-800 rounded-2xl p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                                  <div key={trx.order_id} className="bg-slate-950 border border-gray-800 rounded-2xl p-4 flex flex-col gap-4">
                                     <div>
                                       <p className="font-mono text-xs text-cyan-400 font-black break-all">
                                         {trx.order_id}
@@ -1408,7 +1408,7 @@ const handleEditCatatan = async (trx) => {
 
                               <div className="space-y-3">
                                 {alerts.pendingLama.map((trx) => (
-                                  <div key={trx.order_id} className="bg-slate-950 border border-gray-800 rounded-2xl p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                                  <div key={trx.order_id} className="bg-slate-950 border border-gray-800 rounded-2xl p-4 flex flex-col gap-4">
                                     <div>
                                       <p className="font-mono text-xs text-cyan-400 font-black break-all">
                                         {trx.order_id}
@@ -1424,7 +1424,7 @@ const handleEditCatatan = async (trx) => {
                                       </p>
                                     </div>
 
-                                    <div className="flex flex-wrap gap-2">
+                                    <div className="grid grid-cols-2 gap-2">
                                       <button
                                         onClick={() => handleDetailTransaksi(trx)}
                                         className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-white text-xs font-black"
@@ -1458,8 +1458,7 @@ const handleEditCatatan = async (trx) => {
                           </div>
                         </div>
                       )}
-                    </div>             
-          
+                    </div>              
           </aside>      
             <section className="min-w-0 space-y-6">
                             {/* FILTER */}
@@ -1563,161 +1562,168 @@ const handleEditCatatan = async (trx) => {
                 <div className="p-10 text-center text-gray-500 font-bold">
                   Transaksi gak ada bre.
                 </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-gray-950 text-gray-400 text-xs uppercase tracking-wider font-bold">
-                        <th className="p-4">Order</th>
-                        <th className="p-4">Customer</th>
-                        <th className="p-4">Produk</th>
-                        <th className="p-4">Harga</th>
-                        <th className="p-4">Status</th>
-                        <th className="p-4">Waktu</th>
-                        <th className="p-4 min-w-[280px]">Aksi</th>
-                      </tr>
-                    </thead>
+             ) : (
+  <div className="p-4 space-y-3">
+    {daftarTransaksi.map((trx) => (
+      <div
+        key={trx.id}
+        className="bg-slate-950 border border-gray-800 rounded-2xl p-4 hover:border-emerald-500/30 transition-all"
+      >
+        <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
+          
+          {/* INFO UTAMA */}
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <span className={`px-2 py-1 rounded-md text-[10px] font-black border ${warnaStatusBayar(trx.status_bayar)}`}>
+                Bayar: {trx.status_bayar}
+              </span>
 
-                    <tbody className="divide-y divide-gray-800 text-sm">
-                      {daftarTransaksi.map((trx) => (
-                        <tr key={trx.id} className="hover:bg-gray-800/40 align-top">
-                          <td className="p-4">
-                            <p className="font-mono font-black text-gray-200">{trx.order_id}</p>
-                            <p className="text-[11px] text-gray-500 mt-1">{trx.payment_type || '-'}</p>
-                          </td>
+              <span className={`px-2 py-1 rounded-md text-[10px] font-black border ${warnaStatusTopup(trx.status_topup)}`}>
+                Top-up: {trx.status_topup}
+              </span>
 
-                          <td className="p-4">
-                            <p className="font-black text-white">{trx.id_player}</p>
-                            <p className="text-xs text-gray-500">{trx.zone_player || '-'}</p>
+              <span className="px-2 py-1 rounded-md text-[10px] font-black bg-gray-800 text-gray-400 border border-gray-700">
+                {trx.payment_type || '-'}
+              </span>
+            </div>
 
-                            {trx.customer_whatsapp && (
-                              <a
-                                href={bikinLinkWhatsappCustomer(trx)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-block mt-2 text-[11px] font-black text-green-400 hover:text-green-300"
-                              >
-                                💬 {trx.customer_whatsapp}
-                              </a>
-                            )}
+            <p className="font-mono text-xs text-cyan-400 font-black break-all">
+              {trx.order_id}
+            </p>
 
-                            {trx.customer_email && (
-                              <p className="text-[11px] text-gray-500 mt-1 truncate">
-                                ✉️ {trx.customer_email}
-                              </p>
-                            )}
-                          </td>
+            <p className="text-white font-black mt-2">
+              {trx.nama_produk || trx.kode_produk}
+            </p>
 
-                          <td className="p-4">
-                            <p className="font-bold text-white">{trx.nama_produk || trx.kode_produk}</p>
-                            <p className="text-xs text-emerald-400 font-mono">{trx.kode_produk}</p>
-                            <p className="text-[11px] text-gray-500">{trx.nama_game}</p>
-                          </td>
+            <p className="text-xs text-gray-500 mt-1">
+              {trx.nama_game} • <span className="font-mono text-emerald-400">{trx.kode_produk}</span>
+            </p>
 
-                          <td className="p-4">
-                            <p className="font-black text-green-400">{formatRupiah(trx.harga)}</p>
-                          </td>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 text-sm">
+              <div className="bg-gray-900 border border-gray-800 rounded-xl p-3">
+                <p className="text-[10px] text-gray-500 font-black uppercase tracking-wider">
+                  Player
+                </p>
+                <p className="font-bold text-white break-all">
+                  {trx.id_player}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Zone/Server: {trx.zone_player || '-'}
+                </p>
+              </div>
 
-                          <td className="p-4">
-                            <div className="flex flex-col gap-2">
-                              <span className={`px-2 py-1 rounded-md text-[10px] font-black border w-fit ${warnaStatusBayar(trx.status_bayar)}`}>
-                                Bayar: {trx.status_bayar}
-                              </span>
+              <div className="bg-gray-900 border border-gray-800 rounded-xl p-3">
+                <p className="text-[10px] text-gray-500 font-black uppercase tracking-wider">
+                  Harga
+                </p>
+                <p className="font-black text-green-400">
+                  {formatRupiah(trx.harga)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {trx.created_at ? new Date(trx.created_at).toLocaleString('id-ID') : '-'}
+                </p>
+              </div>
+            </div>
 
-                              <span className={`px-2 py-1 rounded-md text-[10px] font-black border w-fit ${warnaStatusTopup(trx.status_topup)}`}>
-                                Topup: {trx.status_topup}
-                              </span>
-                            </div>
-                          </td>
+            {(trx.customer_whatsapp || trx.customer_email) && (
+              <div className="flex flex-wrap gap-3 mt-3 text-xs">
+                {trx.customer_whatsapp && (
+                  <a
+                    href={bikinLinkWhatsappCustomer(trx)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-green-400 hover:text-green-300 font-black"
+                  >
+                    💬 {trx.customer_whatsapp}
+                  </a>
+                )}
 
-                          <td className="p-4">
-                            <p className="text-xs text-gray-400">
-                              {trx.created_at ? new Date(trx.created_at).toLocaleString('id-ID') : '-'}
-                            </p>
-                            {trx.updated_at && (
-                              <p className="text-[11px] text-gray-600 mt-1">
-                                Update: {new Date(trx.updated_at).toLocaleString('id-ID')}
-                              </p>
-                            )}
-                          </td>
+                {trx.customer_email && (
+                  <span className="text-gray-500 break-all">
+                    ✉️ {trx.customer_email}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
 
-                          <td className="p-4">
-                            <div className="grid grid-cols-2 gap-2">
-                              <button
-                                onClick={() => handleDetailTransaksi(trx)}
-                                className="px-3 py-2 rounded-xl bg-gray-800 text-gray-200 text-xs font-black hover:bg-gray-700 transition-all"
-                              >
-                                👁️ Detail
-                              </button>
+          {/* AKSI */}
+          <div className="w-full xl:w-[260px] shrink-0">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => handleDetailTransaksi(trx)}
+                className="px-3 py-2 rounded-xl bg-gray-800 text-gray-200 text-xs font-black hover:bg-gray-700 transition-all"
+              >
+                👁️ Detail
+              </button>
 
-                              <button
-                                onClick={() => handleEditCatatan(trx)}
-                                className="px-3 py-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-black hover:bg-indigo-600 hover:text-white transition-all"
-                              >
-                                📝 Catatan
-                              </button>
+              <button
+                onClick={() => handleEditCatatan(trx)}
+                className="px-3 py-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-black hover:bg-indigo-600 hover:text-white transition-all"
+              >
+                📝 Catatan
+              </button>
 
-                              <button
-                                onClick={() => handleRetryTopup(trx)}
-                                disabled={
-                                  trx.status_bayar !== 'sukses' ||
-                                  trx.status_topup === 'sukses' ||
-                                  loadingAksiTransaksi === `${trx.order_id}-retry`
-                                }
-                                className="px-3 py-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 text-xs font-black hover:bg-purple-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                              >
-                                {loadingAksiTransaksi === `${trx.order_id}-retry` ? 'Retry...' : '🚀 Retry'}
-                              </button>
+              <button
+                onClick={() => handleRetryTopup(trx)}
+                disabled={
+                  trx.status_bayar !== 'sukses' ||
+                  trx.status_topup === 'sukses' ||
+                  loadingAksiTransaksi === `${trx.order_id}-retry`
+                }
+                className="px-3 py-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 text-xs font-black hover:bg-purple-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {loadingAksiTransaksi === `${trx.order_id}-retry` ? 'Retry...' : '🚀 Retry'}
+              </button>
 
-                              <button
-                                onClick={() =>
-                                  handleUpdateTransaksi(
-                                    trx,
-                                    { status_bayar: 'sukses' },
-                                    'Tandai pembayaran transaksi ini jadi sukses?'
-                                  )
-                                }
-                                disabled={trx.status_bayar === 'sukses'}
-                                className="px-3 py-2 rounded-xl bg-green-500/10 text-green-400 border border-green-500/20 text-xs font-black hover:bg-green-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                              >
-                                💰 Bayar OK
-                              </button>
+              <button
+                onClick={() =>
+                  handleUpdateTransaksi(
+                    trx,
+                    { status_bayar: 'sukses' },
+                    'Tandai pembayaran transaksi ini jadi sukses?'
+                  )
+                }
+                disabled={trx.status_bayar === 'sukses'}
+                className="px-3 py-2 rounded-xl bg-green-500/10 text-green-400 border border-green-500/20 text-xs font-black hover:bg-green-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                💰 Bayar OK
+              </button>
 
-                              <button
-                                onClick={() =>
-                                  handleUpdateTransaksi(
-                                    trx,
-                                    { status_topup: 'sukses' },
-                                    'Tandai top-up transaksi ini jadi sukses manual?'
-                                  )
-                                }
-                                disabled={trx.status_topup === 'sukses'}
-                                className="px-3 py-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs font-black hover:bg-blue-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                              >
-                                ✅ Topup OK
-                              </button>
+              <button
+                onClick={() =>
+                  handleUpdateTransaksi(
+                    trx,
+                    { status_topup: 'sukses' },
+                    'Tandai top-up transaksi ini jadi sukses manual?'
+                  )
+                }
+                disabled={trx.status_topup === 'sukses'}
+                className="px-3 py-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs font-black hover:bg-blue-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                ✅ Topup OK
+              </button>
 
-                              <button
-                                onClick={() =>
-                                  handleUpdateTransaksi(
-                                    trx,
-                                    { status_topup: 'gagal' },
-                                    'Tandai top-up transaksi ini gagal?'
-                                  )
-                                }
-                                disabled={trx.status_topup === 'gagal'}
-                                className="px-3 py-2 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-black hover:bg-red-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                              >
-                                ❌ Gagal
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              <button
+                onClick={() =>
+                  handleUpdateTransaksi(
+                    trx,
+                    { status_topup: 'gagal' },
+                    'Tandai top-up transaksi ini gagal?'
+                  )
+                }
+                disabled={trx.status_topup === 'gagal'}
+                className="px-3 py-2 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-black hover:bg-red-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                ❌ Gagal
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    ))}
+  </div>
+)}
 
               {/* PAGINATION */}
               <div className="p-4 border-t border-gray-800 flex flex-col sm:flex-row justify-between items-center gap-3">
