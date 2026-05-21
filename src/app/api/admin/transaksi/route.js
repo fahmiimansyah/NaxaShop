@@ -88,25 +88,25 @@ export async function GET(request) {
 
     const [transaksi] = await db.query(
       `SELECT
-        t.id,
-        t.order_id,
-        t.game_id,
-        t.produk_id,
-        t.kode_produk,
-        t.id_player,
-        t.zone_player,
-        t.harga,
-        t.payment_type,
-        t.status_bayar,
-        t.status_topup,
-        t.customer_whatsapp,
-        t.customer_email,
-        t.apigames_response,
-        t.catatan_admin,
-        t.created_at,
-        t.updated_at,
-        COALESCE(p.nama_produk, t.kode_produk) AS nama_produk,
-        COALESCE(g.nama, CONCAT('Game ID ', t.game_id)) AS nama_game
+         t.id,
+         t.order_id,
+         t.game_id,
+         t.produk_id,
+         t.kode_produk,
+         t.id_player,
+         t.zone_player,
+         t.harga,
+         t.payment_type,
+         t.status_bayar,
+         t.status_topup,
+         t.customer_whatsapp,
+         t.customer_email,
+         t.apigames_response,
+         t.catatan_admin,
+         t.created_at,
+         t.updated_at,
+         COALESCE(p.nama_produk, t.kode_produk) AS nama_produk,
+         COALESCE(g.nama, CONCAT('Game ID ', t.game_id)) AS nama_game
        FROM transaksi t
        LEFT JOIN produk p ON t.produk_id = p.id
        LEFT JOIN games g ON t.game_id = g.id
@@ -150,9 +150,12 @@ export async function PATCH(request) {
     const body = await request.json();
 
     const orderId = bersihinText(body.order_id);
-    const statusBayar = body.status_bayar !== undefined ? bersihinText(body.status_bayar) : undefined;
-    const statusTopup = body.status_topup !== undefined ? bersihinText(body.status_topup) : undefined;
-    const catatanAdmin = body.catatan_admin !== undefined ? bersihinText(body.catatan_admin) : undefined;
+    const statusBayar =
+      body.status_bayar !== undefined ? bersihinText(body.status_bayar) : undefined;
+    const statusTopup =
+      body.status_topup !== undefined ? bersihinText(body.status_topup) : undefined;
+    const catatanAdmin =
+      body.catatan_admin !== undefined ? bersihinText(body.catatan_admin) : undefined;
 
     if (!orderId) {
       return NextResponse.json(
@@ -161,54 +164,70 @@ export async function PATCH(request) {
       );
     }
 
-const [cekTrx] = await db.query(
-  `SELECT 
-     t.id,
-     t.order_id,
-     t.status_bayar,
-     t.status_topup,
-     t.customer_email,
-     t.harga,
-     t.payment_type,
-     t.kode_produk,
-     COALESCE(p.nama_produk, t.kode_produk) AS nama_produk
-   FROM transaksi t
-   LEFT JOIN produk p ON t.produk_id = p.id
-   WHERE t.order_id = ?
-   LIMIT 1`,
-  [orderId]
-);
+    if (statusBayar !== undefined && !STATUS_BAYAR_VALID.includes(statusBayar)) {
+      return NextResponse.json(
+        { sukses: false, pesan: 'Status bayar gak valid bre!' },
+        { status: 400 }
+      );
+    }
+
+    if (statusTopup !== undefined && !STATUS_TOPUP_VALID.includes(statusTopup)) {
+      return NextResponse.json(
+        { sukses: false, pesan: 'Status topup gak valid bre!' },
+        { status: 400 }
+      );
+    }
+
+    const [cekTrx] = await db.query(
+      `SELECT 
+         t.id,
+         t.order_id,
+         t.status_bayar,
+         t.status_topup,
+         t.customer_email,
+         t.harga,
+         t.payment_type,
+         t.kode_produk,
+         COALESCE(p.nama_produk, t.kode_produk) AS nama_produk
+       FROM transaksi t
+       LEFT JOIN produk p ON t.produk_id = p.id
+       WHERE t.order_id = ?
+       LIMIT 1`,
+      [orderId]
+    );
 
     if (cekTrx.length === 0) {
-      const trx = cekTrx[0];
-
-const statusBayarAkhir = statusBayar !== undefined ? statusBayar : trx.status_bayar;
-
-if (
-  (statusTopup === 'proses' || statusTopup === 'sukses') &&
-  statusBayarAkhir !== 'sukses'
-) {
-  return NextResponse.json(
-    {
-      sukses: false,
-      pesan: 'Pembayaran belum sukses, jangan update top-up dulu bre!'
-    },
-    { status: 400 }
-  );
-}
-
-if (statusBayar === 'gagal' && trx.status_topup === 'sukses') {
-  return NextResponse.json(
-    {
-      sukses: false,
-      pesan: 'Top-up sudah sukses, jangan ubah pembayaran jadi gagal bre!'
-    },
-    { status: 400 }
-  );
-}
       return NextResponse.json(
         { sukses: false, pesan: 'Transaksi gak ketemu bre!' },
         { status: 404 }
+      );
+    }
+
+    const trx = cekTrx[0];
+
+    const statusBayarAkhir =
+      statusBayar !== undefined ? statusBayar : trx.status_bayar;
+
+    if (
+      (statusTopup === 'proses' || statusTopup === 'sukses') &&
+      statusBayarAkhir !== 'sukses'
+    ) {
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan: 'Pembayaran belum sukses, jangan update top-up dulu bre!'
+        },
+        { status: 400 }
+      );
+    }
+
+    if (statusBayar === 'gagal' && trx.status_topup === 'sukses') {
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan: 'Top-up sudah sukses, jangan ubah pembayaran jadi gagal bre!'
+        },
+        { status: 400 }
       );
     }
 
@@ -216,25 +235,11 @@ if (statusBayar === 'gagal' && trx.status_topup === 'sukses') {
     const values = [];
 
     if (statusBayar !== undefined) {
-      if (!STATUS_BAYAR_VALID.includes(statusBayar)) {
-        return NextResponse.json(
-          { sukses: false, pesan: 'Status bayar gak valid bre!' },
-          { status: 400 }
-        );
-      }
-
       fields.push(`status_bayar = ?`);
       values.push(statusBayar);
     }
 
     if (statusTopup !== undefined) {
-      if (!STATUS_TOPUP_VALID.includes(statusTopup)) {
-        return NextResponse.json(
-          { sukses: false, pesan: 'Status topup gak valid bre!' },
-          { status: 400 }
-        );
-      }
-
       fields.push(`status_topup = ?`);
       values.push(statusTopup);
     }
@@ -250,6 +255,7 @@ if (statusBayar === 'gagal' && trx.status_topup === 'sukses') {
         { status: 400 }
       );
     }
+
     fields.push(`updated_at = NOW()`);
     values.push(orderId);
 
@@ -260,23 +266,23 @@ if (statusBayar === 'gagal' && trx.status_topup === 'sukses') {
       values
     );
 
-if (
-  statusTopup === 'sukses' &&
-  trx.status_topup !== 'sukses' &&
-  trx.customer_email
-) {
-  try {
-    await kirimEmailTopupSukses({
-      to: trx.customer_email,
-      orderId: trx.order_id,
-      namaProduk: trx.nama_produk || trx.kode_produk,
-      harga: trx.harga,
-      paymentType: trx.payment_type
-    });
-  } catch (error) {
-    console.error('Gagal kirim email top-up sukses:', error);
-  }
-}
+    if (
+      statusTopup === 'sukses' &&
+      trx.status_topup !== 'sukses' &&
+      trx.customer_email
+    ) {
+      try {
+        await kirimEmailTopupSukses({
+          to: trx.customer_email,
+          orderId: trx.order_id,
+          namaProduk: trx.nama_produk || trx.kode_produk,
+          harga: trx.harga,
+          paymentType: trx.payment_type
+        });
+      } catch (error) {
+        console.error('Gagal kirim email top-up sukses:', error);
+      }
+    }
 
     return NextResponse.json({
       sukses: true,

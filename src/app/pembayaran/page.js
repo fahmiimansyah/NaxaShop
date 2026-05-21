@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 const DURASI_BAYAR_MS = 15 * 60 * 1000;
@@ -43,6 +43,7 @@ export default function HalamanPembayaran() {
 
   const [statusBayar, setStatusBayar] = useState('pending');
   const [statusTopup, setStatusTopup] = useState('pending');
+
   const sedangSyncRef = useRef(false);
   const nomorAdmin = process.env.NEXT_PUBLIC_ADMIN_WHATSAPP;
 
@@ -54,32 +55,30 @@ export default function HalamanPembayaran() {
       return;
     }
 
-    const parsed = JSON.parse(simpenan);
+    try {
+      const parsed = JSON.parse(simpenan);
 
-    // TIMER DEADLINE: biar waktu gak pause pas pindah tab
-    const expiredKey = getExpiredKey(parsed.order_id);
-    let expiredAt = Number(sessionStorage.getItem(expiredKey));
+      const expiredKey = getExpiredKey(parsed.order_id);
+      let expiredAt = Number(sessionStorage.getItem(expiredKey));
 
-    if (!expiredAt) {
-      expiredAt = Date.now() + DURASI_BAYAR_MS;
-      sessionStorage.setItem(expiredKey, String(expiredAt));
-    }
+      if (!expiredAt) {
+        expiredAt = Date.now() + DURASI_BAYAR_MS;
+        sessionStorage.setItem(expiredKey, String(expiredAt));
+      }
 
-    const dataDenganExpired = {
-      ...parsed,
-      expired_at_local: expiredAt
-    };
+      const dataDenganExpired = {
+        ...parsed,
+        expired_at_local: expiredAt
+      };
 
-    sessionStorage.setItem('dataTagihan', JSON.stringify(dataDenganExpired));
+      sessionStorage.setItem('dataTagihan', JSON.stringify(dataDenganExpired));
 
-    setDataBayar(dataDenganExpired);
-    setWaktuMundur(hitungSisaDetik(expiredAt));
+      setDataBayar(dataDenganExpired);
+      setWaktuMundur(hitungSisaDetik(expiredAt));
 
-    // LOAD PROGRESS STEPPER: biar gak balik ke step 2
-    const progressSimpan = sessionStorage.getItem(getProgressKey(parsed.order_id));
+      const progressSimpan = sessionStorage.getItem(getProgressKey(parsed.order_id));
 
-    if (progressSimpan) {
-      try {
+      if (progressSimpan) {
         const progress = JSON.parse(progressSimpan);
 
         setStatusBayar(progress.status_bayar || 'pending');
@@ -88,9 +87,10 @@ export default function HalamanPembayaran() {
         if (progress.pesan) {
           setPesanSync(progress.pesan);
         }
-      } catch (error) {
-        console.error('Progress order rusak:', error);
       }
+    } catch (error) {
+      console.error('Data tagihan rusak:', error);
+      router.push('/');
     }
   }, [router]);
 
@@ -130,6 +130,217 @@ export default function HalamanPembayaran() {
     setTimeout(() => setSudahSalin(false), 2000);
   };
 
+  const bikinPesanProgress = ({ bayar, topup, sumber }) => {
+    if (bayar === 'pending') {
+      return 'Pembayaran belum kebaca lunas. Sistem akan cek otomatis.';
+    }
+
+    if (bayar === 'gagal') {
+      return 'Pembayaran gagal atau expired. Silakan buat order baru.';
+    }
+
+    if (bayar === 'sukses' && topup === 'gagal') {
+      return 'Pembayaran sukses, tapi top-up butuh pengecekan admin.';
+    }
+
+    if (bayar === 'sukses' && topup === 'sukses') {
+      return 'Top-up berhasil! Silakan cek akun game kamu.';
+    }
+
+    if (bayar === 'sukses' && topup === 'proses') {
+      return sumber === 'apigames'
+        ? 'Pembayaran sukses. APIGames masih memproses top-up kamu.'
+        : 'Pembayaran sukses! Sistem sedang mengirim order ke provider.';
+    }
+
+    return 'Status sedang dicek. Tunggu sebentar ya.';
+  };
+
+  const updateProgress = ({ bayar, topup, pesan }) => {
+    setStatusBayar(bayar || 'pending');
+    setStatusTopup(topup || 'pending');
+    setPesanSync(pesan || '');
+
+    if (dataBayar?.order_id) {
+      simpanProgressOrder({
+        orderId: dataBayar.order_id,
+        bayar: bayar || 'pending',
+        topup: topup || 'pending',
+        pesan: pesan || ''
+      });
+    }
+
+    if (bayar === 'sukses' && dataBayar?.order_id) {
+      sessionStorage.setItem('lastOrderId', dataBayar.order_id);
+    }
+  };
+
+  const syncApigames = async ({ silent = false } = {}) => {
+    if (!dataBayar?.order_id) return null;
+
+    const respon = await fetch('/api/apigames/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_id: dataBayar.order_id })
+    });
+
+    const hasil = await respon.json();
+
+    if (!respon.ok || !hasil.sukses) {
+      if (!silent) {
+        setPesanSync(hasil.pesan || 'Gagal cek status top-up APIGames.');
+      }
+
+      return null;
+    }
+
+    const bayar = hasil.data?.status_bayar || 'sukses';
+    const topup = hasil.data?.status_topup || 'proses';
+
+    const pesan = bikinPesanProgress({
+      bayar,
+      topup,
+      sumber: 'apigames'
+    });
+
+    updateProgress({ bayar, topup, pesan });
+
+    return { bayar, topup, hasil };
+  };
+const cekStatusOrderDariDb = async ({ silent = true } = {}) => {
+  if (!dataBayar?.order_id) return null;
+
+  try {
+    const respon = await fetch(
+      `/api/pesanan?id=${encodeURIComponent(dataBayar.order_id)}`,
+      { cache: 'no-store' }
+    );
+
+    const hasil = await respon.json();
+
+    if (!respon.ok || !hasil.sukses) {
+      if (!silent) {
+        setPesanSync(hasil.pesan || 'Gagal cek status order.');
+      }
+
+      return null;
+    }
+
+    const bayar = hasil.data?.status_bayar || 'pending';
+    const topup = hasil.data?.status_topup || 'pending';
+
+    const pesan = bikinPesanProgress({
+      bayar,
+      topup,
+      sumber: 'admin'
+    });
+
+    updateProgress({ bayar, topup, pesan });
+
+    return { bayar, topup };
+  } catch (error) {
+    if (!silent) {
+      setPesanSync('Gagal cek update status order.');
+    }
+
+    return null;
+  }
+};
+  const cekPembayaran = async ({ silent = false } = {}) => {
+    if (!dataBayar?.order_id) return;
+
+    if (sedangSyncRef.current) return;
+
+    sedangSyncRef.current = true;
+
+    if (!silent) {
+      setLoadingSync(true);
+      setPesanSync('');
+    }
+
+    try {
+      const respon = await fetch('/api/payment/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: dataBayar.order_id })
+      });
+
+      const hasil = await respon.json();
+
+      if (!respon.ok || !hasil.sukses) {
+        setPesanSync(hasil.pesan || 'Gagal cek pembayaran bre.');
+        return;
+      }
+
+      let bayar = hasil.data?.status_bayar || 'pending';
+      let topup = hasil.data?.status_topup || 'pending';
+
+      let pesan = bikinPesanProgress({
+        bayar,
+        topup,
+        sumber: 'midtrans'
+      });
+
+      updateProgress({ bayar, topup, pesan });
+
+      // Kalau pembayaran sudah sukses dan top-up masih proses,
+      // lanjut cek status final ke APIGames.
+      if (bayar === 'sukses' && topup === 'proses') {
+        const hasilApiGames = await syncApigames({ silent });
+
+        if (hasilApiGames) {
+          bayar = hasilApiGames.bayar;
+          topup = hasilApiGames.topup;
+        }
+      }
+    } catch (error) {
+      console.error('Gagal sync pembayaran:', error);
+
+      if (!silent) {
+        setPesanSync('Server lagi ngadat pas cek pembayaran bre.');
+      }
+    } finally {
+      sedangSyncRef.current = false;
+
+      if (!silent) {
+        setLoadingSync(false);
+      }
+    }
+  };
+
+useEffect(() => {
+  if (!dataBayar?.order_id) return;
+
+  const pembayaranGagal = statusBayar === 'gagal';
+  const topupSelesai = statusTopup === 'sukses';
+
+  // Kalau pembayaran gagal total atau top-up sudah sukses, polling stop.
+  if (pembayaranGagal || topupSelesai) return;
+
+  // Kalau top-up gagal / butuh admin, jangan hit Midtrans/APIGames terus.
+  // Cukup pantau DB. Kalau admin klik Topup OK, stepper otomatis naik selesai.
+  if (statusBayar === 'sukses' && statusTopup === 'gagal') {
+    const intervalAdmin = setInterval(() => {
+      cekStatusOrderDariDb({ silent: true });
+    }, 10000);
+
+    return () => clearInterval(intervalAdmin);
+  }
+
+  // Normal flow: payment pending / top-up proses
+  const firstCheck = setTimeout(() => {
+    cekPembayaran({ silent: true });
+  }, 1500);
+
+  const interval = setInterval(() => {
+    cekPembayaran({ silent: true });
+  }, 8000);
+
+  return () => {
+    clearTimeout(firstCheck);
+    clearInterval(interval);
+  };
+}, [dataBayar?.order_id, statusBayar, statusTopup]);
   const getStatusUi = () => {
     if (statusBayar === 'gagal') {
       return {
@@ -169,7 +380,7 @@ export default function HalamanPembayaran() {
         step: 3,
         icon: '🚀',
         title: 'Top-up Sedang Diproses',
-        desc: 'Pembayaran sudah sukses. Sistem sedang mengirim order ke provider.',
+        desc: 'Pembayaran sudah sukses. Sistem sedang menunggu status final dari provider.',
         box: 'bg-purple-500/10 border-purple-500/20 text-purple-300',
         glow: 'bg-purple-500/20 text-purple-400'
       };
@@ -179,7 +390,7 @@ export default function HalamanPembayaran() {
       step: 2,
       icon: '💸',
       title: 'Menunggu Pembayaran',
-      desc: 'Selesaikan pembayaran, lalu klik tombol cek pembayaran.',
+      desc: 'Selesaikan pembayaran, lalu biarkan halaman ini cek status otomatis.',
       box: 'bg-yellow-500/10 border-yellow-500/20 text-yellow-300',
       glow: 'bg-yellow-500/20 text-yellow-400'
     };
@@ -196,97 +407,6 @@ export default function HalamanPembayaran() {
 
   const progressWidth = `${((statusUi.step - 1) / (steps.length - 1)) * 100}%`;
 
-  const cekPembayaran = async ({ silent = false } = {}) => {
-  if (!dataBayar?.order_id) return;
-
-  // Biar auto polling dan klik manual gak nembak barengan
-  if (sedangSyncRef.current) return;
-
-  sedangSyncRef.current = true;
-
-  if (!silent) {
-    setLoadingSync(true);
-    setPesanSync('');
-  }
-
-  try {
-    const respon = await fetch('/api/payment/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order_id: dataBayar.order_id })
-    });
-
-    const hasil = await respon.json();
-
-    if (!respon.ok || !hasil.sukses) {
-      setPesanSync(hasil.pesan || 'Gagal cek pembayaran bre.');
-      return;
-    }
-
-    const bayar = hasil.data?.status_bayar || 'pending';
-    const topup = hasil.data?.status_topup || 'pending';
-
-    const pesanProgress =
-      bayar === 'pending'
-        ? 'Pembayaran belum kebaca lunas. Tunggu sebentar, sistem akan cek otomatis.'
-        : bayar === 'gagal'
-          ? 'Pembayaran gagal atau expired. Silakan buat order baru.'
-          : topup === 'gagal'
-            ? 'Pembayaran sukses, tapi top-up butuh pengecekan admin.'
-            : topup === 'sukses'
-              ? 'Top-up berhasil! Silakan cek akun game kamu.'
-              : 'Pembayaran sukses! Top-up sedang diproses.';
-
-    setStatusBayar(bayar);
-    setStatusTopup(topup);
-    setPesanSync(pesanProgress);
-
-    simpanProgressOrder({
-      orderId: dataBayar.order_id,
-      bayar,
-      topup,
-      pesan: pesanProgress
-    });
-
-    if (bayar === 'sukses') {
-      sessionStorage.setItem('lastOrderId', dataBayar.order_id);
-    }
-  } catch (error) {
-    setPesanSync('Server lagi ngadat pas cek pembayaran bre.');
-  } finally {
-    sedangSyncRef.current = false;
-
-    if (!silent) {
-      setLoadingSync(false);
-    }
-  }
-};
-useEffect(() => {
-  if (!dataBayar?.order_id) return;
-
-  const statusFinal =
-    statusBayar === 'gagal' ||
-    statusTopup === 'gagal' ||
-    statusTopup === 'sukses';
-
-  // Kalau sudah final, stop polling
-  if (statusFinal) return;
-
-  // Cek pertama otomatis setelah halaman kebuka
-  const firstCheck = setTimeout(() => {
-    cekPembayaran({ silent: true });
-  }, 1500);
-
-  // Lanjut cek tiap 8 detik
-  const interval = setInterval(() => {
-    cekPembayaran({ silent: true });
-  }, 8000);
-
-  return () => {
-    clearTimeout(firstCheck);
-    clearInterval(interval);
-  };
-}, [dataBayar?.order_id, statusBayar, statusTopup]);
   const linkChatAdmin = () => {
     if (!nomorAdmin || !dataBayar?.order_id) return '#';
 
@@ -308,7 +428,6 @@ useEffect(() => {
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center py-6 sm:py-12 px-4">
       <div className="w-full max-w-md">
-
         {/* STEPPER */}
         <div className="mb-8 px-2">
           <div className="flex items-center justify-between relative">
@@ -500,7 +619,7 @@ useEffect(() => {
             disabled={loadingSync}
             className="mt-6 w-full py-4 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white rounded-xl font-black shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loadingSync ? 'Ngecek Pembayaran...' : 'Cek Status Pembayaran 🔥'}
+            {loadingSync ? 'Ngecek Status...' : 'Cek Status Sekarang 🔥'}
           </button>
 
           <button
@@ -524,7 +643,7 @@ useEffect(() => {
           )}
 
           <p className="text-[11px] text-gray-500 mt-5">
-            Jangan tutup halaman ini sebelum status pembayaran kebaca.
+            Jangan tutup halaman ini. Sistem akan cek pembayaran dan top-up otomatis.
           </p>
         </div>
       </div>

@@ -1,13 +1,28 @@
 import nodemailer from 'nodemailer';
+import dns from 'dns';
+
+dns.setDefaultResultOrder('ipv4first');
+
+try {
+  dns.setServers(['1.1.1.1', '8.8.8.8']);
+} catch (error) {
+  console.error('Gagal set DNS server Node:', error);
+}
+const EMAIL_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS || 10000);
 
 const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_SERVER_HOST,
+  host: process.env.EMAIL_SERVER_HOST || 'smtp.gmail.com',
   port: Number(process.env.EMAIL_SERVER_PORT || 465),
   secure: Number(process.env.EMAIL_SERVER_PORT || 465) === 465,
   auth: {
     user: process.env.EMAIL_SERVER_USER,
     pass: process.env.EMAIL_SERVER_PASSWORD,
   },
+
+  // Biar kalau Gmail/DNS ngadat, gak ngegantung kelamaan
+  connectionTimeout: EMAIL_TIMEOUT_MS,
+  greetingTimeout: EMAIL_TIMEOUT_MS,
+  socketTimeout: EMAIL_TIMEOUT_MS,
 });
 
 function formatRupiah(angka) {
@@ -23,12 +38,46 @@ function escapeHtml(value) {
     .replaceAll("'", '&#039;');
 }
 
+function getFromEmail() {
+  return process.env.EMAIL_FROM || process.env.EMAIL_SERVER_USER;
+}
+
+function getBaseUrl() {
+  return (
+    process.env.NEXT_PUBLIC_BASE_URL ||
+    process.env.NEXTAUTH_URL ||
+    'http://localhost:3000'
+  );
+}
+
+function emailSiap() {
+  return Boolean(
+    process.env.EMAIL_SERVER_USER &&
+      process.env.EMAIL_SERVER_PASSWORD &&
+      getFromEmail()
+  );
+}
+
+async function sendMailAman(options) {
+  if (!emailSiap()) {
+    console.warn('Email belum dikonfigurasi lengkap. Email tidak dikirim:', {
+      to: options?.to,
+      subject: options?.subject,
+    });
+
+    return {
+      skipped: true,
+      reason: 'EMAIL_NOT_CONFIGURED',
+    };
+  }
+
+  return transporter.sendMail(options);
+}
+
 // EMAIL VERIFIKASI REGISTER
 export async function kirimEmailVerifikasi({ to, nama, link }) {
-  const from = process.env.EMAIL_FROM || process.env.EMAIL_SERVER_USER;
-
-  await transporter.sendMail({
-    from,
+  await sendMailAman({
+    from: getFromEmail(),
     to,
     subject: 'Verifikasi Email NaXaShop',
     html: `
@@ -57,15 +106,15 @@ export async function kirimEmailVerifikasi({ to, nama, link }) {
 export async function kirimEmailAdmin({ subject, title, message, orderId, detail }) {
   const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_SERVER_USER;
 
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM || process.env.EMAIL_SERVER_USER,
+  await sendMailAman({
+    from: getFromEmail(),
     to: adminEmail,
-    subject,
+    subject: subject || 'Notifikasi NaXaShop',
     html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <h2>${escapeHtml(title)}</h2>
+        <h2>${escapeHtml(title || 'Notifikasi NaXaShop')}</h2>
 
-        <p>${escapeHtml(message)}</p>
+        <p>${escapeHtml(message || '-')}</p>
 
         ${
           orderId
@@ -100,11 +149,11 @@ export async function kirimEmailTopupSukses({
 }) {
   if (!to) return;
 
-  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
-  const linkCekOrder = `${baseUrl}/cek-order`;
+  const baseUrl = getBaseUrl();
+  const linkCekOrder = `${baseUrl}/lacak?order_id=${encodeURIComponent(orderId)}`;
 
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM || process.env.EMAIL_SERVER_USER,
+  await sendMailAman({
+    from: getFromEmail(),
     to,
     subject: `Top-up Berhasil - ${orderId}`,
     html: `
@@ -121,13 +170,13 @@ export async function kirimEmailTopupSukses({
 
           <div style="background:#020617;border:1px solid #1f2937;border-radius:14px;padding:16px;margin:18px 0;">
             <p style="margin:0 0 8px;"><b>Order ID:</b><br/><code>${escapeHtml(orderId)}</code></p>
-            <p style="margin:0 0 8px;"><b>Produk:</b><br/>${escapeHtml(namaProduk)}</p>
+            <p style="margin:0 0 8px;"><b>Produk:</b><br/>${escapeHtml(namaProduk || '-')}</p>
             <p style="margin:0 0 8px;"><b>Total:</b><br/>${formatRupiah(harga)}</p>
-            <p style="margin:0;"><b>Metode:</b><br/>${escapeHtml(paymentType)}</p>
+            <p style="margin:0;"><b>Metode:</b><br/>${escapeHtml(paymentType || '-')}</p>
           </div>
 
           <p>
-            <a href="${linkCekOrder}"
+            <a href="${escapeHtml(linkCekOrder)}"
                style="display:inline-block;padding:12px 18px;background:#06b6d4;color:#fff;text-decoration:none;border-radius:12px;font-weight:bold;">
               Cek Status Order
             </a>
