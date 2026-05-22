@@ -93,6 +93,8 @@ export async function GET(request) {
          t.game_id,
          t.produk_id,
          t.kode_produk,
+         t.provider,
+         t.kode_produk_provider,
          t.id_player,
          t.zone_player,
          t.harga,

@@ -5,19 +5,18 @@ import { useRouter } from 'next/navigation';
 
 const DURASI_BAYAR_MS = 15 * 60 * 1000;
 
-const getExpiredKey = (orderId) => {
-  return `expiredAt:${orderId}`;
-};
-
-const getProgressKey = (orderId) => {
-  return `progressOrder:${orderId}`;
-};
+const getExpiredKey = (orderId) => `expiredAt:${orderId}`;
+const getProgressKey = (orderId) => `progressOrder:${orderId}`;
 
 const hitungSisaDetik = (expiredAt) => {
   return Math.max(0, Math.ceil((Number(expiredAt) - Date.now()) / 1000));
 };
 
-const simpanProgressOrder = ({ orderId, bayar, topup, pesan }) => {
+const normalisasiProvider = (value) => {
+  return String(value || 'apigames').trim().toLowerCase();
+};
+
+const simpanProgressOrder = ({ orderId, bayar, topup, pesan, provider }) => {
   if (!orderId) return;
 
   sessionStorage.setItem(
@@ -25,6 +24,7 @@ const simpanProgressOrder = ({ orderId, bayar, topup, pesan }) => {
     JSON.stringify({
       status_bayar: bayar || 'pending',
       status_topup: topup || 'pending',
+      provider: provider || 'apigames',
       pesan: pesan || '',
       updated_at: Date.now()
     })
@@ -43,6 +43,7 @@ export default function HalamanPembayaran() {
 
   const [statusBayar, setStatusBayar] = useState('pending');
   const [statusTopup, setStatusTopup] = useState('pending');
+  const [providerOrder, setProviderOrder] = useState('apigames');
 
   const sedangSyncRef = useRef(false);
   const nomorAdmin = process.env.NEXT_PUBLIC_ADMIN_WHATSAPP;
@@ -83,6 +84,7 @@ export default function HalamanPembayaran() {
 
         setStatusBayar(progress.status_bayar || 'pending');
         setStatusTopup(progress.status_topup || 'pending');
+        setProviderOrder(normalisasiProvider(progress.provider));
 
         if (progress.pesan) {
           setPesanSync(progress.pesan);
@@ -130,7 +132,19 @@ export default function HalamanPembayaran() {
     setTimeout(() => setSudahSalin(false), 2000);
   };
 
-  const bikinPesanProgress = ({ bayar, topup, sumber }) => {
+  const labelProvider = (provider) => {
+    const p = normalisasiProvider(provider);
+
+    if (p === 'digiflazz') return 'Digiflazz';
+    if (p === 'apigames') return 'APIGames';
+    if (p === 'mock') return 'Mock Provider';
+
+    return 'Provider';
+  };
+
+  const bikinPesanProgress = ({ bayar, topup, provider }) => {
+    const namaProvider = labelProvider(provider);
+
     if (bayar === 'pending') {
       return 'Pembayaran belum kebaca lunas. Sistem akan cek otomatis.';
     }
@@ -148,17 +162,18 @@ export default function HalamanPembayaran() {
     }
 
     if (bayar === 'sukses' && topup === 'proses') {
-      return sumber === 'apigames'
-        ? 'Pembayaran sukses. APIGames masih memproses top-up kamu.'
-        : 'Pembayaran sukses! Sistem sedang mengirim order ke provider.';
+      return `Pembayaran sukses. ${namaProvider} sedang memproses top-up kamu.`;
     }
 
     return 'Status sedang dicek. Tunggu sebentar ya.';
   };
 
-  const updateProgress = ({ bayar, topup, pesan }) => {
+  const updateProgress = ({ bayar, topup, pesan, provider }) => {
+    const providerFinal = normalisasiProvider(provider || providerOrder);
+
     setStatusBayar(bayar || 'pending');
     setStatusTopup(topup || 'pending');
+    setProviderOrder(providerFinal);
     setPesanSync(pesan || '');
 
     if (dataBayar?.order_id) {
@@ -166,6 +181,7 @@ export default function HalamanPembayaran() {
         orderId: dataBayar.order_id,
         bayar: bayar || 'pending',
         topup: topup || 'pending',
+        provider: providerFinal,
         pesan: pesan || ''
       });
     }
@@ -175,77 +191,109 @@ export default function HalamanPembayaran() {
     }
   };
 
-  const syncApigames = async ({ silent = false } = {}) => {
+  const cekStatusOrderDariDb = async ({ silent = true } = {}) => {
     if (!dataBayar?.order_id) return null;
 
-    const respon = await fetch('/api/apigames/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order_id: dataBayar.order_id })
-    });
+    try {
+      const respon = await fetch(
+        `/api/pesanan?id=${encodeURIComponent(dataBayar.order_id)}`,
+        { cache: 'no-store' }
+      );
 
-    const hasil = await respon.json();
+      const hasil = await respon.json();
 
-    if (!respon.ok || !hasil.sukses) {
+      if (!respon.ok || !hasil.sukses) {
+        if (!silent) {
+          setPesanSync(hasil.pesan || 'Gagal cek status order.');
+        }
+
+        return null;
+      }
+
+      const bayar = hasil.data?.status_bayar || 'pending';
+      const topup = hasil.data?.status_topup || 'pending';
+      const provider = normalisasiProvider(hasil.data?.provider || providerOrder);
+
+      const pesan = bikinPesanProgress({
+        bayar,
+        topup,
+        provider
+      });
+
+      updateProgress({ bayar, topup, provider, pesan });
+
+      return { bayar, topup, provider };
+    } catch (error) {
+      console.error('Gagal cek DB order:', error);
+
       if (!silent) {
-        setPesanSync(hasil.pesan || 'Gagal cek status top-up APIGames.');
+        setPesanSync('Gagal cek update status order.');
       }
 
       return null;
     }
-
-    const bayar = hasil.data?.status_bayar || 'sukses';
-    const topup = hasil.data?.status_topup || 'proses';
-
-    const pesan = bikinPesanProgress({
-      bayar,
-      topup,
-      sumber: 'apigames'
-    });
-
-    updateProgress({ bayar, topup, pesan });
-
-    return { bayar, topup, hasil };
   };
-const cekStatusOrderDariDb = async ({ silent = true } = {}) => {
-  if (!dataBayar?.order_id) return null;
 
-  try {
-    const respon = await fetch(
-      `/api/pesanan?id=${encodeURIComponent(dataBayar.order_id)}`,
-      { cache: 'no-store' }
-    );
+  const syncApiGamesFinal = async ({ silent = true } = {}) => {
+    if (!dataBayar?.order_id) return null;
 
-    const hasil = await respon.json();
+    try {
+      const respon = await fetch('/api/apigames/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: dataBayar.order_id })
+      });
 
-    if (!respon.ok || !hasil.sukses) {
+      const hasil = await respon.json();
+
+      if (!respon.ok || !hasil.sukses) {
+        if (!silent) {
+          setPesanSync(hasil.pesan || 'Gagal cek status APIGames.');
+        }
+
+        return null;
+      }
+
+      const bayar = hasil.data?.status_bayar || 'sukses';
+      const topup = hasil.data?.status_topup || 'proses';
+      const provider = 'apigames';
+
+      const pesan = bikinPesanProgress({
+        bayar,
+        topup,
+        provider
+      });
+
+      updateProgress({ bayar, topup, provider, pesan });
+
+      return { bayar, topup, provider };
+    } catch (error) {
+      console.error('Gagal sync APIGames:', error);
+
       if (!silent) {
-        setPesanSync(hasil.pesan || 'Gagal cek status order.');
+        setPesanSync('Gagal cek status APIGames.');
       }
 
       return null;
     }
+  };
 
-    const bayar = hasil.data?.status_bayar || 'pending';
-    const topup = hasil.data?.status_topup || 'pending';
+  const syncProviderFinal = async ({ provider, silent = true } = {}) => {
+    const providerFinal = normalisasiProvider(provider);
 
-    const pesan = bikinPesanProgress({
-      bayar,
-      topup,
-      sumber: 'admin'
-    });
-
-    updateProgress({ bayar, topup, pesan });
-
-    return { bayar, topup };
-  } catch (error) {
-    if (!silent) {
-      setPesanSync('Gagal cek update status order.');
+    if (providerFinal === 'apigames') {
+      return syncApiGamesFinal({ silent });
     }
 
-    return null;
-  }
-};
+    // Untuk Digiflazz sementara jangan panggil /api/apigames/sync.
+    // Nanti setelah route /api/provider/sync dibuat, bagian ini kita arahkan ke sana.
+    if (providerFinal === 'digiflazz' || providerFinal === 'mock') {
+      return cekStatusOrderDariDb({ silent });
+    }
+
+    return cekStatusOrderDariDb({ silent });
+  };
+
   const cekPembayaran = async ({ silent = false } = {}) => {
     if (!dataBayar?.order_id) return;
 
@@ -268,29 +316,38 @@ const cekStatusOrderDariDb = async ({ silent = true } = {}) => {
       const hasil = await respon.json();
 
       if (!respon.ok || !hasil.sukses) {
-        setPesanSync(hasil.pesan || 'Gagal cek pembayaran bre.');
+        if (!silent) {
+          setPesanSync(hasil.pesan || 'Gagal cek pembayaran bre.');
+        }
+
         return;
       }
 
       let bayar = hasil.data?.status_bayar || 'pending';
       let topup = hasil.data?.status_topup || 'pending';
-
+      let provider = normalisasiProvider(hasil.data?.provider || providerOrder);
+console.log('PAYMENT PAGE DEBUG:', {
+  orderId: dataBayar.order_id,
+  provider,
+  bayar,
+  topup,
+  hasil: hasil.data
+});
       let pesan = bikinPesanProgress({
         bayar,
         topup,
-        sumber: 'midtrans'
+        provider
       });
 
-      updateProgress({ bayar, topup, pesan });
+      updateProgress({ bayar, topup, provider, pesan });
 
-      // Kalau pembayaran sudah sukses dan top-up masih proses,
-      // lanjut cek status final ke APIGames.
       if (bayar === 'sukses' && topup === 'proses') {
-        const hasilApiGames = await syncApigames({ silent });
+        const hasilProvider = await syncProviderFinal({ provider, silent });
 
-        if (hasilApiGames) {
-          bayar = hasilApiGames.bayar;
-          topup = hasilApiGames.topup;
+        if (hasilProvider) {
+          bayar = hasilProvider.bayar;
+          topup = hasilProvider.topup;
+          provider = hasilProvider.provider || provider;
         }
       }
     } catch (error) {
@@ -308,39 +365,36 @@ const cekStatusOrderDariDb = async ({ silent = true } = {}) => {
     }
   };
 
-useEffect(() => {
-  if (!dataBayar?.order_id) return;
+  useEffect(() => {
+    if (!dataBayar?.order_id) return;
 
-  const pembayaranGagal = statusBayar === 'gagal';
-  const topupSelesai = statusTopup === 'sukses';
+    const pembayaranGagal = statusBayar === 'gagal';
+    const topupSelesai = statusTopup === 'sukses';
 
-  // Kalau pembayaran gagal total atau top-up sudah sukses, polling stop.
-  if (pembayaranGagal || topupSelesai) return;
+    if (pembayaranGagal || topupSelesai) return;
 
-  // Kalau top-up gagal / butuh admin, jangan hit Midtrans/APIGames terus.
-  // Cukup pantau DB. Kalau admin klik Topup OK, stepper otomatis naik selesai.
-  if (statusBayar === 'sukses' && statusTopup === 'gagal') {
-    const intervalAdmin = setInterval(() => {
-      cekStatusOrderDariDb({ silent: true });
+    if (statusBayar === 'sukses' && statusTopup === 'gagal') {
+      const intervalAdmin = setInterval(() => {
+        cekStatusOrderDariDb({ silent: true });
+      }, 10000);
+
+      return () => clearInterval(intervalAdmin);
+    }
+
+    const firstCheck = setTimeout(() => {
+      cekPembayaran({ silent: true });
+    }, 1500);
+
+    const interval = setInterval(() => {
+      cekPembayaran({ silent: true });
     }, 10000);
 
-    return () => clearInterval(intervalAdmin);
-  }
+    return () => {
+      clearTimeout(firstCheck);
+      clearInterval(interval);
+    };
+  }, [dataBayar?.order_id, statusBayar, statusTopup, providerOrder]);
 
-  // Normal flow: payment pending / top-up proses
-  const firstCheck = setTimeout(() => {
-    cekPembayaran({ silent: true });
-  }, 1500);
-
-  const interval = setInterval(() => {
-    cekPembayaran({ silent: true });
-  }, 8000);
-
-  return () => {
-    clearTimeout(firstCheck);
-    clearInterval(interval);
-  };
-}, [dataBayar?.order_id, statusBayar, statusTopup]);
   const getStatusUi = () => {
     if (statusBayar === 'gagal') {
       return {
@@ -380,7 +434,7 @@ useEffect(() => {
         step: 3,
         icon: '🚀',
         title: 'Top-up Sedang Diproses',
-        desc: 'Pembayaran sudah sukses. Sistem sedang menunggu status final dari provider.',
+        desc: `Pembayaran sudah sukses. Sistem sedang menunggu status final dari ${labelProvider(providerOrder)}.`,
         box: 'bg-purple-500/10 border-purple-500/20 text-purple-300',
         glow: 'bg-purple-500/20 text-purple-400'
       };
@@ -411,7 +465,7 @@ useEffect(() => {
     if (!nomorAdmin || !dataBayar?.order_id) return '#';
 
     const pesan = encodeURIComponent(
-      `Halo admin NaXaShop, saya butuh bantuan.\n\nOrder ID: ${dataBayar.order_id}\nProduk: ${dataBayar.nama_produk || '-'}\nStatus Bayar: ${statusBayar}\nStatus Top-up: ${statusTopup}`
+      `Halo admin NaXaShop, saya butuh bantuan.\n\nOrder ID: ${dataBayar.order_id}\nProduk: ${dataBayar.nama_produk || '-'}\nStatus Bayar: ${statusBayar}\nStatus Top-up: ${statusTopup}\nProvider: ${labelProvider(providerOrder)}`
     );
 
     return `https://wa.me/${nomorAdmin}?text=${pesan}`;
@@ -428,7 +482,6 @@ useEffect(() => {
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center py-6 sm:py-12 px-4">
       <div className="w-full max-w-md">
-        {/* STEPPER */}
         <div className="mb-8 px-2">
           <div className="flex items-center justify-between relative">
             <div className="absolute left-0 top-4 w-full h-1 bg-gray-800 z-0 rounded-full"></div>
@@ -469,7 +522,6 @@ useEffect(() => {
           </div>
         </div>
 
-        {/* CARD UTAMA */}
         <div className="bg-gray-900 p-5 sm:p-8 rounded-3xl border border-gray-700 shadow-2xl text-center">
           <div className={`mb-6 rounded-3xl border p-5 ${statusUi.box}`}>
             <div className="text-4xl mb-3">{statusUi.icon}</div>
@@ -483,15 +535,22 @@ useEffect(() => {
             </p>
           </div>
 
-          {/* RINGKASAN ORDER */}
           <div className="bg-slate-950 border border-gray-800 rounded-2xl p-4 mb-6 text-left">
-            <p className="text-[10px] text-gray-500 font-black uppercase tracking-wider">
-              Order ID
-            </p>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] text-gray-500 font-black uppercase tracking-wider">
+                  Order ID
+                </p>
 
-            <p className="font-mono text-cyan-400 font-black break-all text-xs mt-1">
-              {dataBayar.order_id}
-            </p>
+                <p className="font-mono text-cyan-400 font-black break-all text-xs mt-1">
+                  {dataBayar.order_id}
+                </p>
+              </div>
+
+              <span className="shrink-0 rounded-full bg-gray-800 border border-gray-700 px-3 py-1 text-[10px] font-black text-gray-300 uppercase">
+                {labelProvider(providerOrder)}
+              </span>
+            </div>
 
             <div className="grid grid-cols-2 gap-3 mt-4 text-sm">
               <div>
@@ -514,7 +573,6 @@ useEffect(() => {
             </div>
           </div>
 
-          {/* INSTRUKSI BAYAR */}
           {statusBayar === 'pending' && (
             <>
               <p className="text-gray-400 text-sm mb-6">

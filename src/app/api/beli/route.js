@@ -155,6 +155,8 @@ export async function POST(request) {
          p.kode_produk,
          p.nama_produk,
          p.harga,
+         p.provider,
+        COALESCE(p.kode_produk_provider, p.kode_produk) AS kode_produk_provider,
          g.zone_id,
          g.server_game
        FROM produk p
@@ -179,6 +181,32 @@ export async function POST(request) {
     }
 
     const produk = dataProduk[0];
+    const provider = bersihinText(produk.provider || 'apigames').toLowerCase();
+const kodeProdukProvider = bersihinText(
+  produk.kode_produk_provider || produk.kode_produk
+);
+
+const PROVIDER_VALID = ['apigames', 'digiflazz', 'mock'];
+
+if (!PROVIDER_VALID.includes(provider)) {
+  return NextResponse.json(
+    {
+      sukses: false,
+      pesan: 'Provider produk gak valid bre!'
+    },
+    { status: 400 }
+  );
+}
+
+if (!kodeProdukProvider) {
+  return NextResponse.json(
+    {
+      sukses: false,
+      pesan: 'Kode produk provider belum disetting bre!'
+    },
+    { status: 400 }
+  );
+}
     const hargaAsli = Number(produk.harga);
 
     if (!hargaAsli || hargaAsli <= 0) {
@@ -232,6 +260,8 @@ export async function POST(request) {
          game_id,
          produk_id,
          kode_produk,
+         provider,
+         kode_produk_provider,
          id_player,
          zone_player,
          harga,
@@ -241,12 +271,14 @@ export async function POST(request) {
          customer_whatsapp,
          customer_email
        )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         orderId,
         produk.game_id,
         produk.id,
         produk.kode_produk,
+        provider,
+        kodeProdukProvider,
         idPlayer,
         zonePlayer,
         hargaAsli,

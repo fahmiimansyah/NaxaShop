@@ -26,7 +26,9 @@ export default function DashboardAdmin() {
     kode_produk: '',
     nama_produk: '',
     harga: '',
-    status_produk: 'aktif'
+    status_produk: 'aktif',
+    provider: 'apigames',
+    kode_produk_provider: ''
   });
 
   const [modeEditProduk, setModeEditProduk] = useState(false);
@@ -152,7 +154,9 @@ export default function DashboardAdmin() {
       kode_produk: '',
       nama_produk: '',
       harga: '',
-      status_produk: 'aktif'
+      status_produk: 'aktif',
+      provider: 'apigames',
+    kode_produk_provider: ''
     });
 
     setModeEditProduk(false);
@@ -896,7 +900,9 @@ const handleEditCatatan = async (trx) => {
       kode_produk: item.kode_produk || '',
       nama_produk: item.nama_produk || '',
       harga: String(item.harga || ''),
-      status_produk: item.status_produk || 'aktif'
+      status_produk: item.status_produk || 'aktif',
+      provider: item.provider || 'apigames',
+      kode_produk_provider: item.kode_produk_provider || item.kode_produk || ''
     });
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -931,7 +937,9 @@ const handleEditCatatan = async (trx) => {
         kode_produk: item.kode_produk,
         nama_produk: item.nama_produk,
         harga: item.harga,
-        status_produk: statusBaru
+        status_produk: statusBaru,
+          provider: item.provider || 'apigames',
+        kode_produk_provider: item.kode_produk_provider || item.kode_produk
       })
     });
 
@@ -1031,7 +1039,7 @@ const handleEditCatatan = async (trx) => {
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center font-bold animate-pulse">
-        Mengecek KTP Digital...
+        Saha Maneh?
       </div>
     );
   }
@@ -2033,17 +2041,62 @@ const handleEditCatatan = async (trx) => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">Kode APIGames Produk</label>
+  <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">
+    Provider
+  </label>
+
+  <select
+    value={formProduk.provider}
+    onChange={(e) =>
+      setFormProduk({
+        ...formProduk,
+        provider: e.target.value,
+        kode_produk_provider:
+          formProduk.kode_produk_provider || formProduk.kode_produk
+      })
+    }
+    className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-cyan-500 font-bold"
+  >
+    <option value="apigames">APIGames</option>
+    <option value="digiflazz">Digiflazz</option>
+    <option value="mock">Mock / Simulasi</option>
+  </select>
+</div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">Kode Produk Internal</label>
                   <input
                     type="text"
                     required
-                    placeholder="Contoh: ML_86"
+                    placeholder="(Kode game API) Contoh: ML5-DIGI / UPMBL5"
                     value={formProduk.kode_produk}
                     onChange={(e) => setFormProduk({ ...formProduk, kode_produk: e.target.value })}
                     className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-cyan-500"
                   />
                 </div>
+                  <div>
+  <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">
+    Kode Produk Provider
+  </label>
 
+  <input
+    type="text"
+    required
+    placeholder="Contoh Digiflazz: test | APIGames: UPMBL5"
+    value={formProduk.kode_produk_provider}
+    onChange={(e) =>
+      setFormProduk({
+        ...formProduk,
+        kode_produk_provider: e.target.value
+      })
+    }
+    className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-cyan-500"
+  />
+
+  <p className="text-[11px] text-gray-500 mt-1">
+    Ini kode asli yang ditembak ke provider. Boleh beda dari kode internal.
+  </p>
+</div>
                 <div>
                   <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">Nama Tampilan</label>
                   <input
@@ -2136,7 +2189,25 @@ const handleEditCatatan = async (trx) => {
                           </span>
                         </div>
                         <h4 className="font-bold text-white truncate">{item.nama_produk}</h4>
-                        <p className="text-xs text-gray-500 font-mono mt-1 truncate">{item.kode_produk}</p>
+                        <p className="text-xs text-gray-500 font-mono mt-1 truncate">
+  {item.kode_produk}
+</p>
+
+<div className="flex flex-wrap items-center gap-2 mt-2">
+  <span className={`px-2 py-1 rounded-md text-[10px] font-black border uppercase ${
+    item.provider === 'digiflazz'
+      ? 'bg-orange-500/10 text-orange-400 border-orange-500/20'
+      : item.provider === 'apigames'
+        ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
+        : 'bg-gray-800 text-gray-400 border-gray-700'
+  }`}>
+    {item.provider || 'apigames'}
+  </span>
+
+  <span className="px-2 py-1 rounded-md text-[10px] font-mono bg-gray-950 text-gray-400 border border-gray-800 truncate max-w-[180px]">
+    {item.kode_produk_provider || item.kode_produk}
+  </span>
+</div>
                       </div>
 
                       <p className="text-lg font-black text-green-400 shrink-0">

@@ -5,6 +5,9 @@ import db from '../../../lib/db';
 
 const EMAIL_CEO = 'fahmiimansyah28@gmail.com';
 
+const STATUS_PRODUK_VALID = ['aktif', 'nonaktif'];
+const PROVIDER_VALID = ['apigames', 'digiflazz', 'mock'];
+
 async function cekAdmin() {
   const session = await getServerSession(authOptions);
 
@@ -19,6 +22,26 @@ function bersihinText(value) {
   return String(value || '').trim();
 }
 
+function normalisasiStatusProduk(value) {
+  const status = bersihinText(value).toLowerCase();
+  return STATUS_PRODUK_VALID.includes(status) ? status : 'aktif';
+}
+
+function normalisasiProvider(value) {
+  const provider = bersihinText(value || 'apigames').toLowerCase();
+  return PROVIDER_VALID.includes(provider) ? provider : '';
+}
+
+function validasiHarga(value) {
+  const harga = Number(value);
+
+  if (Number.isNaN(harga) || harga <= 0) {
+    return null;
+  }
+
+  return harga;
+}
+
 export async function GET() {
   const adminValid = await cekAdmin();
 
@@ -31,9 +54,17 @@ export async function GET() {
 
   try {
     const [daftarProduk] = await db.query(
-      `SELECT id, kode_produk, nama_produk, harga, game_id, status_produk
-      FROM produk
-      ORDER BY id DESC`
+      `SELECT 
+         id,
+         kode_produk,
+         nama_produk,
+         harga,
+         game_id,
+         status_produk,
+         provider,
+         COALESCE(kode_produk_provider, kode_produk) AS kode_produk_provider
+       FROM produk
+       ORDER BY id DESC`
     );
 
     return NextResponse.json({
@@ -52,9 +83,7 @@ export async function GET() {
 
 export async function POST(request) {
   const adminValid = await cekAdmin();
-  const status_produk = ['aktif', 'nonaktif'].includes(dataBaru.status_produk)
-  ? dataBaru.status_produk
-  : 'aktif';
+
   if (!adminValid) {
     return NextResponse.json(
       { sukses: false, pesan: 'Akses ditolak bre! Lu bukan admin.' },
@@ -68,18 +97,31 @@ export async function POST(request) {
     const kode_produk = bersihinText(dataBaru.kode_produk);
     const nama_produk = bersihinText(dataBaru.nama_produk);
     const game_id = dataBaru.game_id;
-    const hargaAngka = Number(dataBaru.harga);
+    const harga = validasiHarga(dataBaru.harga);
+    const status_produk = normalisasiStatusProduk(dataBaru.status_produk);
 
-    if (!kode_produk || !nama_produk || !hargaAngka || !game_id) {
+    const provider = normalisasiProvider(dataBaru.provider);
+    const kode_produk_provider = bersihinText(
+      dataBaru.kode_produk_provider || kode_produk
+    );
+
+    if (!kode_produk || !nama_produk || !harga || !game_id) {
       return NextResponse.json(
         { sukses: false, pesan: 'Data produk belum lengkap bre!' },
         { status: 400 }
       );
     }
 
-    if (Number.isNaN(hargaAngka) || hargaAngka <= 0) {
+    if (!provider) {
       return NextResponse.json(
-        { sukses: false, pesan: 'Harga produk harus angka valid bre!' },
+        { sukses: false, pesan: 'Provider produk gak valid bre!' },
+        { status: 400 }
+      );
+    }
+
+    if (!kode_produk_provider) {
+      return NextResponse.json(
+        { sukses: false, pesan: 'Kode produk provider wajib diisi bre!' },
         { status: 400 }
       );
     }
@@ -109,10 +151,27 @@ export async function POST(request) {
     }
 
     await db.query(
-  `INSERT INTO produk (kode_produk, nama_produk, harga, game_id, status_produk)
-   VALUES (?, ?, ?, ?, ?)`,
-  [kode_produk, nama_produk, hargaAngka, game_id, status_produk]
-);
+      `INSERT INTO produk
+       (
+         kode_produk,
+         nama_produk,
+         harga,
+         game_id,
+         status_produk,
+         provider,
+         kode_produk_provider
+       )
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        kode_produk,
+        nama_produk,
+        harga,
+        game_id,
+        status_produk,
+        provider,
+        kode_produk_provider
+      ]
+    );
 
     return NextResponse.json({
       sukses: true,
@@ -130,6 +189,7 @@ export async function POST(request) {
 
 export async function PATCH(request) {
   const adminValid = await cekAdmin();
+
   if (!adminValid) {
     return NextResponse.json(
       { sukses: false, pesan: 'Akses ditolak bre! Lu bukan admin.' },
@@ -144,10 +204,14 @@ export async function PATCH(request) {
     const game_id = body.game_id;
     const kode_produk = bersihinText(body.kode_produk);
     const nama_produk = bersihinText(body.nama_produk);
-    const harga = Number(body.harga);
-    const status_produk = ['aktif', 'nonaktif'].includes(body.status_produk)
-    ? body.status_produk
-    : 'aktif';
+    const harga = validasiHarga(body.harga);
+    const status_produk = normalisasiStatusProduk(body.status_produk);
+
+    const provider = normalisasiProvider(body.provider);
+    const kode_produk_provider = bersihinText(
+      body.kode_produk_provider || kode_produk
+    );
+
     if (!id || !game_id || !kode_produk || !nama_produk || !harga) {
       return NextResponse.json(
         { sukses: false, pesan: 'Data produk belum lengkap bre!' },
@@ -155,9 +219,16 @@ export async function PATCH(request) {
       );
     }
 
-    if (Number.isNaN(harga) || harga <= 0) {
+    if (!provider) {
       return NextResponse.json(
-        { sukses: false, pesan: 'Harga produk gak valid bre!' },
+        { sukses: false, pesan: 'Provider produk gak valid bre!' },
+        { status: 400 }
+      );
+    }
+
+    if (!kode_produk_provider) {
+      return NextResponse.json(
+        { sukses: false, pesan: 'Kode produk provider wajib diisi bre!' },
         { status: 400 }
       );
     }
@@ -201,12 +272,23 @@ export async function PATCH(request) {
     await db.query(
       `UPDATE produk
        SET game_id = ?,
-          kode_produk = ?,
-          nama_produk = ?,
-          harga = ?,
-          status_produk = ?
-      WHERE id = ?`,
-      [game_id, kode_produk, nama_produk, harga, status_produk, id]
+           kode_produk = ?,
+           nama_produk = ?,
+           harga = ?,
+           status_produk = ?,
+           provider = ?,
+           kode_produk_provider = ?
+       WHERE id = ?`,
+      [
+        game_id,
+        kode_produk,
+        nama_produk,
+        harga,
+        status_produk,
+        provider,
+        kode_produk_provider,
+        id
+      ]
     );
 
     return NextResponse.json({
