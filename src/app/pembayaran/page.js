@@ -234,65 +234,61 @@ export default function HalamanPembayaran() {
     }
   };
 
-  const syncApiGamesFinal = async ({ silent = true } = {}) => {
-    if (!dataBayar?.order_id) return null;
 
-    try {
-      const respon = await fetch('/api/apigames/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order_id: dataBayar.order_id })
-      });
+  const syncProviderFinal = async ({ provider, silent = true } = {}) => {
+  if (!dataBayar?.order_id) return null;
 
-      const hasil = await respon.json();
+  try {
+    const respon = await fetch('/api/provider/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_id: dataBayar.order_id })
+    });
 
-      if (!respon.ok || !hasil.sukses) {
-        if (!silent) {
-          setPesanSync(hasil.pesan || 'Gagal cek status APIGames.');
-        }
+    const hasil = await respon.json();
 
-        return null;
-      }
-
-      const bayar = hasil.data?.status_bayar || 'sukses';
-      const topup = hasil.data?.status_topup || 'proses';
-      const provider = 'apigames';
-
-      const pesan = bikinPesanProgress({
-        bayar,
-        topup,
-        provider
-      });
-
-      updateProgress({ bayar, topup, provider, pesan });
-
-      return { bayar, topup, provider };
-    } catch (error) {
-      console.error('Gagal sync APIGames:', error);
-
+    if (!respon.ok || !hasil.sukses) {
       if (!silent) {
-        setPesanSync('Gagal cek status APIGames.');
+        setPesanSync(hasil.pesan || 'Gagal cek status provider.');
       }
 
       return null;
     }
-  };
 
-  const syncProviderFinal = async ({ provider, silent = true } = {}) => {
-    const providerFinal = normalisasiProvider(provider);
+    const bayar = hasil.data?.status_bayar || 'sukses';
+    const topup = hasil.data?.status_topup || 'proses';
+    const providerFinal = normalisasiProvider(
+      hasil.data?.provider || provider || providerOrder
+    );
 
-    if (providerFinal === 'apigames') {
-      return syncApiGamesFinal({ silent });
+    const pesan = bikinPesanProgress({
+      bayar,
+      topup,
+      provider: providerFinal
+    });
+
+    updateProgress({
+      bayar,
+      topup,
+      provider: providerFinal,
+      pesan
+    });
+
+    return {
+      bayar,
+      topup,
+      provider: providerFinal
+    };
+  } catch (error) {
+    console.error('Gagal sync provider:', error);
+
+    if (!silent) {
+      setPesanSync('Gagal cek status provider.');
     }
 
-    // Untuk Digiflazz sementara jangan panggil /api/apigames/sync.
-    // Nanti setelah route /api/provider/sync dibuat, bagian ini kita arahkan ke sana.
-    if (providerFinal === 'digiflazz' || providerFinal === 'mock') {
-      return cekStatusOrderDariDb({ silent });
-    }
-
-    return cekStatusOrderDariDb({ silent });
-  };
+    return null;
+  }
+};
 
   const cekPembayaran = async ({ silent = false } = {}) => {
     if (!dataBayar?.order_id) return;
@@ -326,13 +322,7 @@ export default function HalamanPembayaran() {
       let bayar = hasil.data?.status_bayar || 'pending';
       let topup = hasil.data?.status_topup || 'pending';
       let provider = normalisasiProvider(hasil.data?.provider || providerOrder);
-console.log('PAYMENT PAGE DEBUG:', {
-  orderId: dataBayar.order_id,
-  provider,
-  bayar,
-  topup,
-  hasil: hasil.data
-});
+
       let pesan = bikinPesanProgress({
         bayar,
         topup,
@@ -341,15 +331,28 @@ console.log('PAYMENT PAGE DEBUG:', {
 
       updateProgress({ bayar, topup, provider, pesan });
 
-      if (bayar === 'sukses' && topup === 'proses') {
-        const hasilProvider = await syncProviderFinal({ provider, silent });
+      const topupButuhCekProvider =
+  bayar === 'sukses' && !['sukses', 'gagal'].includes(topup);
 
-        if (hasilProvider) {
-          bayar = hasilProvider.bayar;
-          topup = hasilProvider.topup;
-          provider = hasilProvider.provider || provider;
-        }
-      }
+console.log('CEK LANJUT PROVIDER?', {
+  orderId: dataBayar.order_id,
+  bayar,
+  topup,
+  provider,
+  topupButuhCekProvider
+});
+
+if (topupButuhCekProvider) {
+  console.log('GAS HIT /api/provider/sync 🚀');
+
+  const hasilProvider = await syncProviderFinal({ provider, silent });
+
+  if (hasilProvider) {
+    bayar = hasilProvider.bayar;
+    topup = hasilProvider.topup;
+    provider = hasilProvider.provider || provider;
+  }
+}
     } catch (error) {
       console.error('Gagal sync pembayaran:', error);
 

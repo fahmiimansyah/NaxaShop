@@ -440,15 +440,38 @@ const handleUpdateTransaksi = async (trx, payload, teksKonfirmasi) => {
 };
 
 const handleRetryTopup = async (trx) => {
+  const providerRaw = String(trx.provider || 'provider').toLowerCase();
+
+  const providerLabel =
+    providerRaw === 'digiflazz'
+      ? 'Digiflazz'
+      : providerRaw === 'apigames'
+        ? 'APIGames'
+        : providerRaw === 'mock'
+          ? 'Mock Provider'
+          : 'Provider';
+
   const konfirmasi = await Swal.fire({
     title: 'Retry top-up?',
     html: `
-      <b>${escapeHtml(trx.order_id)}</b><br/>
-      <small>Ini bakal nembak ulang APIGames. Jangan retry kalau top-up sebenarnya sudah masuk.</small>
+      <div style="text-align:left">
+        <b>${escapeHtml(trx.order_id)}</b><br/>
+        <small>
+          Ini bakal nembak ulang ke <b>${escapeHtml(providerLabel)}</b>.
+          Jangan retry kalau top-up sebenarnya sudah masuk ke akun customer.
+        </small>
+        <br/><br/>
+        <small style="color:#fbbf24">
+          Provider: ${escapeHtml(providerLabel)}<br/>
+          Produk: ${escapeHtml(trx.nama_produk || trx.kode_produk || '-')}<br/>
+          ID: ${escapeHtml(trx.id_player || '-')}<br/>
+          Server/Zone: ${escapeHtml(trx.zone_player || '-')}
+        </small>
+      </div>
     `,
     icon: 'warning',
     showCancelButton: true,
-    confirmButtonText: 'Retry sekarang!',
+    confirmButtonText: `Retry ke ${providerLabel}!`,
     cancelButtonText: 'Batal',
     background: '#1f2937',
     color: '#fff',
@@ -474,7 +497,10 @@ const handleRetryTopup = async (trx) => {
     if (respon.ok) {
       Swal.fire({
         title: 'RETRY TERKIRIM! 🚀',
-        text: hasil.pesan,
+        html: `
+          <b>${escapeHtml(hasil.pesan || 'Retry berhasil dikirim.')}</b><br/>
+          <small>Provider: ${escapeHtml(hasil.data?.provider || providerLabel)}</small>
+        `,
         icon: 'success',
         background: '#1f2937',
         color: '#fff'
@@ -486,7 +512,15 @@ const handleRetryTopup = async (trx) => {
     } else {
       Swal.fire({
         title: 'RETRY GAGAL ❌',
-        text: hasil.pesan,
+        html: `
+          <b>${escapeHtml(hasil.pesan || 'Retry gagal.')}</b><br/>
+          <small>Provider: ${escapeHtml(hasil.data?.provider || providerLabel)}</small>
+          ${
+            hasil.data?.label_gagal
+              ? `<br/><small style="color:#fbbf24">Masalah: ${escapeHtml(hasil.data.label_gagal)}</small>`
+              : ''
+          }
+        `,
         icon: 'error',
         background: '#1f2937',
         color: '#fff'

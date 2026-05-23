@@ -4,17 +4,13 @@ import { authOptions } from '../../../auth/[...nextauth]/route';
 import crypto from 'crypto';
 import db from '../../../../lib/db';
 import { kirimEmailAdmin, kirimEmailTopupSukses } from '../../../../lib/mailer';
+import { transaksiDigiflazz } from '../../../../lib/digiflazz';
 
 const EMAIL_CEO = 'fahmiimansyah28@gmail.com';
 
 async function cekAdmin() {
   const session = await getServerSession(authOptions);
-
-  if (!session || session.user?.email !== EMAIL_CEO) {
-    return false;
-  }
-
-  return true;
+  return Boolean(session && session.user?.email === EMAIL_CEO);
 }
 
 function bersihinText(value) {
@@ -25,15 +21,19 @@ function realTopupAktif() {
   return process.env.ENABLE_REAL_TOPUP === 'true';
 }
 
+function normalisasiProvider(value) {
+  return String(value || 'apigames').trim().toLowerCase();
+}
+
+function normalisasiStatus(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
 function bikinSignatureApiGames({ merchantId, secretKey, refId }) {
   return crypto
     .createHash('md5')
     .update(`${merchantId}:${secretKey}:${refId}`)
     .digest('hex');
-}
-
-function normalisasiStatus(value) {
-  return String(value || '').trim().toLowerCase();
 }
 
 function ambilStatusApiGames(data) {
@@ -46,19 +46,118 @@ function ambilStatusApiGames(data) {
   );
 }
 
-function statusApiGamesSukses(status) {
+function statusProviderSukses(status) {
   const s = normalisasiStatus(status);
   return ['sukses', 'success', 'berhasil'].includes(s);
 }
 
-function statusApiGamesGagal(status) {
+function statusProviderGagal(status) {
   const s = normalisasiStatus(status);
   return ['gagal', 'failed', 'fail', 'error'].includes(s);
 }
 
-function statusApiGamesButuhAdmin(status) {
+function statusProviderButuhAdmin(status) {
   const s = normalisasiStatus(status);
   return ['sukses sebagian', 'partial', 'partial success'].includes(s);
+}
+
+function statusProviderMasihProses(status) {
+  const s = normalisasiStatus(status);
+
+  return [
+    '',
+    'pending',
+    'proses',
+    'process',
+    'processing',
+    'validasi provider',
+    'validasi_provider'
+  ].includes(s);
+}
+
+function ambilPesanProvider(data) {
+  return (
+    data?.data?.message ||
+    data?.message ||
+    data?.data?.data?.message ||
+    ''
+  );
+}
+
+function ambilRcProvider(data) {
+  return (
+    data?.data?.rc ||
+    data?.rc ||
+    data?.data?.data?.rc ||
+    ''
+  );
+}
+
+function deteksiMasalahProvider(hasilProvider) {
+  const provider = normalisasiProvider(hasilProvider.provider);
+  const rc = String(ambilRcProvider(hasilProvider.data) || '').trim();
+  const pesan = String(ambilPesanProvider(hasilProvider.data) || '').trim();
+  const pesanLower = pesan.toLowerCase();
+
+  if (
+    provider === 'digiflazz' &&
+    (
+      rc === '45' ||
+      pesanLower.includes('ip anda tidak kami kenali') ||
+      (pesanLower.includes('ip') && pesanLower.includes('tidak') && pesanLower.includes('kenali'))
+    )
+  ) {
+    return {
+      jenis: 'konfigurasi_provider',
+      label: 'IP Digiflazz belum whitelist',
+      pesan: pesan || 'IP server belum terdaftar di whitelist Digiflazz.',
+      aksi: 'Tambahkan IP publik server/laptop ke whitelist Development IP Digiflazz, atau jalankan backend dari VPS dengan IP tetap.'
+    };
+  }
+
+  if (
+    pesanLower.includes('signature') ||
+    pesanLower.includes('sign') ||
+    pesanLower.includes('username') ||
+    pesanLower.includes('api key')
+  ) {
+    return {
+      jenis: 'konfigurasi_provider',
+      label: 'Credential provider bermasalah',
+      pesan: pesan || 'Credential provider tidak valid.',
+      aksi: 'Cek username, API key, dan mode environment provider.'
+    };
+  }
+
+  if (
+    pesanLower.includes('saldo') ||
+    pesanLower.includes('balance')
+  ) {
+    return {
+      jenis: 'saldo_provider',
+      label: 'Saldo provider bermasalah',
+      pesan: pesan || 'Saldo provider tidak mencukupi.',
+      aksi: 'Cek saldo provider.'
+    };
+  }
+
+  return {
+    jenis: 'gagal_provider',
+    label: 'Provider mengembalikan status gagal',
+    pesan: pesan || hasilProvider.statusRaw || 'Provider mengembalikan status gagal.',
+    aksi: 'Cek response provider di dashboard admin.'
+  };
+}
+
+function bikinCustomerNoDigiflazz(trx) {
+  const idPlayer = bersihinText(trx.id_player);
+  const zonePlayer = bersihinText(trx.zone_player);
+
+  if (zonePlayer) {
+    return `${idPlayer}|${zonePlayer}`;
+  }
+
+  return idPlayer;
 }
 
 async function kirimNotifAman(payload) {
@@ -79,6 +178,139 @@ async function updateGagal(orderId, responseText, catatan) {
      WHERE order_id = ?`,
     [responseText || null, catatan, orderId]
   );
+}
+
+async function tembakApiGames(trx) {
+  const merchantId = process.env.APIGAMES_MERCHANT_ID;
+  const secretKey = process.env.APIGAMES_SECRET;
+
+  if (!merchantId || !secretKey) {
+    throw new Error('Env APIGames belum lengkap');
+  }
+
+  const refId = trx.order_id;
+  const kodeProdukProvider = trx.kode_produk_provider || trx.kode_produk;
+
+  const signatureApiGames = bikinSignatureApiGames({
+    merchantId,
+    secretKey,
+    refId
+  });
+
+  const responPabrik = await fetch('https://v1.apigames.id/v2/transaksi', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      ref_id: refId,
+      merchant_id: merchantId,
+      produk: kodeProdukProvider,
+      tujuan: trx.id_player,
+      server_id: trx.zone_player || '',
+      signature: signatureApiGames
+    }),
+    cache: 'no-store'
+  });
+
+  const rawPabrik = await responPabrik.text();
+
+  let hasilPabrik;
+
+  try {
+    hasilPabrik = JSON.parse(rawPabrik);
+  } catch (error) {
+    hasilPabrik = {
+      raw_response: rawPabrik
+    };
+  }
+
+  const statusRaw = ambilStatusApiGames(hasilPabrik);
+
+  const gagal =
+    !responPabrik.ok ||
+    hasilPabrik.status === 0 ||
+    hasilPabrik.status === false ||
+    statusProviderGagal(statusRaw) ||
+    statusProviderButuhAdmin(statusRaw);
+
+  return {
+    provider: 'apigames',
+    gagal,
+    suksesFinal: statusProviderSukses(statusRaw),
+    masihProses: statusProviderMasihProses(statusRaw),
+    statusRaw,
+    statusNormal: normalisasiStatus(statusRaw),
+    data: hasilPabrik
+  };
+}
+
+async function tembakDigiflazz(trx) {
+  const refId = trx.order_id;
+  const buyerSkuCode = trx.kode_produk_provider || trx.kode_produk;
+  const customerNo = bikinCustomerNoDigiflazz(trx);
+
+  const hasil = await transaksiDigiflazz({
+    refId,
+    buyerSkuCode,
+    customerNo
+  });
+
+  const statusRaw =
+    hasil.status ||
+    hasil.data?.data?.status ||
+    hasil.data?.status ||
+    '';
+
+  const gagal =
+    !hasil.ok ||
+    hasil.gagal ||
+    statusProviderGagal(statusRaw) ||
+    statusProviderButuhAdmin(statusRaw);
+
+  return {
+    provider: 'digiflazz',
+    gagal,
+    suksesFinal: hasil.sukses || statusProviderSukses(statusRaw),
+    masihProses: hasil.pending || statusProviderMasihProses(statusRaw),
+    statusRaw,
+    statusNormal: normalisasiStatus(statusRaw),
+    data: hasil.data
+  };
+}
+
+async function tembakMock(trx) {
+  return {
+    provider: 'mock',
+    gagal: false,
+    suksesFinal: true,
+    masihProses: false,
+    statusRaw: 'Sukses',
+    statusNormal: 'sukses',
+    data: {
+      ref_id: trx.order_id,
+      status: 'Sukses',
+      message: 'Mock provider sukses dari retry admin'
+    }
+  };
+}
+
+async function tembakProvider(trx) {
+  const provider = normalisasiProvider(trx.provider);
+
+  if (provider === 'apigames') {
+    return tembakApiGames(trx);
+  }
+
+  if (provider === 'digiflazz') {
+    return tembakDigiflazz(trx);
+  }
+
+  if (provider === 'mock') {
+    return tembakMock(trx);
+  }
+
+  throw new Error(`Provider tidak dikenali: ${provider}`);
 }
 
 export async function POST(request) {
@@ -122,6 +354,7 @@ export async function POST(request) {
     }
 
     const trx = dataTrx[0];
+    const provider = normalisasiProvider(trx.provider);
 
     if (trx.status_bayar !== 'sukses') {
       return NextResponse.json(
@@ -147,66 +380,33 @@ export async function POST(request) {
       );
     }
 
-    // SAFETY SWITCH:
-    // Kalau ENABLE_REAL_TOPUP=false, tombol retry tidak akan nembak APIGames real.
     if (!realTopupAktif()) {
       await db.query(
         `UPDATE transaksi
-         SET catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nRetry dibatalkan: ENABLE_REAL_TOPUP=false pada ', NOW()),
+         SET catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nRetry dibatalkan: ENABLE_REAL_TOPUP=false. Provider ', ?, ' tidak ditembak pada ', NOW()),
              updated_at = NOW()
          WHERE order_id = ?`,
-        [orderId]
+        [provider, orderId]
       );
 
       return NextResponse.json(
         {
           sukses: false,
-          pesan: 'Mode aman aktif bre. ENABLE_REAL_TOPUP=false, APIGames tidak ditembak.'
+          pesan: `Mode aman aktif bre. ENABLE_REAL_TOPUP=false, ${provider} tidak ditembak.`
         },
         { status: 400 }
-      );
-    }
-
-    const merchantId = process.env.APIGAMES_MERCHANT_ID;
-    const secretKey = process.env.APIGAMES_SECRET;
-
-    if (!merchantId || !secretKey) {
-      await updateGagal(
-        orderId,
-        null,
-        'Retry gagal: env APIGames belum lengkap pada ' + new Date().toISOString()
-      );
-
-      await kirimNotifAman({
-        subject: `🚨 Retry Gagal ENV APIGames - ${orderId}`,
-        title: 'Retry Top-up Gagal: ENV APIGames Kosong',
-        message: 'Admin mencoba retry, tapi APIGames env belum lengkap.',
-        orderId,
-        detail: JSON.stringify(
-          {
-            merchantIdAda: Boolean(merchantId),
-            secretKeyAda: Boolean(secretKey)
-          },
-          null,
-          2
-        )
-      });
-
-      return NextResponse.json(
-        { sukses: false, pesan: 'Env APIGames belum lengkap bre!' },
-        { status: 500 }
       );
     }
 
     const [hasilLock] = await db.query(
       `UPDATE transaksi
        SET status_topup = 'proses',
-           catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nRetry top-up oleh admin pada ', NOW()),
+           catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nRetry top-up oleh admin via ', ?, ' pada ', NOW()),
            updated_at = NOW()
        WHERE order_id = ?
          AND status_bayar = 'sukses'
          AND status_topup != 'sukses'`,
-      [orderId]
+      [provider, orderId]
     );
 
     if (hasilLock.affectedRows === 0) {
@@ -219,109 +419,123 @@ export async function POST(request) {
       );
     }
 
-    const refId = trx.order_id;
-
-    const signatureApiGames = bikinSignatureApiGames({
-      merchantId,
-      secretKey,
-      refId
-    });
-
-    let responPabrik;
-    let rawPabrik;
-    let hasilPabrik;
+    let hasilProvider;
 
     try {
-      responPabrik = await fetch('https://v1.apigames.id/v2/transaksi', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          ref_id: refId,
-          merchant_id: merchantId,
-          produk: trx.kode_produk,
-          tujuan: trx.id_player,
-          server_id: trx.zone_player || '',
-          signature: signatureApiGames
-        }),
-        cache: 'no-store'
-      });
-
-      rawPabrik = await responPabrik.text();
-
-      try {
-        hasilPabrik = JSON.parse(rawPabrik);
-      } catch (error) {
-        hasilPabrik = {
-          raw_response: rawPabrik
-        };
-      }
+      hasilProvider = await tembakProvider(trx);
     } catch (error) {
       await updateGagal(
         orderId,
         null,
-        `Retry gagal fetch APIGames pada ${new Date().toISOString()}: ${error.message || String(error)}`
+        `Retry gagal tembak provider ${provider} pada ${new Date().toISOString()}: ${error.message || String(error)}`
       );
 
       await kirimNotifAman({
-        subject: `🚨 Retry APIGames Error - ${orderId}`,
-        title: 'Retry Top-up Error Saat Menghubungi APIGames',
-        message: 'Admin mencoba retry, tapi request ke APIGames error.',
+        subject: `🚨 Retry Provider Error - ${orderId}`,
+        title: `Retry Top-up Error Saat Menghubungi ${provider.toUpperCase()}`,
+        message: 'Admin mencoba retry, tapi request ke provider error.',
         orderId,
         detail: error.message || String(error)
       });
 
       return NextResponse.json(
-        { sukses: false, pesan: 'Koneksi ke APIGames gagal bre!' },
+        {
+          sukses: false,
+          pesan: `Koneksi ke ${provider} gagal bre!`,
+          provider
+        },
         { status: 502 }
       );
     }
 
-    const responseText = JSON.stringify(hasilPabrik);
-    const statusRaw = ambilStatusApiGames(hasilPabrik);
+    const responseText = JSON.stringify(hasilProvider.data);
 
-    const apiGamesGagal =
-      !responPabrik.ok ||
-      hasilPabrik.status === 0 ||
-      hasilPabrik.status === false ||
-      statusApiGamesGagal(statusRaw) ||
-      statusApiGamesButuhAdmin(statusRaw);
+    if (hasilProvider.gagal) {
+      const masalahProvider = deteksiMasalahProvider(hasilProvider);
 
-    if (apiGamesGagal) {
-      await updateGagal(
-        orderId,
-        responseText,
-        'Retry gagal pada ' + new Date().toISOString()
+      await db.query(
+        `UPDATE transaksi
+         SET status_topup = 'gagal',
+             apigames_response = ?,
+             catatan_admin = CONCAT(
+               IFNULL(catatan_admin, ''),
+               '\nRetry gagal via ', ?, ' pada ', NOW(),
+               '\nJenis: ', ?,
+               '\nLabel: ', ?,
+               '\nPesan: ', ?,
+               '\nAksi: ', ?
+             ),
+             updated_at = NOW()
+         WHERE order_id = ?`,
+        [
+          responseText,
+          hasilProvider.provider || provider,
+          masalahProvider.jenis,
+          masalahProvider.label,
+          masalahProvider.pesan,
+          masalahProvider.aksi,
+          orderId
+        ]
       );
 
       await kirimNotifAman({
-        subject: `🚨 Retry Top-up Gagal - ${orderId}`,
-        title: 'Retry Top-up Gagal',
-        message: 'Admin sudah mencoba retry top-up, tapi APIGames masih gagal.',
+        subject:
+          masalahProvider.jenis === 'konfigurasi_provider'
+            ? `⚙️ Retry Konfigurasi Provider Bermasalah - ${orderId}`
+            : `🚨 Retry Top-up Gagal - ${orderId}`,
+        title:
+          masalahProvider.jenis === 'konfigurasi_provider'
+            ? `Konfigurasi ${String(hasilProvider.provider || provider).toUpperCase()} Bermasalah`
+            : `Retry Top-up Gagal dari ${String(hasilProvider.provider || provider).toUpperCase()}`,
+        message:
+          masalahProvider.jenis === 'konfigurasi_provider'
+            ? 'Admin retry top-up, tapi provider menolak request karena masalah konfigurasi. Ini bukan kesalahan customer.'
+            : 'Admin sudah mencoba retry top-up, tapi provider masih gagal.',
         orderId,
-        detail: JSON.stringify(hasilPabrik, null, 2)
+        detail: JSON.stringify(
+          {
+            jenis: masalahProvider.jenis,
+            label: masalahProvider.label,
+            pesan: masalahProvider.pesan,
+            aksi: masalahProvider.aksi,
+            response_provider: hasilProvider.data
+          },
+          null,
+          2
+        )
       });
 
       return NextResponse.json(
         {
           sukses: false,
-          pesan: 'Retry ke APIGames gagal bre!',
-          data_apigames: hasilPabrik
+          pesan:
+            masalahProvider.jenis === 'konfigurasi_provider'
+              ? 'Retry gagal karena konfigurasi provider butuh dicek admin.'
+              : `Retry ke ${hasilProvider.provider || provider} gagal bre!`,
+          data: {
+            provider: hasilProvider.provider || provider,
+            status_topup: 'gagal',
+            status_provider: hasilProvider.statusNormal,
+            jenis_gagal: masalahProvider.jenis,
+            label_gagal: masalahProvider.label,
+            pesan_provider: masalahProvider.pesan,
+            butuh_admin: true
+          },
+          data_provider: hasilProvider.data
         },
         { status: 500 }
       );
     }
 
-    if (statusApiGamesSukses(statusRaw)) {
+    if (hasilProvider.suksesFinal) {
       await db.query(
         `UPDATE transaksi
          SET status_topup = 'sukses',
              apigames_response = ?,
-             catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nRetry langsung SUKSES dari APIGames pada ', NOW()),
+             catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nRetry langsung SUKSES dari ', ?, ' pada ', NOW()),
              updated_at = NOW()
          WHERE order_id = ?`,
-        [responseText, orderId]
+        [responseText, hasilProvider.provider || provider, orderId]
       );
 
       if (trx.customer_email) {
@@ -342,9 +556,11 @@ export async function POST(request) {
         sukses: true,
         pesan: 'Retry top-up sukses. Status jadi sukses.',
         data: {
-          status_topup: 'sukses'
+          provider: hasilProvider.provider || provider,
+          status_topup: 'sukses',
+          status_provider: hasilProvider.statusNormal
         },
-        data_apigames: hasilPabrik
+        data_provider: hasilProvider.data
       });
     }
 
@@ -352,20 +568,26 @@ export async function POST(request) {
       `UPDATE transaksi
        SET status_topup = 'proses',
            apigames_response = ?,
-           catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nRetry terkirim ke APIGames pada ', NOW()),
+           catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nRetry terkirim ke ', ?, ' pada ', NOW(), ': ', ?),
            updated_at = NOW()
        WHERE order_id = ?`,
-      [responseText, orderId]
+      [
+        responseText,
+        hasilProvider.provider || provider,
+        hasilProvider.statusRaw || 'Status provider proses/belum final',
+        orderId
+      ]
     );
 
     return NextResponse.json({
       sukses: true,
-      pesan: 'Retry top-up berhasil dikirim ke APIGames. Status jadi proses.',
+      pesan: `Retry top-up berhasil dikirim ke ${hasilProvider.provider || provider}. Status jadi proses.`,
       data: {
+        provider: hasilProvider.provider || provider,
         status_topup: 'proses',
-        status_apigames: normalisasiStatus(statusRaw)
+        status_provider: hasilProvider.statusNormal
       },
-      data_apigames: hasilPabrik
+      data_provider: hasilProvider.data
     });
   } catch (error) {
     console.error('Retry top-up error:', error);

@@ -83,6 +83,86 @@ function statusProviderMasihProses(status) {
   ].includes(s);
 }
 
+function ambilPesanProvider(data) {
+  return (
+    data?.data?.message ||
+    data?.message ||
+    data?.data?.data?.message ||
+    ''
+  );
+}
+
+function ambilRcProvider(data) {
+  return (
+    data?.data?.rc ||
+    data?.rc ||
+    data?.data?.data?.rc ||
+    ''
+  );
+}
+
+function deteksiMasalahProvider(hasilProvider) {
+  const provider = normalisasiProvider(hasilProvider.provider);
+  const rc = String(ambilRcProvider(hasilProvider.data) || '').trim();
+  const pesan = String(ambilPesanProvider(hasilProvider.data) || '').trim();
+  const pesanLower = pesan.toLowerCase();
+
+  if (
+    provider === 'digiflazz' &&
+    (
+      rc === '45' ||
+      pesanLower.includes('ip anda tidak kami kenali') ||
+      (pesanLower.includes('ip') && pesanLower.includes('tidak') && pesanLower.includes('kenali'))
+    )
+  ) {
+    return {
+      jenis: 'konfigurasi_provider',
+      label: 'IP Digiflazz belum whitelist',
+      pesan:
+        pesan ||
+        'IP server belum terdaftar di whitelist Digiflazz.',
+      aksi:
+        'Tambahkan IP publik server/laptop ke whitelist Development IP Digiflazz, atau jalankan backend dari VPS dengan IP tetap.'
+    };
+  }
+
+  if (
+    pesanLower.includes('signature') ||
+    pesanLower.includes('sign') ||
+    pesanLower.includes('username') ||
+    pesanLower.includes('api key')
+  ) {
+    return {
+      jenis: 'konfigurasi_provider',
+      label: 'Credential provider bermasalah',
+      pesan: pesan || 'Credential provider tidak valid.',
+      aksi: 'Cek username, API key, dan mode environment provider.'
+    };
+  }
+
+  if (
+    pesanLower.includes('saldo') ||
+    pesanLower.includes('balance')
+  ) {
+    return {
+      jenis: 'saldo_provider',
+      label: 'Saldo provider bermasalah',
+      pesan: pesan || 'Saldo provider tidak mencukupi.',
+      aksi: 'Cek saldo provider.'
+    };
+  }
+
+  return {
+    jenis: 'gagal_provider',
+    label: 'Provider mengembalikan status gagal',
+    pesan:
+      pesan ||
+      hasilProvider.statusRaw ||
+      'Provider mengembalikan status gagal.',
+    aksi: 'Cek response provider di dashboard admin.'
+  };
+}
+
 function bikinCustomerNoDigiflazz(trx) {
   const idPlayer = bersihinText(trx.id_player);
   const zonePlayer = bersihinText(trx.zone_player);
@@ -580,42 +660,79 @@ export async function POST(request) {
     }
 
     if (hasilProvider.gagal) {
-      await db.query(
-        `UPDATE transaksi
-         SET status_topup = 'gagal',
-             apigames_response = ?,
-             catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nProvider ', ?, ' gagal saat payment sync pada ', NOW(), ': ', ?),
-             updated_at = NOW()
-         WHERE order_id = ?`,
-        [
-          JSON.stringify(hasilProvider.data),
-          hasilProvider.provider || provider,
-          hasilProvider.statusRaw || 'Status provider gagal',
-          orderId
-        ]
-      );
+  const masalahProvider = deteksiMasalahProvider(hasilProvider);
 
-      await kirimNotifAman({
-        subject: `🚨 Top-up Gagal via Payment Sync - ${orderId}`,
-        title: `Top-up Gagal dari ${String(hasilProvider.provider || provider).toUpperCase()}`,
-        message:
-          'Pembayaran sukses, tapi provider mengembalikan status gagal saat payment sync. Cek dashboard admin.',
-        orderId,
-        detail: JSON.stringify(hasilProvider.data, null, 2)
-      });
+  await db.query(
+    `UPDATE transaksi
+     SET status_topup = 'gagal',
+         apigames_response = ?,
+         catatan_admin = CONCAT(
+           IFNULL(catatan_admin, ''),
+           '\nProvider ', ?, ' gagal saat payment sync pada ', NOW(),
+           '\nJenis: ', ?,
+           '\nLabel: ', ?,
+           '\nPesan: ', ?,
+           '\nAksi: ', ?
+         ),
+         updated_at = NOW()
+     WHERE order_id = ?`,
+    [
+      JSON.stringify(hasilProvider.data),
+      hasilProvider.provider || provider,
+      masalahProvider.jenis,
+      masalahProvider.label,
+      masalahProvider.pesan,
+      masalahProvider.aksi,
+      orderId
+    ]
+  );
 
-      return NextResponse.json({
-        sukses: true,
-        pesan: 'Pembayaran sukses, tapi top-up gagal. Admin sudah dinotifikasi.',
-        data: {
-          provider: hasilProvider.provider || provider,
-          status_bayar: 'sukses',
-          status_topup: 'gagal',
-          status_provider: hasilProvider.statusNormal,
-          status_apigames: hasilProvider.statusNormal
-        }
-      });
+  await kirimNotifAman({
+    subject:
+      masalahProvider.jenis === 'konfigurasi_provider'
+        ? `⚙️ Konfigurasi Provider Bermasalah - ${orderId}`
+        : `🚨 Top-up Gagal via Payment Sync - ${orderId}`,
+    title:
+      masalahProvider.jenis === 'konfigurasi_provider'
+        ? `Konfigurasi ${String(hasilProvider.provider || provider).toUpperCase()} Bermasalah`
+        : `Top-up Gagal dari ${String(hasilProvider.provider || provider).toUpperCase()}`,
+    message:
+      masalahProvider.jenis === 'konfigurasi_provider'
+        ? 'Pembayaran sukses, tapi provider menolak request karena masalah konfigurasi. Ini bukan kesalahan customer.'
+        : 'Pembayaran sukses, tapi provider mengembalikan status gagal saat payment sync.',
+    orderId,
+    detail: JSON.stringify(
+      {
+        jenis: masalahProvider.jenis,
+        label: masalahProvider.label,
+        pesan: masalahProvider.pesan,
+        aksi: masalahProvider.aksi,
+        response_provider: hasilProvider.data
+      },
+      null,
+      2
+    )
+  });
+
+  return NextResponse.json({
+    sukses: true,
+    pesan:
+      masalahProvider.jenis === 'konfigurasi_provider'
+        ? 'Pembayaran sukses, tapi provider sedang butuh pengecekan konfigurasi admin.'
+        : 'Pembayaran sukses, tapi top-up gagal. Admin sudah dinotifikasi.',
+    data: {
+      provider: hasilProvider.provider || provider,
+      status_bayar: 'sukses',
+      status_topup: 'gagal',
+      status_provider: hasilProvider.statusNormal,
+      status_apigames: hasilProvider.statusNormal,
+      jenis_gagal: masalahProvider.jenis,
+      label_gagal: masalahProvider.label,
+      pesan_provider: masalahProvider.pesan,
+      butuh_admin: true
     }
+  });
+}
 
     if (hasilProvider.suksesFinal) {
       await db.query(
