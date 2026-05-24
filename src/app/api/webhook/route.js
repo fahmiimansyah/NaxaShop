@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import db from '../../lib/db';
 import { kirimEmailAdmin, kirimEmailTopupSukses } from '../../lib/mailer';
+import { transaksiDigiflazz } from '../../lib/digiflazz';
 
 function bersihinText(value) {
   return String(value || '').trim();
@@ -9,6 +10,10 @@ function bersihinText(value) {
 
 function orderIdValid(orderId) {
   return /^NX-\d{10,20}(-[A-Z0-9]{8})?$/.test(orderId);
+}
+
+function realTopupAktif() {
+  return process.env.ENABLE_REAL_TOPUP === 'true';
 }
 
 function buatSignatureMidtrans(notif, serverKey) {
@@ -52,6 +57,10 @@ function normalisasiStatus(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function normalisasiProvider(value) {
+  return String(value || 'apigames').trim().toLowerCase();
+}
+
 function ambilStatusApiGames(data) {
   return (
     data?.data?.status ||
@@ -62,22 +71,118 @@ function ambilStatusApiGames(data) {
   );
 }
 
-function statusApiGamesSukses(status) {
+function statusProviderSukses(status) {
   const s = normalisasiStatus(status);
-
   return ['sukses', 'success', 'berhasil'].includes(s);
 }
 
-function statusApiGamesGagal(status) {
+function statusProviderGagal(status) {
   const s = normalisasiStatus(status);
-
   return ['gagal', 'failed', 'fail', 'error'].includes(s);
 }
 
-function statusApiGamesButuhAdmin(status) {
+function statusProviderButuhAdmin(status) {
+  const s = normalisasiStatus(status);
+  return ['sukses sebagian', 'partial', 'partial success'].includes(s);
+}
+
+function statusProviderMasihProses(status) {
   const s = normalisasiStatus(status);
 
-  return ['sukses sebagian', 'partial', 'partial success'].includes(s);
+  return [
+    '',
+    'pending',
+    'proses',
+    'process',
+    'processing',
+    'validasi provider',
+    'validasi_provider'
+  ].includes(s);
+}
+
+function ambilPesanProvider(data) {
+  return (
+    data?.data?.message ||
+    data?.message ||
+    data?.data?.data?.message ||
+    ''
+  );
+}
+
+function ambilRcProvider(data) {
+  return (
+    data?.data?.rc ||
+    data?.rc ||
+    data?.data?.data?.rc ||
+    ''
+  );
+}
+
+function deteksiMasalahProvider(hasilProvider) {
+  const provider = normalisasiProvider(hasilProvider.provider);
+  const rc = String(ambilRcProvider(hasilProvider.data) || '').trim();
+  const pesan = String(ambilPesanProvider(hasilProvider.data) || '').trim();
+  const pesanLower = pesan.toLowerCase();
+
+  if (
+    provider === 'digiflazz' &&
+    (
+      rc === '45' ||
+      pesanLower.includes('ip anda tidak kami kenali') ||
+      (pesanLower.includes('ip') && pesanLower.includes('tidak') && pesanLower.includes('kenali'))
+    )
+  ) {
+    return {
+      jenis: 'konfigurasi_provider',
+      label: 'IP Digiflazz belum whitelist',
+      pesan: pesan || 'IP server belum terdaftar di whitelist Digiflazz.',
+      aksi: 'Tambahkan IP publik server/laptop ke whitelist Development IP Digiflazz, atau jalankan backend dari VPS dengan IP tetap.'
+    };
+  }
+
+  if (
+    pesanLower.includes('signature') ||
+    pesanLower.includes('sign') ||
+    pesanLower.includes('username') ||
+    pesanLower.includes('api key')
+  ) {
+    return {
+      jenis: 'konfigurasi_provider',
+      label: 'Credential provider bermasalah',
+      pesan: pesan || 'Credential provider tidak valid.',
+      aksi: 'Cek username, API key, dan mode environment provider.'
+    };
+  }
+
+  if (
+    pesanLower.includes('saldo') ||
+    pesanLower.includes('balance')
+  ) {
+    return {
+      jenis: 'saldo_provider',
+      label: 'Saldo provider bermasalah',
+      pesan: pesan || 'Saldo provider tidak mencukupi.',
+      aksi: 'Cek saldo provider.'
+    };
+  }
+
+  return {
+    jenis: 'gagal_provider',
+    label: 'Provider mengembalikan status gagal',
+    pesan: pesan || hasilProvider.statusRaw || 'Provider mengembalikan status gagal.',
+    aksi: 'Cek response provider di dashboard admin.'
+  };
+}
+
+function bikinCustomerNoDigiflazz(trx) {
+  const idPlayer = bersihinText(trx.id_player);
+  const zonePlayer = bersihinText(trx.zone_player);
+
+  if (zonePlayer) {
+    return `${idPlayer}|${zonePlayer}`;
+  }
+
+  return idPlayer;
 }
 
 async function kirimNotifAman(payload) {
@@ -111,6 +216,7 @@ async function tembakApiGames(trx) {
   }
 
   const refId = trx.order_id;
+  const kodeProdukProvider = trx.kode_produk_provider || trx.kode_produk;
 
   const signatureApiGames = crypto
     .createHash('md5')
@@ -125,7 +231,7 @@ async function tembakApiGames(trx) {
     body: JSON.stringify({
       ref_id: refId,
       merchant_id: merchantId,
-      produk: trx.kode_produk,
+      produk: kodeProdukProvider,
       tujuan: trx.id_player,
       server_id: trx.zone_player || '',
       signature: signatureApiGames
@@ -151,18 +257,86 @@ async function tembakApiGames(trx) {
     !responPabrik.ok ||
     hasilPabrik.status === 0 ||
     hasilPabrik.status === false ||
-    statusApiGamesGagal(statusRaw) ||
-    statusApiGamesButuhAdmin(statusRaw);
-
-  const suksesFinal = statusApiGamesSukses(statusRaw);
+    statusProviderGagal(statusRaw) ||
+    statusProviderButuhAdmin(statusRaw);
 
   return {
+    provider: 'apigames',
     gagal,
-    suksesFinal,
+    suksesFinal: statusProviderSukses(statusRaw),
+    masihProses: statusProviderMasihProses(statusRaw),
     statusRaw,
     statusNormal: normalisasiStatus(statusRaw),
     data: hasilPabrik
   };
+}
+
+async function tembakDigiflazz(trx) {
+  const refId = trx.order_id;
+  const buyerSkuCode = trx.kode_produk_provider || trx.kode_produk;
+  const customerNo = bikinCustomerNoDigiflazz(trx);
+
+  const hasil = await transaksiDigiflazz({
+    refId,
+    buyerSkuCode,
+    customerNo
+  });
+
+  const statusRaw =
+    hasil.status ||
+    hasil.data?.data?.status ||
+    hasil.data?.status ||
+    '';
+
+  const gagal =
+    !hasil.ok ||
+    hasil.gagal ||
+    statusProviderGagal(statusRaw) ||
+    statusProviderButuhAdmin(statusRaw);
+
+  return {
+    provider: 'digiflazz',
+    gagal,
+    suksesFinal: hasil.sukses || statusProviderSukses(statusRaw),
+    masihProses: hasil.pending || statusProviderMasihProses(statusRaw),
+    statusRaw,
+    statusNormal: normalisasiStatus(statusRaw),
+    data: hasil.data
+  };
+}
+
+async function tembakMock(trx) {
+  return {
+    provider: 'mock',
+    gagal: false,
+    suksesFinal: true,
+    masihProses: false,
+    statusRaw: 'Sukses',
+    statusNormal: 'sukses',
+    data: {
+      ref_id: trx.order_id,
+      status: 'Sukses',
+      message: 'Mock provider sukses dari webhook'
+    }
+  };
+}
+
+async function tembakProvider(trx) {
+  const provider = normalisasiProvider(trx.provider);
+
+  if (provider === 'apigames') {
+    return tembakApiGames(trx);
+  }
+
+  if (provider === 'digiflazz') {
+    return tembakDigiflazz(trx);
+  }
+
+  if (provider === 'mock') {
+    return tembakMock(trx);
+  }
+
+  throw new Error(`Provider tidak dikenali: ${provider}`);
 }
 
 export async function POST(request) {
@@ -249,6 +423,7 @@ export async function POST(request) {
     }
 
     const trx = dataTrx[0];
+    const provider = normalisasiProvider(trx.provider);
 
     const grossAmountMidtrans = Number(notif.gross_amount);
     const hargaDatabase = Number(trx.harga);
@@ -343,14 +518,22 @@ export async function POST(request) {
 
     if (trx.status_topup === 'sukses') {
       return NextResponse.json(
-        { sukses: true, pesan: 'Order ini sudah sukses sebelumnya. Aman, gak ditembak dobel.' },
+        {
+          sukses: true,
+          pesan: 'Order ini sudah sukses sebelumnya. Aman, gak ditembak dobel.',
+          data: { provider }
+        },
         { status: 200 }
       );
     }
 
     if (trx.status_topup === 'proses') {
       return NextResponse.json(
-        { sukses: true, pesan: 'Order ini sedang diproses. Webhook dobel diabaikan.' },
+        {
+          sukses: true,
+          pesan: 'Order ini sedang diproses. Webhook dobel diabaikan.',
+          data: { provider }
+        },
         { status: 200 }
       );
     }
@@ -364,7 +547,8 @@ export async function POST(request) {
       return NextResponse.json(
         {
           sukses: true,
-          pesan: 'Pembayaran sukses, tapi top-up sudah gagal. Menunggu retry admin.'
+          pesan: 'Pembayaran sukses, tapi top-up sudah gagal. Menunggu retry admin.',
+          data: { provider }
         },
         { status: 200 }
       );
@@ -374,60 +558,68 @@ export async function POST(request) {
       `UPDATE transaksi
        SET status_bayar = 'sukses',
            status_topup = 'proses',
-           catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nWebhook memproses top-up pada ', NOW()),
+           catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nWebhook memproses top-up via ', ?, ' pada ', NOW()),
            updated_at = NOW()
        WHERE order_id = ?
          AND status_topup = 'pending'`,
-      [orderId]
+      [provider, orderId]
     );
 
     if (hasilLock.affectedRows === 0) {
       return NextResponse.json(
-        { sukses: true, pesan: 'Order sudah pernah diproses. Webhook dobel diabaikan.' },
-        { status: 200 }
-      );
-    }
-
-    const enableRealTopup = process.env.ENABLE_REAL_TOPUP !== 'false';
-
-    if (!enableRealTopup) {
-      await db.query(
-        `UPDATE transaksi
-         SET status_topup = 'proses',
-             catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nWebhook: ENABLE_REAL_TOPUP=false, APIGames tidak ditembak pada ', NOW()),
-             updated_at = NOW()
-         WHERE order_id = ?`,
-        [orderId]
-      );
-
-      return NextResponse.json(
         {
           sukses: true,
-          pesan: 'Payment sukses. Real top-up dimatikan, APIGames tidak ditembak.'
+          pesan: 'Order sudah pernah diproses. Webhook dobel diabaikan.',
+          data: { provider }
         },
         { status: 200 }
       );
     }
 
-    let hasilApiGames;
+    if (!realTopupAktif()) {
+      await db.query(
+        `UPDATE transaksi
+         SET status_topup = 'proses',
+             catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nWebhook: ENABLE_REAL_TOPUP=false, provider ', ?, ' tidak ditembak pada ', NOW()),
+             updated_at = NOW()
+         WHERE order_id = ?`,
+        [provider, orderId]
+      );
+
+      return NextResponse.json(
+        {
+          sukses: true,
+          pesan: `Payment sukses. Real top-up dimatikan, ${provider} tidak ditembak.`,
+          data: {
+            provider,
+            status_bayar: 'sukses',
+            status_topup: 'proses',
+            mode_real_topup: false
+          }
+        },
+        { status: 200 }
+      );
+    }
+
+    let hasilProvider;
 
     try {
-      hasilApiGames = await tembakApiGames(trx);
+      hasilProvider = await tembakProvider(trx);
     } catch (error) {
       await db.query(
         `UPDATE transaksi
          SET status_topup = 'gagal',
-             catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nWebhook gagal tembak APIGames pada ', NOW(), ': ', ?),
+             catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nWebhook gagal tembak provider ', ?, ' pada ', NOW(), ': ', ?),
              updated_at = NOW()
          WHERE order_id = ?`,
-        [error.message || 'Unknown APIGames error', orderId]
+        [provider, error.message || 'Unknown provider error', orderId]
       );
 
       await kirimNotifAman({
-        subject: `🚨 APIGames Error via Webhook - ${orderId}`,
-        title: 'APIGames Error dari Webhook',
+        subject: `🚨 Provider Error via Webhook - ${orderId}`,
+        title: `Provider Error dari Webhook (${provider.toUpperCase()})`,
         message:
-          'Pembayaran sukses, tapi sistem gagal menembak APIGames. Cek dashboard admin.',
+          'Pembayaran sukses, tapi sistem gagal menembak provider dari webhook. Cek dashboard admin.',
         orderId,
         detail: error.message || String(error)
       });
@@ -435,54 +627,108 @@ export async function POST(request) {
       return NextResponse.json(
         {
           sukses: true,
-          pesan: 'Pembayaran sukses, tapi APIGames error. Admin sudah dinotifikasi.'
+          pesan: `Pembayaran sukses, tapi ${provider} error. Admin sudah dinotifikasi.`,
+          data: {
+            provider,
+            status_bayar: 'sukses',
+            status_topup: 'gagal'
+          }
         },
         { status: 200 }
       );
     }
 
-    if (hasilApiGames.gagal) {
+    const responseText = JSON.stringify(hasilProvider.data);
+
+    if (hasilProvider.gagal) {
+      const masalahProvider = deteksiMasalahProvider(hasilProvider);
+
       await db.query(
         `UPDATE transaksi
          SET status_topup = 'gagal',
              apigames_response = ?,
-             catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nAPIGames gagal saat webhook pada ', NOW(), ': ', ?),
+             catatan_admin = CONCAT(
+               IFNULL(catatan_admin, ''),
+               '\nProvider ', ?, ' gagal saat webhook pada ', NOW(),
+               '\nJenis: ', ?,
+               '\nLabel: ', ?,
+               '\nPesan: ', ?,
+               '\nAksi: ', ?
+             ),
              updated_at = NOW()
          WHERE order_id = ?`,
         [
-          JSON.stringify(hasilApiGames.data),
-          hasilApiGames.statusRaw || 'Status APIGames gagal',
+          responseText,
+          hasilProvider.provider || provider,
+          masalahProvider.jenis,
+          masalahProvider.label,
+          masalahProvider.pesan,
+          masalahProvider.aksi,
           orderId
         ]
       );
 
       await kirimNotifAman({
-        subject: `🚨 Top-up Gagal via Webhook - ${orderId}`,
-        title: 'Top-up Gagal Dikirim ke APIGames',
+        subject:
+          masalahProvider.jenis === 'konfigurasi_provider'
+            ? `⚙️ Konfigurasi Provider Bermasalah via Webhook - ${orderId}`
+            : `🚨 Top-up Gagal via Webhook - ${orderId}`,
+        title:
+          masalahProvider.jenis === 'konfigurasi_provider'
+            ? `Konfigurasi ${String(hasilProvider.provider || provider).toUpperCase()} Bermasalah`
+            : `Top-up Gagal dari ${String(hasilProvider.provider || provider).toUpperCase()}`,
         message:
-          'Ada pembayaran sukses, tapi APIGames mengembalikan status gagal dari webhook. Cek dashboard admin sekarang.',
+          masalahProvider.jenis === 'konfigurasi_provider'
+            ? 'Pembayaran sukses, tapi provider menolak request karena masalah konfigurasi. Ini bukan kesalahan customer.'
+            : 'Pembayaran sukses, tapi provider mengembalikan status gagal dari webhook.',
         orderId,
-        detail: JSON.stringify(hasilApiGames.data, null, 2)
+        detail: JSON.stringify(
+          {
+            jenis: masalahProvider.jenis,
+            label: masalahProvider.label,
+            pesan: masalahProvider.pesan,
+            aksi: masalahProvider.aksi,
+            response_provider: hasilProvider.data
+          },
+          null,
+          2
+        )
       });
 
       return NextResponse.json(
         {
           sukses: true,
-          pesan: 'Pembayaran sukses, tapi APIGames gagal. Admin sudah dinotifikasi.'
+          pesan:
+            masalahProvider.jenis === 'konfigurasi_provider'
+              ? 'Pembayaran sukses, tapi konfigurasi provider butuh dicek admin.'
+              : 'Pembayaran sukses, tapi provider gagal. Admin sudah dinotifikasi.',
+          data: {
+            provider: hasilProvider.provider || provider,
+            status_bayar: 'sukses',
+            status_topup: 'gagal',
+            status_provider: hasilProvider.statusNormal,
+            jenis_gagal: masalahProvider.jenis,
+            label_gagal: masalahProvider.label,
+            butuh_admin: true
+          }
         },
         { status: 200 }
       );
     }
 
-    if (hasilApiGames.suksesFinal) {
+    if (hasilProvider.suksesFinal) {
       await db.query(
         `UPDATE transaksi
          SET status_topup = 'sukses',
              apigames_response = ?,
-             catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nAPIGames langsung SUKSES via webhook pada ', NOW()),
+             catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nProvider ', ?, ' langsung SUKSES via webhook pada ', NOW()),
              updated_at = NOW()
          WHERE order_id = ?`,
-        [JSON.stringify(hasilApiGames.data), orderId]
+        [
+          responseText,
+          hasilProvider.provider || provider,
+          orderId
+        ]
       );
 
       if (trx.customer_email) {
@@ -501,7 +747,7 @@ export async function POST(request) {
             subject: `⚠️ Gagal Kirim Email Customer - ${orderId}`,
             title: 'Top-up Sukses Tapi Email Customer Gagal',
             message:
-              'APIGames sudah sukses via webhook, tapi email customer gagal dikirim.',
+              'Provider sudah sukses via webhook, tapi email customer gagal dikirim.',
             orderId,
             detail: error.message || String(error)
           });
@@ -511,7 +757,13 @@ export async function POST(request) {
       return NextResponse.json(
         {
           sukses: true,
-          pesan: 'Pembayaran sukses, top-up berhasil via webhook.'
+          pesan: 'Pembayaran sukses, top-up berhasil via webhook.',
+          data: {
+            provider: hasilProvider.provider || provider,
+            status_bayar: 'sukses',
+            status_topup: 'sukses',
+            status_provider: hasilProvider.statusNormal
+          }
         },
         { status: 200 }
       );
@@ -521,12 +773,13 @@ export async function POST(request) {
       `UPDATE transaksi
        SET status_topup = 'proses',
            apigames_response = ?,
-           catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nOrder terkirim ke APIGames via webhook pada ', NOW(), ': ', ?),
+           catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nOrder terkirim ke provider ', ?, ' via webhook pada ', NOW(), ': ', ?),
            updated_at = NOW()
        WHERE order_id = ?`,
       [
-        JSON.stringify(hasilApiGames.data),
-        hasilApiGames.statusRaw || 'Status APIGames proses/belum final',
+        responseText,
+        hasilProvider.provider || provider,
+        hasilProvider.statusRaw || 'Status provider proses/belum final',
         orderId
       ]
     );
@@ -534,7 +787,13 @@ export async function POST(request) {
     return NextResponse.json(
       {
         sukses: true,
-        pesan: 'Pembayaran sukses, order sudah dikirim ke APIGames.'
+        pesan: 'Pembayaran sukses, order sudah dikirim ke provider.',
+        data: {
+          provider: hasilProvider.provider || provider,
+          status_bayar: 'sukses',
+          status_topup: 'proses',
+          status_provider: hasilProvider.statusNormal
+        }
       },
       { status: 200 }
     );

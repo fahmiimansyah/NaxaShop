@@ -26,6 +26,7 @@ export default function DashboardAdmin() {
     kode_produk: '',
     nama_produk: '',
     harga: '',
+    harga_modal: '',
     status_produk: 'aktif',
     provider: 'apigames',
     kode_produk_provider: ''
@@ -120,6 +121,43 @@ export default function DashboardAdmin() {
     if (status === 'gagal') return 'bg-red-500/10 text-red-400 border-red-500/20';
     return 'bg-gray-800 text-gray-400 border-gray-700';
   };
+
+  const normalisasiProvider = (value) => {
+  return String(value || 'apigames').trim().toLowerCase();
+};
+
+const labelProvider = (provider) => {
+  const p = normalisasiProvider(provider);
+
+  if (p === 'digiflazz') return 'Digiflazz';
+  if (p === 'apigames') return 'APIGames';
+  if (p === 'mock') return 'Mock Provider';
+
+  return 'Provider';
+};
+
+const warnaProvider = (provider) => {
+  const p = normalisasiProvider(provider);
+
+  if (p === 'digiflazz') {
+    return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
+  }
+
+  if (p === 'apigames') {
+    return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20';
+  }
+
+  if (p === 'mock') {
+    return 'bg-gray-500/10 text-gray-300 border-gray-500/20';
+  }
+
+  return 'bg-gray-800 text-gray-400 border-gray-700';
+};
+
+const kodeProviderEfektif = (item) => {
+  return item.kode_produk_provider || item.kode_produk || '-';
+};
+
   const bikinLinkWhatsappCustomer = (trx) => {
   if (!trx.customer_whatsapp) return '#';
 
@@ -154,6 +192,7 @@ export default function DashboardAdmin() {
       kode_produk: '',
       nama_produk: '',
       harga: '',
+      harga_modal: '',
       status_produk: 'aktif',
       provider: 'apigames',
     kode_produk_provider: ''
@@ -296,9 +335,12 @@ const handleGantiHalamanTransaksi = (pageBaru) => {
 };
 
 const handleDetailTransaksi = (trx) => {
+  const providerLabel = labelProvider(trx.provider);
+  const kodeProvider = kodeProviderEfektif(trx);
+
   Swal.fire({
     title: 'Detail Transaksi 🧾',
-    width: 720,
+    width: 760,
     background: '#1f2937',
     color: '#fff',
     confirmButtonColor: '#06b6d4',
@@ -312,17 +354,32 @@ const handleDetailTransaksi = (trx) => {
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
           <div style="background:#111827; padding:12px; border-radius:12px;">
             <b>Game</b><br/>
-            ${escapeHtml(trx.nama_game)}
+            ${escapeHtml(trx.nama_game || '-')}
           </div>
 
           <div style="background:#111827; padding:12px; border-radius:12px;">
             <b>Produk</b><br/>
-            ${escapeHtml(trx.nama_produk || trx.kode_produk)}
+            ${escapeHtml(trx.nama_produk || trx.kode_produk || '-')}
+          </div>
+
+          <div style="background:#111827; padding:12px; border-radius:12px;">
+            <b>Provider</b><br/>
+            ${escapeHtml(providerLabel)}
+          </div>
+
+          <div style="background:#111827; padding:12px; border-radius:12px;">
+            <b>Kode Provider</b><br/>
+            <code>${escapeHtml(kodeProvider)}</code>
+          </div>
+
+          <div style="background:#111827; padding:12px; border-radius:12px;">
+            <b>Kode Internal</b><br/>
+            <code>${escapeHtml(trx.kode_produk || '-')}</code>
           </div>
 
           <div style="background:#111827; padding:12px; border-radius:12px;">
             <b>ID Player</b><br/>
-            ${escapeHtml(trx.id_player)}
+            ${escapeHtml(trx.id_player || '-')}
           </div>
 
           <div style="background:#111827; padding:12px; border-radius:12px;">
@@ -341,14 +398,14 @@ const handleDetailTransaksi = (trx) => {
           </div>
 
           <div style="background:#111827; padding:12px; border-radius:12px;">
-          <b>WhatsApp Customer</b><br/>
-          ${escapeHtml(trx.customer_whatsapp || '-')}
-        </div>
+            <b>WhatsApp Customer</b><br/>
+            ${escapeHtml(trx.customer_whatsapp || '-')}
+          </div>
 
-        <div style="background:#111827; padding:12px; border-radius:12px;">
-          <b>Email Customer</b><br/>
-          ${escapeHtml(trx.customer_email || '-')}
-        </div>
+          <div style="background:#111827; padding:12px; border-radius:12px;">
+            <b>Email Customer</b><br/>
+            ${escapeHtml(trx.customer_email || '-')}
+          </div>
 
           <div style="background:#111827; padding:12px; border-radius:12px;">
             <b>Status Bayar</b><br/>
@@ -367,7 +424,7 @@ const handleDetailTransaksi = (trx) => {
         </div>
 
         <div style="background:#111827; padding:12px; border-radius:12px; margin-top:10px;">
-          <b>Response APIGames</b><br/>
+          <b>Response Provider</b><br/>
           <pre style="white-space:pre-wrap; color:#d1d5db; max-height:180px; overflow:auto;">${escapeHtml(potongText(trx.apigames_response || '-'))}</pre>
         </div>
       </div>
@@ -533,6 +590,98 @@ const handleRetryTopup = async (trx) => {
     Swal.fire({
       title: 'ERROR SERVER!',
       text: 'Gagal retry top-up bre',
+      icon: 'error',
+      background: '#1f2937',
+      color: '#fff'
+    });
+  } finally {
+    setLoadingAksiTransaksi(null);
+  }
+};
+
+const handleCekProvider = async (trx) => {
+  const providerLabel = labelProvider(trx.provider);
+
+  const konfirmasi = await Swal.fire({
+    title: 'Cek status provider?',
+    html: `
+      <div style="text-align:left">
+        <b>${escapeHtml(trx.order_id)}</b><br/>
+        <small>
+          Ini cuma ngecek status terbaru ke <b>${escapeHtml(providerLabel)}</b>,
+          bukan retry / nembak ulang order baru.
+        </small>
+        <br/><br/>
+        <small style="color:#67e8f9">
+          Cocok buat order yang masih proses kelamaan.
+        </small>
+      </div>
+    `,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: `Cek ${providerLabel}`,
+    cancelButtonText: 'Batal',
+    background: '#1f2937',
+    color: '#fff',
+    confirmButtonColor: '#06b6d4',
+    cancelButtonColor: '#374151'
+  });
+
+  if (!konfirmasi.isConfirmed) return;
+
+  setLoadingAksiTransaksi(`${trx.order_id}-cek-provider`);
+
+  try {
+    const respon = await fetch('/api/provider/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        order_id: trx.order_id
+      })
+    });
+
+    const hasil = await respon.json();
+
+    if (respon.ok && hasil.sukses) {
+      Swal.fire({
+        title: 'STATUS PROVIDER KECEK! 🔄',
+        html: `
+          <b>${escapeHtml(hasil.pesan || 'Status provider berhasil dicek.')}</b><br/>
+          <small>Provider: ${escapeHtml(labelProvider(hasil.data?.provider || trx.provider))}</small><br/>
+          <small>Status Top-up: ${escapeHtml(hasil.data?.status_topup || '-')}</small>
+          ${
+            hasil.data?.status_provider
+              ? `<br/><small>Status Provider: ${escapeHtml(hasil.data.status_provider)}</small>`
+              : ''
+          }
+        `,
+        icon: hasil.data?.status_topup === 'sukses' ? 'success' : 'info',
+        background: '#1f2937',
+        color: '#fff'
+      });
+
+      ambilDataSultan();
+      ambilTransaksi();
+      ambilAlerts();
+    } else {
+      Swal.fire({
+        title: 'CEK PROVIDER GAGAL ❌',
+        html: `
+          <b>${escapeHtml(hasil.pesan || 'Gagal cek provider.')}</b><br/>
+          <small>Provider: ${escapeHtml(labelProvider(hasil.data?.provider || trx.provider))}</small>
+        `,
+        icon: 'error',
+        background: '#1f2937',
+        color: '#fff'
+      });
+
+      ambilTransaksi();
+      ambilAlerts();
+    }
+  } catch (error) {
+    Swal.fire({
+      title: 'ERROR SERVER!',
+      text: 'Gagal cek status provider bre',
       icon: 'error',
       background: '#1f2937',
       color: '#fff'
@@ -884,7 +1033,8 @@ const handleEditCatatan = async (trx) => {
         body: JSON.stringify({
           ...formProduk,
           id: produkEditId,
-          harga: parseInt(formProduk.harga)
+          harga: parseInt(formProduk.harga),
+          harga_modal: parseInt(formProduk.harga_modal || 0)
         })
       });
 
@@ -934,6 +1084,7 @@ const handleEditCatatan = async (trx) => {
       kode_produk: item.kode_produk || '',
       nama_produk: item.nama_produk || '',
       harga: String(item.harga || ''),
+      harga_modal: String(item.harga_modal || ''),
       status_produk: item.status_produk || 'aktif',
       provider: item.provider || 'apigames',
       kode_produk_provider: item.kode_produk_provider || item.kode_produk || ''
@@ -971,6 +1122,7 @@ const handleEditCatatan = async (trx) => {
         kode_produk: item.kode_produk,
         nama_produk: item.nama_produk,
         harga: item.harga,
+        harga_modal: item.harga_modal || 0,
         status_produk: statusBaru,
           provider: item.provider || 'apigames',
         kode_produk_provider: item.kode_produk_provider || item.kode_produk
@@ -1163,20 +1315,37 @@ const handleEditCatatan = async (trx) => {
         {/* TAB STATISTIK */}
         {tabAktif === 'statistik' && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
+              
               <div className="bg-gradient-to-br from-gray-900 to-slate-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
-                <div className="absolute top-4 right-4 text-3xl opacity-20">💰</div>
-                <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Total Omset</p>
-                <h3 className="text-2xl font-black text-green-400">
-                  Rp {stats?.totalCuan?.toLocaleString('id-ID') || 0}
-                </h3>
-              </div>
+  <div className="absolute top-4 right-4 text-3xl opacity-20">💰</div>
+  <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Total Omset</p>
+  <h3 className="text-2xl font-black text-green-400">
+    {formatRupiah(stats?.totalOmset ?? stats?.totalCuan)}
+  </h3>
+</div>
 
-              <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
-                <div className="absolute top-4 right-4 text-3xl opacity-20">🚀</div>
-                <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Topup Sukses</p>
-                <h3 className="text-2xl font-black text-blue-400">{stats?.suksesTopup || 0}</h3>
-              </div>
+<div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
+  <div className="absolute top-4 right-4 text-3xl opacity-20">📦</div>
+  <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Total Modal</p>
+  <h3 className="text-2xl font-black text-orange-400">
+    {formatRupiah(stats?.totalModal)}
+  </h3>
+</div>
+
+<div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
+  <div className="absolute top-4 right-4 text-3xl opacity-20">💸</div>
+  <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Profit</p>
+  <h3 className="text-2xl font-black text-emerald-400">
+    {formatRupiah(stats?.totalProfit)}
+  </h3>
+</div>
+
+<div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
+  <div className="absolute top-4 right-4 text-3xl opacity-20">🚀</div>
+  <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Topup Sukses</p>
+  <h3 className="text-2xl font-black text-blue-400">{stats?.suksesTopup || 0}</h3>
+</div>
 
               <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
                 <div className="absolute top-4 right-4 text-3xl opacity-20">⏳</div>
@@ -1359,6 +1528,20 @@ const handleEditCatatan = async (trx) => {
                                       </button>
 
                                       <button
+                                        onClick={() => handleCekProvider(trx)}
+                                        disabled={
+                                          trx.status_bayar !== 'sukses' ||
+                                          trx.status_topup === 'sukses' ||
+                                          loadingAksiTransaksi === `${trx.order_id}-cek-provider`
+                                        }
+                                        className="px-3 py-2 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-xs font-black hover:bg-cyan-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                                      >
+                                        {loadingAksiTransaksi === `${trx.order_id}-cek-provider`
+                                          ? 'Cek...'
+                                          : '🔄 Cek Provider'}
+                                      </button>
+
+                                      <button
                                         onClick={() => handleRetryTopup(trx)}
                                         className="px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-black"
                                       >
@@ -1414,6 +1597,20 @@ const handleEditCatatan = async (trx) => {
                                         className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-white text-xs font-black"
                                       >
                                         👁️ Detail
+                                      </button>
+
+                                      <button
+                                        onClick={() => handleCekProvider(trx)}
+                                        disabled={
+                                          trx.status_bayar !== 'sukses' ||
+                                          trx.status_topup === 'sukses' ||
+                                          loadingAksiTransaksi === `${trx.order_id}-cek-provider`
+                                        }
+                                        className="px-3 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-black disabled:opacity-40 disabled:cursor-not-allowed"
+                                      >
+                                        {loadingAksiTransaksi === `${trx.order_id}-cek-provider`
+                                          ? 'Cek...'
+                                          : '🔄 Cek Provider'}
                                       </button>
 
                                       <button
@@ -1627,6 +1824,10 @@ const handleEditCatatan = async (trx) => {
               <span className="px-2 py-1 rounded-md text-[10px] font-black bg-gray-800 text-gray-400 border border-gray-700">
                 {trx.payment_type || '-'}
               </span>
+
+              <span className={`px-2 py-1 rounded-md text-[10px] font-black border ${warnaProvider(trx.provider)}`}>
+  {labelProvider(trx.provider)}
+</span>
             </div>
 
             <p className="font-mono text-xs text-cyan-400 font-black break-all">
@@ -1638,7 +1839,10 @@ const handleEditCatatan = async (trx) => {
             </p>
 
             <p className="text-xs text-gray-500 mt-1">
-              {trx.nama_game} • <span className="font-mono text-emerald-400">{trx.kode_produk}</span>
+            {trx.nama_game} • Internal:{' '}
+<span className="font-mono text-emerald-400">{trx.kode_produk}</span>
+{' '}• Provider:{' '}
+<span className="font-mono text-orange-400">{kodeProviderEfektif(trx)}</span>
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 text-sm">
@@ -1704,6 +1908,20 @@ const handleEditCatatan = async (trx) => {
                 className="px-3 py-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-black hover:bg-indigo-600 hover:text-white transition-all"
               >
                 📝 Catatan
+              </button>
+
+              <button
+                onClick={() => handleCekProvider(trx)}
+                disabled={
+                  trx.status_bayar !== 'sukses' ||
+                  trx.status_topup === 'sukses' ||
+                  loadingAksiTransaksi === `${trx.order_id}-cek-provider`
+                }
+                className="px-3 py-2 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-xs font-black hover:bg-cyan-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {loadingAksiTransaksi === `${trx.order_id}-cek-provider`
+                  ? 'Cek...'
+                  : '🔄 Cek Provider'}
               </button>
 
               <button
@@ -1889,7 +2107,7 @@ const handleEditCatatan = async (trx) => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">Kode Game APIGames</label>
+                  <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">Kode Game </label>
                   <input
                     type="text"
                     required
@@ -2104,14 +2322,40 @@ const handleEditCatatan = async (trx) => {
                     required
                     placeholder="(Kode game API) Contoh: ML5-DIGI / UPMBL5"
                     value={formProduk.kode_produk}
-                    onChange={(e) => setFormProduk({ ...formProduk, kode_produk: e.target.value })}
+                    onChange={(e) => {
+                    const kodeBaru = e.target.value;
+
+                    setFormProduk((prev) => ({
+                      ...prev,
+                      kode_produk: kodeBaru,
+                      kode_produk_provider:
+                        !prev.kode_produk_provider || prev.kode_produk_provider === prev.kode_produk
+                          ? kodeBaru
+                          : prev.kode_produk_provider
+                    }));
+                  }}
                     className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-cyan-500"
                   />
                 </div>
                   <div>
-  <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">
-    Kode Produk Provider
-  </label>
+  <div className="flex items-center justify-between gap-3 mb-1">
+    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">
+      Kode Produk Provider
+    </label>
+
+    <button
+      type="button"
+      onClick={() =>
+        setFormProduk((prev) => ({
+          ...prev,
+          kode_produk_provider: prev.kode_produk
+        }))
+      }
+      className="text-[10px] font-black text-cyan-400 hover:text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2 py-1 rounded-lg"
+    >
+      Samakan
+    </button>
+  </div>
 
   <input
     type="text"
@@ -2119,16 +2363,17 @@ const handleEditCatatan = async (trx) => {
     placeholder="Contoh Digiflazz: test | APIGames: UPMBL5"
     value={formProduk.kode_produk_provider}
     onChange={(e) =>
-      setFormProduk({
-        ...formProduk,
+      setFormProduk((prev) => ({
+        ...prev,
         kode_produk_provider: e.target.value
-      })
+      }))
     }
     className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-cyan-500"
   />
 
   <p className="text-[11px] text-gray-500 mt-1">
-    Ini kode asli yang ditembak ke provider. Boleh beda dari kode internal.
+    Ini kode asli yang ditembak ke {labelProvider(formProduk.provider)}.
+    Kalau sama dengan kode internal, klik <b>Samakan</b>.
   </p>
 </div>
                 <div>
@@ -2154,6 +2399,28 @@ const handleEditCatatan = async (trx) => {
                     className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-cyan-500"
                   />
                 </div>
+
+                <div>
+  <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">
+    Harga Modal Provider
+  </label>
+
+  <input
+    type="number"
+    min="0"
+    required
+    placeholder="Contoh: 8700"
+    value={formProduk.harga_modal}
+    onChange={(e) => setFormProduk({ ...formProduk, harga_modal: e.target.value })}
+    className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-cyan-500"
+  />
+
+  <p className="text-[11px] text-gray-500 mt-1">
+    Ini modal dari provider. Profit = Harga Jual - Harga Modal.
+  </p>
+
+  
+</div>
 
                 <button
                   type="submit"
@@ -2208,45 +2475,75 @@ const handleEditCatatan = async (trx) => {
                     key={item.id}
                     className="bg-gray-950 border border-gray-800 p-4 rounded-2xl hover:border-cyan-500/50 transition-all group"
                   >
+            
                     <div className="flex justify-between items-start gap-4">
                       <div className="min-w-0 flex-1">
-                        <div className="flex flex-warp gap-2 mb-2">
-                          <span className="text-[10px] font-black text-cyan-500 bg-cyan-500/10 px-2 py-1 rounded-md mb-2 inline-block">
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          <span className="text-[10px] font-black text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2 py-1 rounded-md inline-block">
                             {cariNamaGame(item.game_id)}
                           </span>
-                          <span className={`text-[10px] font-black px-2 py-1 rounded-md inline-block mb-2 ml-2 ${
-                            item.status_produk === 'aktif'
-                              ? 'text-green-400 bg-green-500/10'
-                              : 'text-red-400 bg-red-500/10'
-                          }`}>
+
+                          <span
+                            className={`text-[10px] font-black px-2 py-1 rounded-md inline-block border ${
+                              item.status_produk === 'aktif'
+                                ? 'text-green-400 bg-green-500/10 border-green-500/20'
+                                : 'text-red-400 bg-red-500/10 border-red-500/20'
+                            }`}
+                          >
                             {item.status_produk === 'aktif' ? 'AKTIF' : 'NONAKTIF'}
                           </span>
+
+                          <span className={`text-[10px] font-black px-2 py-1 rounded-md inline-block border ${warnaProvider(item.provider)}`}>
+                            {labelProvider(item.provider)}
+                          </span>
                         </div>
-                        <h4 className="font-bold text-white truncate">{item.nama_produk}</h4>
-                        <p className="text-xs text-gray-500 font-mono mt-1 truncate">
-  {item.kode_produk}
-</p>
 
-<div className="flex flex-wrap items-center gap-2 mt-2">
-  <span className={`px-2 py-1 rounded-md text-[10px] font-black border uppercase ${
-    item.provider === 'digiflazz'
-      ? 'bg-orange-500/10 text-orange-400 border-orange-500/20'
-      : item.provider === 'apigames'
-        ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
-        : 'bg-gray-800 text-gray-400 border-gray-700'
-  }`}>
-    {item.provider || 'apigames'}
-  </span>
+                        <h4 className="font-bold text-white truncate">
+                          {item.nama_produk}
+                        </h4>
 
-  <span className="px-2 py-1 rounded-md text-[10px] font-mono bg-gray-950 text-gray-400 border border-gray-800 truncate max-w-[180px]">
-    {item.kode_produk_provider || item.kode_produk}
-  </span>
-</div>
+                        <div className="mt-2 space-y-1">
+                          <p className="text-xs text-gray-500 font-mono truncate">
+                            Internal:{' '}
+                            <span className="text-emerald-400">
+                              {item.kode_produk}
+                            </span>
+                          </p>
+
+                          <p className="text-xs text-gray-500 font-mono truncate">
+                            Provider:{' '}
+                            <span className="text-orange-400">
+                              {kodeProviderEfektif(item)}
+                            </span>
+                          </p>
+                        </div>
                       </div>
 
-                      <p className="text-lg font-black text-green-400 shrink-0">
-                        Rp {item.harga?.toLocaleString('id-ID')}
-                      </p>
+                      <div className="text-right shrink-0">
+  <p className="text-lg font-black text-green-400">
+    {formatRupiah(item.harga)}
+  </p>
+
+  <p className="text-[11px] text-gray-500 mt-1">
+    Modal: {formatRupiah(item.harga_modal)}
+  </p>
+
+  <p
+    className={`text-[11px] font-black mt-1 ${
+      Number(item.harga || 0) - Number(item.harga_modal || 0) > 0
+        ? 'text-emerald-400'
+        : 'text-red-400'
+    }`}
+  >
+    Profit: {formatRupiah(Number(item.harga || 0) - Number(item.harga_modal || 0))}
+  </p>
+
+  {item.kode_produk_provider && item.kode_produk_provider !== item.kode_produk && (
+    <p className="text-[10px] text-orange-400 font-black mt-1">
+      beda kode
+    </p>
+  )}
+</div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 mt-4">

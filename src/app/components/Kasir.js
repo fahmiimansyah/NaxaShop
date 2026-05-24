@@ -23,10 +23,41 @@ export default function FormKasir({ dataGame }) {
     return `Rp ${Number(angka || 0).toLocaleString('id-ID')}`;
   };
 
-  const namaMetodeBayar = {
-    qris: 'QRIS',
-    bca_va: 'BCA Virtual Account'
-  };
+const daftarMetodeBayar = [
+  {
+    grup: 'QR & E-Wallet',
+    items: [
+      { value: 'qris', label: 'QRIS', desc: 'Gopay, OVO, Dana', logo: '/payment/qris.png', fallback: 'QR' },
+      { value: 'gopay', label: 'GoPay', desc: 'QR / deeplink GoPay', logo: '/payment/gopay.png', fallback: 'GP' },
+      { value: 'shopeepay', label: 'ShopeePay', desc: 'Bayar via ShopeePay', logo: '/payment/shopeepay.png', fallback: 'SP' }
+    ]
+  },
+  {
+    grup: 'Virtual Account',
+    items: [
+      { value: 'bca_va', label: 'BCA VA', desc: 'Virtual Account BCA', logo: '/payment/bca.svg', fallback: 'BCA' },
+      { value: 'bni_va', label: 'BNI VA', desc: 'Virtual Account BNI', logo: '/payment/bni.png', fallback: 'BNI' },
+      { value: 'bri_va', label: 'BRI VA', desc: 'Virtual Account BRI', logo: '/payment/bri.png', fallback: 'BRI' },
+      { value: 'cimb_va', label: 'CIMB VA', desc: 'Virtual Account CIMB', logo: '/payment/cimb.png', fallback: 'CIMB' },
+      { value: 'permata_va', label: 'Permata VA', desc: 'Virtual Account Permata', logo: '/payment/permata.png', fallback: 'PRMT' },
+      { value: 'mandiri_bill', label: 'Mandiri Bill', desc: 'Mandiri Bill Payment', logo: '/payment/mandiri.png', fallback: 'MDR' }
+    ]
+  },
+  {
+    grup: 'Minimarket',
+    items: [
+      { value: 'alfamart', label: 'Alfamart', desc: 'Bayar di kasir Alfamart', logo: '/payment/alfa.png', fallback: 'ALFA' },
+      { value: 'indomaret', label: 'Indomaret', desc: 'Bayar di kasir Indomaret', logo: '/payment/indomaret.png', fallback: 'INDO' }
+    ]
+  }
+];
+
+const namaMetodeBayar = daftarMetodeBayar
+  .flatMap((grup) => grup.items)
+  .reduce((hasil, item) => {
+    hasil[item.value] = item.label;
+    return hasil;
+  }, {});
 
   const checkoutDisabled =
     !produkDipilih ||
@@ -363,7 +394,7 @@ export default function FormKasir({ dataGame }) {
             <b>Target:</b> ${namaTarget}<br/>
             <b>ID:</b> ${inputUserId}<br/>
             <b>Server/Zone:</b> ${inputZoneId || '-'}<br/>
-            <b>Metode:</b> ${metodeBayar.toUpperCase()}
+            <b>Metode:</b> ${namaMetodeBayar[metodeBayar] || metodeBayar}
           </div>
         `,
         icon: 'question',
@@ -525,41 +556,98 @@ export default function FormKasir({ dataGame }) {
           </div>
         </div>
 
-        {/* 3. PILIH METODE PEMBAYARAN */}
-        <div className="bg-gray-800 p-6 rounded-3xl border border-gray-700 shadow-lg">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-black text-sm">
-              3
-            </div>
-            <h2 className="text-xl font-bold text-white">Pilih Pembayaran</h2>
-          </div>
+       {/* 3. PILIH METODE PEMBAYARAN */}
+<div className="bg-gray-800 p-6 rounded-3xl border border-gray-700 shadow-lg">
+  <div className="flex items-center gap-3 mb-4">
+    <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-black text-sm">
+      3
+    </div>
+    <div>
+      <h2 className="text-xl font-bold text-white">Pilih Pembayaran</h2>
+    </div>
+  </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div
-              onClick={() => setMetodeBayar('qris')}
-              className={`p-4 rounded-2xl border-2 cursor-pointer text-center transition-all ${
-                metodeBayar === 'qris'
-                  ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)]'
-                  : 'bg-gray-900 border-gray-700 hover:border-blue-400'
-              }`}
-            >
-              <p className="font-black text-white text-lg">QRIS</p>
-              <p className="text-xs text-gray-400 mt-1">GoPay, OVO, Dana</p>
-            </div>
-
-            <div
-              onClick={() => setMetodeBayar('bca_va')}
-              className={`p-4 rounded-2xl border-2 cursor-pointer text-center transition-all ${
-                metodeBayar === 'bca_va'
-                  ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)]'
-                  : 'bg-gray-900 border-gray-700 hover:border-blue-400'
-              }`}
-            >
-              <p className="font-black text-white text-lg">BCA</p>
-              <p className="text-xs text-gray-400 mt-1">Virtual Account Transfer</p>
-            </div>
-          </div>
+  <div className="space-y-5">
+    {daftarMetodeBayar.map((grup) => (
+      <div key={grup.grup}>
+        <div className="flex items-center gap-2 mb-3">
+          <div className="h-px flex-1 bg-gray-700" />
+          <p className="text-[11px] font-black uppercase tracking-wider text-gray-400">
+            {grup.grup}
+          </p>
+          <div className="h-px flex-1 bg-gray-700" />
         </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+          {grup.items.map((item) => {
+            const aktif = metodeBayar === item.value;
+
+            return (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => setMetodeBayar(item.value)}
+                className={`p-4 rounded-2xl border-2 cursor-pointer text-left transition-all ${
+                  aktif
+                    ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)]'
+                    : 'bg-gray-900 border-gray-700 hover:border-blue-400'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+          <div
+  className={`w-14 h-10 rounded-xl flex items-center justify-center shrink-0 border overflow-hidden ${
+    aktif
+      ? 'bg-white border-blue-400'
+      : 'bg-white border-gray-700'
+  }`}
+>
+  {item.logo ? (
+    <img
+      src={item.logo}
+      alt={item.label}
+      className="max-w-[42px] max-h-7 object-contain"
+      onError={(e) => {
+        e.currentTarget.style.display = 'none';
+        e.currentTarget.nextElementSibling.style.display = 'block';
+      }}
+    />
+  ) : null}
+
+  <span
+    className="hidden text-[10px] font-black text-gray-900"
+  >
+    {item.fallback}
+  </span>
+</div>
+
+                  <div className="min-w-0">
+                    <p className="font-black text-white text-sm">
+                      {item.label}
+                    </p>
+                    <p className="text-[11px] text-gray-400 mt-1 leading-snug">
+                      {item.desc}
+                    </p>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    ))}
+  </div>
+
+  {metodeBayar && (
+    <div className="mt-4 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4">
+      <p className="text-xs text-cyan-200">
+        Metode dipilih:{' '}
+        <span className="font-black text-white">
+          {namaMetodeBayar[metodeBayar]}
+        </span>
+      </p>
+    </div>
+  )}
+</div> 
 
         {/* 4. KONTAK PEMBELI */}
         <div className="bg-gray-800 p-6 rounded-3xl border border-gray-700 shadow-lg">

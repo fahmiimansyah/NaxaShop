@@ -42,6 +42,16 @@ function validasiHarga(value) {
   return harga;
 }
 
+function validasiHargaModal(value) {
+  const hargaModal = Number(value || 0);
+
+  if (Number.isNaN(hargaModal) || hargaModal < 0) {
+    return null;
+  }
+
+  return hargaModal;
+}
+
 export async function GET() {
   const adminValid = await cekAdmin();
 
@@ -59,6 +69,7 @@ export async function GET() {
          kode_produk,
          nama_produk,
          harga,
+         harga_modal,
          game_id,
          status_produk,
          provider,
@@ -98,6 +109,7 @@ export async function POST(request) {
     const nama_produk = bersihinText(dataBaru.nama_produk);
     const game_id = dataBaru.game_id;
     const harga = validasiHarga(dataBaru.harga);
+    const harga_modal = validasiHargaModal(dataBaru.harga_modal);
     const status_produk = normalisasiStatusProduk(dataBaru.status_produk);
 
     const provider = normalisasiProvider(dataBaru.provider);
@@ -105,9 +117,16 @@ export async function POST(request) {
       dataBaru.kode_produk_provider || kode_produk
     );
 
-    if (!kode_produk || !nama_produk || !harga || !game_id) {
+    if (!kode_produk || !nama_produk || !harga || harga_modal === null || !game_id) {
       return NextResponse.json(
         { sukses: false, pesan: 'Data produk belum lengkap bre!' },
+        { status: 400 }
+      );
+    }
+
+    if (harga_modal > harga) {
+      return NextResponse.json(
+        { sukses: false, pesan: 'Harga modal gak boleh lebih gede dari harga jual bre!' },
         { status: 400 }
       );
     }
@@ -156,16 +175,18 @@ export async function POST(request) {
          kode_produk,
          nama_produk,
          harga,
+         harga_modal,
          game_id,
          status_produk,
          provider,
          kode_produk_provider
        )
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         kode_produk,
         nama_produk,
         harga,
+        harga_modal,
         game_id,
         status_produk,
         provider,
@@ -205,6 +226,7 @@ export async function PATCH(request) {
     const kode_produk = bersihinText(body.kode_produk);
     const nama_produk = bersihinText(body.nama_produk);
     const harga = validasiHarga(body.harga);
+    const harga_modal = validasiHargaModal(body.harga_modal);
     const status_produk = normalisasiStatusProduk(body.status_produk);
 
     const provider = normalisasiProvider(body.provider);
@@ -212,9 +234,16 @@ export async function PATCH(request) {
       body.kode_produk_provider || kode_produk
     );
 
-    if (!id || !game_id || !kode_produk || !nama_produk || !harga) {
+    if (!id || !game_id || !kode_produk || !nama_produk || !harga || harga_modal === null) {
       return NextResponse.json(
         { sukses: false, pesan: 'Data produk belum lengkap bre!' },
+        { status: 400 }
+      );
+    }
+
+    if (harga_modal > harga) {
+      return NextResponse.json(
+        { sukses: false, pesan: 'Harga modal gak boleh lebih gede dari harga jual bre!' },
         { status: 400 }
       );
     }
@@ -275,6 +304,7 @@ export async function PATCH(request) {
            kode_produk = ?,
            nama_produk = ?,
            harga = ?,
+           harga_modal = ?,
            status_produk = ?,
            provider = ?,
            kode_produk_provider = ?
@@ -284,6 +314,7 @@ export async function PATCH(request) {
         kode_produk,
         nama_produk,
         harga,
+        harga_modal,
         status_produk,
         provider,
         kode_produk_provider,

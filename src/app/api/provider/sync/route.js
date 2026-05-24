@@ -3,7 +3,7 @@ import db from '../../../lib/db';
 import { rateLimit } from '../../../lib/rate-limit';
 import { kirimEmailAdmin, kirimEmailTopupSukses } from '../../../lib/mailer';
 import { transaksiDigiflazz } from '../../../lib/digiflazz';
-
+import crypto from 'crypto';
 function bersihinText(value) {
   return String(value || '').trim();
 }
@@ -104,22 +104,267 @@ async function syncMock(trx) {
   };
 }
 
-async function proxyApiGamesSync(request, orderId) {
-  const url = new URL('/api/apigames/sync', request.url);
+function bikinSignatureApiGames({ merchantId, secretKey, refId }) {
+  return crypto
+    .createHash('md5')
+    .update(`${merchantId}:${secretKey}:${refId}`)
+    .digest('hex');
+}
 
-  const respon = await fetch(url.toString(), {
-    method: 'POST',
+function ambilStatusApiGames(data) {
+  return (
+    data?.data?.status ||
+    data?.status ||
+    data?.data?.transaction_status ||
+    data?.transaction_status ||
+    ''
+  );
+}
+
+function normalisasiStatusProvider(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function statusProviderSukses(status) {
+  return ['sukses', 'success', 'berhasil'].includes(
+    normalisasiStatusProvider(status)
+  );
+}
+
+function statusProviderGagal(status) {
+  return ['gagal', 'failed', 'fail', 'error', 'partial', 'partial success', 'sukses sebagian'].includes(
+    normalisasiStatusProvider(status)
+  );
+}
+
+async function cekStatusApiGames(refId) {
+  const merchantId = process.env.APIGAMES_MERCHANT_ID;
+  const secretKey =
+    process.env.APIGAMES_SECRET_KEY ||
+    process.env.APIGAMES_SECRET;
+
+  if (!merchantId || !secretKey) {
+    throw new Error('Env APIGames belum lengkap');
+  }
+
+  const signature = bikinSignatureApiGames({
+    merchantId,
+    secretKey,
+    refId
+  });
+
+  const url = new URL('https://v1.apigames.id/v2/transaksi/status');
+  url.searchParams.set('merchant_id', merchantId);
+  url.searchParams.set('ref_id', refId);
+  url.searchParams.set('signature', signature);
+
+  const response = await fetch(url.toString(), {
+    method: 'GET',
     headers: {
-      'Content-Type': 'application/json'
+      Accept: 'application/json'
     },
-    body: JSON.stringify({ order_id: orderId }),
     cache: 'no-store'
   });
 
-  const hasil = await respon.json();
+  const raw = await response.text();
 
-  return NextResponse.json(hasil, {
-    status: respon.status
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    data = { raw_response: raw };
+  }
+
+  return {
+    ok: response.ok,
+    data
+  };
+}
+
+async function syncApiGamesLangsung(orderId) {
+  const [dataTrx] = await db.query(
+    `SELECT
+   t.id,
+   t.order_id,
+   t.status_bayar,
+   t.status_topup,
+   t.customer_email,
+   t.harga,
+   t.payment_type,
+   t.kode_produk,
+   t.apigames_response,
+   COALESCE(p.nama_produk, t.kode_produk) AS nama_produk
+ FROM transaksi t
+ LEFT JOIN produk p ON t.produk_id = p.id
+ WHERE t.order_id = ?
+ LIMIT 1`,
+    [orderId]
+  );
+
+  if (dataTrx.length === 0) {
+    return NextResponse.json(
+      {
+        sukses: false,
+        pesan: 'Transaksi gak ketemu bre!'
+      },
+      { status: 404 }
+    );
+  }
+
+  const trx = dataTrx[0];
+
+  if (trx.status_bayar !== 'sukses') {
+    return NextResponse.json({
+      sukses: true,
+      pesan: 'Pembayaran belum sukses, provider belum perlu dicek.',
+      data: {
+        provider: 'apigames',
+        status_bayar: trx.status_bayar,
+        status_topup: trx.status_topup
+      }
+    });
+  }
+
+  if (trx.status_topup === 'sukses') {
+    return NextResponse.json({
+      sukses: true,
+      pesan: 'Top-up sudah sukses.',
+      data: {
+        provider: 'apigames',
+        status_bayar: 'sukses',
+        status_topup: 'sukses'
+      }
+    });
+  }
+
+  if (trx.status_topup === 'pending') {
+    return NextResponse.json({
+      sukses: true,
+      pesan: 'Top-up belum dikirim ke APIGames.',
+      data: {
+        provider: 'apigames',
+        status_bayar: 'sukses',
+        status_topup: 'pending'
+      }
+    });
+  }
+
+  const hasilStatus = await cekStatusApiGames(orderId);
+
+  if (!hasilStatus.ok) {
+    await db.query(
+      `UPDATE transaksi
+       SET apigames_response = ?,
+           catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nGagal cek status APIGames pada ', NOW())
+       WHERE order_id = ?`,
+      [JSON.stringify(hasilStatus.data), orderId]
+    );
+
+    return NextResponse.json(
+      {
+        sukses: false,
+        pesan: 'Gagal cek status APIGames bre.',
+        data: {
+          provider: 'apigames',
+          status_bayar: trx.status_bayar,
+          status_topup: trx.status_topup
+        }
+      },
+      { status: 502 }
+    );
+  }
+
+  const statusRaw = ambilStatusApiGames(hasilStatus.data);
+  const statusNormal = normalisasiStatusProvider(statusRaw);
+
+  if (statusProviderSukses(statusRaw)) {
+    await db.query(
+      `UPDATE transaksi
+       SET status_topup = 'sukses',
+           apigames_response = ?,
+           catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nAPIGames sync SUKSES pada ', NOW())
+            updated_at = NOW()
+           WHERE order_id = ?`,
+      [JSON.stringify(hasilStatus.data), orderId]
+    );
+
+    if (trx.customer_email) {
+  try {
+    await kirimEmailTopupSukses({
+      to: trx.customer_email,
+      orderId: trx.order_id,
+      namaProduk: trx.nama_produk || trx.kode_produk,
+      harga: trx.harga,
+      paymentType: trx.payment_type
+    });
+  } catch (error) {
+    console.error('Gagal kirim email sukses customer via APIGames sync:', error);
+
+    await kirimNotifAman({
+      subject: `⚠️ Gagal Kirim Email Customer - ${orderId}`,
+      title: 'Top-up APIGames Sukses Tapi Email Customer Gagal',
+      message:
+        'APIGames sudah status sukses, tapi sistem gagal mengirim email sukses ke customer.',
+      orderId,
+      detail: error.message || String(error)
+    });
+  }
+}
+
+    return NextResponse.json({
+      sukses: true,
+      pesan: 'Top-up sukses dari APIGames.',
+      data: {
+        provider: 'apigames',
+        status_bayar: 'sukses',
+        status_topup: 'sukses',
+        status_provider: statusNormal
+      }
+    });
+  }
+
+  if (statusProviderGagal(statusRaw)) {
+    await db.query(
+      `UPDATE transaksi
+       SET status_topup = 'gagal',
+           apigames_response = ?,
+           catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nAPIGames sync GAGAL pada ', NOW(), ': ', ?)
+       WHERE order_id = ?
+         AND status_topup != 'sukses'`,
+      [JSON.stringify(hasilStatus.data), statusRaw, orderId]
+    );
+
+    return NextResponse.json({
+      sukses: true,
+      pesan: 'Top-up gagal atau butuh pengecekan admin.',
+      data: {
+        provider: 'apigames',
+        status_bayar: 'sukses',
+        status_topup: 'gagal',
+        status_provider: statusNormal
+      }
+    });
+  }
+
+  await db.query(
+    `UPDATE transaksi
+     SET status_topup = 'proses',
+         apigames_response = ?,
+         catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nAPIGames sync masih proses pada ', NOW(), ': ', ?)
+     WHERE order_id = ?
+       AND status_topup != 'sukses'`,
+    [JSON.stringify(hasilStatus.data), statusRaw || 'unknown', orderId]
+  );
+
+  return NextResponse.json({
+    sukses: true,
+    pesan: 'Top-up masih diproses APIGames.',
+    data: {
+      provider: 'apigames',
+      status_bayar: 'sukses',
+      status_topup: 'proses',
+      status_provider: statusNormal
+    }
   });
 }
 
@@ -210,11 +455,9 @@ export async function POST(request) {
       });
     }
 
-    // Transisi aman:
-    // APIGames masih pakai route lama dulu.
     if (provider === 'apigames') {
-      return proxyApiGamesSync(request, orderId);
-    }
+  return syncApiGamesLangsung(orderId);
+}
 
     let hasilProvider;
 

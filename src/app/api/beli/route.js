@@ -3,7 +3,46 @@ import crypto from 'crypto';
 import db from '../../lib/db';
 import { rateLimit } from '../../lib/rate-limit';
 
-const METODE_BAYAR_VALID = ['qris', 'bca_va'];
+const METODE_BAYAR_VALID = [
+  'qris',
+  'gopay',
+  'shopeepay',
+
+  'bca_va',
+  'bni_va',
+  'bri_va',
+  'cimb_va',
+  'permata_va',
+  'mandiri_bill',
+
+  'alfamart',
+  'indomaret'
+];
+
+const BANK_TRANSFER_MAP = {
+  bca_va: 'bca',
+  bni_va: 'bni',
+  bri_va: 'bri',
+  cimb_va: 'cimb'
+};
+
+const LABEL_METODE_BAYAR = {
+  qris: 'QRIS',
+  gopay: 'GoPay',
+  shopeepay: 'ShopeePay',
+
+  bca_va: 'BCA Virtual Account',
+  bni_va: 'BNI Virtual Account',
+  bri_va: 'BRI Virtual Account',
+  cimb_va: 'CIMB Virtual Account',
+  permata_va: 'Permata Virtual Account',
+  mandiri_bill: 'Mandiri Bill Payment',
+
+  alfamart: 'Alfamart',
+  indomaret: 'Indomaret'
+};
+
+const PROVIDER_VALID = ['apigames', 'digiflazz', 'mock'];
 
 function bersihinText(value) {
   return String(value || '').trim();
@@ -18,12 +57,12 @@ function bersihinWhatsapp(value) {
 }
 
 function whatsappValid(value) {
-  if (!value) return true; // opsional
+  if (!value) return true;
   return /^62[0-9]{8,15}$/.test(value);
 }
 
 function emailValid(value) {
-  if (!value) return true; // opsional
+  if (!value) return true;
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
@@ -36,6 +75,28 @@ function getMidtransBaseUrl() {
   return process.env.MIDTRANS_IS_PRODUCTION === 'true'
     ? 'https://api.midtrans.com'
     : 'https://api.sandbox.midtrans.com';
+}
+
+function ambilActionUrl(data, namaActionList = []) {
+  const actions = Array.isArray(data?.actions) ? data.actions : [];
+
+  for (const nama of namaActionList) {
+    const ketemu = actions.find((action) => action.name === nama);
+    if (ketemu?.url) return ketemu.url;
+  }
+
+  return '';
+}
+
+function bikinFinishUrl(request, orderId) {
+  const origin =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    request.nextUrl?.origin ||
+    '';
+
+  if (!origin) return '';
+
+  return `${origin}/pembayaran?order_id=${encodeURIComponent(orderId)}`;
 }
 
 async function updateTransaksiGagal(orderId, catatan) {
@@ -53,6 +114,245 @@ async function updateTransaksiGagal(orderId, catatan) {
   } catch (error) {
     console.error('Gagal update transaksi jadi gagal:', error);
   }
+}
+
+function bikinPayloadMidtrans({
+  metodeBayar,
+  orderId,
+  hargaAsli,
+  idPlayer,
+  customerEmail,
+  customerWhatsapp,
+  namaProduk,
+  finishUrl
+}) {
+  const payload = {
+    transaction_details: {
+      order_id: orderId,
+      gross_amount: hargaAsli
+    },
+    customer_details: {
+      first_name: 'Player',
+      last_name: idPlayer,
+      email: customerEmail || undefined,
+      phone: customerWhatsapp || undefined
+    },
+    item_details: [
+      {
+        id: namaProduk?.slice(0, 50) || 'Produk',
+        price: hargaAsli,
+        quantity: 1,
+        name: namaProduk?.slice(0, 50) || 'Produk NaXaShop'
+      }
+    ]
+  };
+
+  if (metodeBayar === 'qris') {
+    payload.payment_type = 'qris';
+    return payload;
+  }
+
+  if (metodeBayar === 'gopay') {
+    payload.payment_type = 'gopay';
+
+    if (finishUrl) {
+      payload.gopay = {
+        enable_callback: true,
+        callback_url: finishUrl
+      };
+    }
+
+    return payload;
+  }
+
+  if (metodeBayar === 'shopeepay') {
+    payload.payment_type = 'shopeepay';
+
+    if (finishUrl) {
+      payload.shopeepay = {
+        callback_url: finishUrl
+      };
+    }
+
+    return payload;
+  }
+
+  if (BANK_TRANSFER_MAP[metodeBayar]) {
+    payload.payment_type = 'bank_transfer';
+    payload.bank_transfer = {
+      bank: BANK_TRANSFER_MAP[metodeBayar]
+    };
+
+    return payload;
+  }
+
+  if (metodeBayar === 'permata_va') {
+    payload.payment_type = 'permata';
+    return payload;
+  }
+
+  if (metodeBayar === 'mandiri_bill') {
+    payload.payment_type = 'echannel';
+    payload.echannel = {
+      bill_info1: 'Payment',
+      bill_info2: 'NaXaShop'
+    };
+
+    return payload;
+  }
+
+  if (metodeBayar === 'alfamart') {
+    payload.payment_type = 'cstore';
+    payload.cstore = {
+      store: 'alfamart',
+      message: 'NaXaShop',
+      alfamart_free_text_1: 'NaXaShop',
+      alfamart_free_text_2: orderId.slice(0, 40),
+      alfamart_free_text_3: 'Terima kasih'
+    };
+
+    return payload;
+  }
+
+  if (metodeBayar === 'indomaret') {
+    payload.payment_type = 'cstore';
+    payload.cstore = {
+      store: 'indomaret',
+      message: 'NaXaShop'
+    };
+
+    return payload;
+  }
+
+  return payload;
+}
+
+function bikinResponsePembayaran({
+  metodeBayar,
+  orderId,
+  hargaAsli,
+  namaProduk,
+  dataMidtrans
+}) {
+  const labelMetode = LABEL_METODE_BAYAR[metodeBayar] || metodeBayar;
+
+  const baseResponse = {
+    sukses: true,
+    order_id: orderId,
+    metode_bayar: metodeBayar,
+    label_metode_bayar: labelMetode,
+    harga: hargaAsli,
+    nama_produk: namaProduk
+  };
+
+  if (metodeBayar === 'qris') {
+    const qrisUrl = ambilActionUrl(dataMidtrans, [
+      'generate-qr-code',
+      'generate-qr-code-v2'
+    ]);
+
+    return {
+      ...baseResponse,
+      tipe: 'qris',
+      qris_url: qrisUrl
+    };
+  }
+
+  if (metodeBayar === 'gopay' || metodeBayar === 'shopeepay') {
+    const qrisUrl = ambilActionUrl(dataMidtrans, [
+      'generate-qr-code',
+      'generate-qr-code-v2'
+    ]);
+
+    const deeplinkUrl = ambilActionUrl(dataMidtrans, [
+      'deeplink-redirect',
+      'mobile-redirect',
+      'app-deeplink-redirect'
+    ]);
+
+    const redirectUrl = ambilActionUrl(dataMidtrans, [
+      'redirect-url',
+      'web-redirect',
+      'payment-page'
+    ]);
+
+    return {
+      ...baseResponse,
+      tipe: 'ewallet',
+      payment_url: deeplinkUrl || redirectUrl || '',
+      deeplink_url: deeplinkUrl || '',
+      redirect_url: redirectUrl || '',
+      qris_url: qrisUrl || '',
+      actions: dataMidtrans.actions || []
+    };
+  }
+
+  if (BANK_TRANSFER_MAP[metodeBayar]) {
+    const vaNumber = dataMidtrans.va_numbers?.[0]?.va_number || '';
+
+    return {
+      ...baseResponse,
+      tipe: 'va',
+      bank: labelMetode.replace(' Virtual Account', ''),
+      va_number: vaNumber
+    };
+  }
+
+  if (metodeBayar === 'permata_va') {
+    return {
+      ...baseResponse,
+      tipe: 'va',
+      bank: 'Permata',
+      va_number: dataMidtrans.permata_va_number || ''
+    };
+  }
+
+  if (metodeBayar === 'mandiri_bill') {
+    return {
+      ...baseResponse,
+      tipe: 'mandiri_bill',
+      bank: 'Mandiri',
+      biller_code: dataMidtrans.biller_code || '',
+      bill_key: dataMidtrans.bill_key || ''
+    };
+  }
+
+  if (metodeBayar === 'alfamart' || metodeBayar === 'indomaret') {
+    return {
+      ...baseResponse,
+      tipe: 'cstore',
+      store: dataMidtrans.store || metodeBayar,
+      payment_code: dataMidtrans.payment_code || ''
+    };
+  }
+
+  return {
+    ...baseResponse,
+    tipe: 'unknown'
+  };
+}
+
+function responsePunyaInstruksiBayar(responseBayar) {
+  if (responseBayar.tipe === 'qris') return Boolean(responseBayar.qris_url);
+
+  if (responseBayar.tipe === 'ewallet') {
+    return Boolean(
+      responseBayar.payment_url ||
+      responseBayar.deeplink_url ||
+      responseBayar.redirect_url ||
+      responseBayar.qris_url
+    );
+  }
+
+  if (responseBayar.tipe === 'va') return Boolean(responseBayar.va_number);
+
+  if (responseBayar.tipe === 'mandiri_bill') {
+    return Boolean(responseBayar.biller_code && responseBayar.bill_key);
+  }
+
+  if (responseBayar.tipe === 'cstore') return Boolean(responseBayar.payment_code);
+
+  return true;
 }
 
 export async function POST(request) {
@@ -146,8 +446,6 @@ export async function POST(request) {
       );
     }
 
-    // Ambil produk dari database.
-    // Jangan percaya harga/game/produk dari frontend.
     const [dataProduk] = await db.query(
       `SELECT 
          p.id,
@@ -155,8 +453,9 @@ export async function POST(request) {
          p.kode_produk,
          p.nama_produk,
          p.harga,
+         p.harga_modal,
          p.provider,
-        COALESCE(p.kode_produk_provider, p.kode_produk) AS kode_produk_provider,
+         COALESCE(p.kode_produk_provider, p.kode_produk) AS kode_produk_provider,
          g.zone_id,
          g.server_game
        FROM produk p
@@ -181,33 +480,34 @@ export async function POST(request) {
     }
 
     const produk = dataProduk[0];
+
     const provider = bersihinText(produk.provider || 'apigames').toLowerCase();
-const kodeProdukProvider = bersihinText(
-  produk.kode_produk_provider || produk.kode_produk
-);
+    const kodeProdukProvider = bersihinText(
+      produk.kode_produk_provider || produk.kode_produk
+    );
 
-const PROVIDER_VALID = ['apigames', 'digiflazz', 'mock'];
+    if (!PROVIDER_VALID.includes(provider)) {
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan: 'Provider produk gak valid bre!'
+        },
+        { status: 400 }
+      );
+    }
 
-if (!PROVIDER_VALID.includes(provider)) {
-  return NextResponse.json(
-    {
-      sukses: false,
-      pesan: 'Provider produk gak valid bre!'
-    },
-    { status: 400 }
-  );
-}
+    if (!kodeProdukProvider) {
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan: 'Kode produk provider belum disetting bre!'
+        },
+        { status: 400 }
+      );
+    }
 
-if (!kodeProdukProvider) {
-  return NextResponse.json(
-    {
-      sukses: false,
-      pesan: 'Kode produk provider belum disetting bre!'
-    },
-    { status: 400 }
-  );
-}
     const hargaAsli = Number(produk.harga);
+    const hargaModal = Number(produk.harga_modal || 0);
 
     if (!hargaAsli || hargaAsli <= 0) {
       return NextResponse.json(
@@ -251,8 +551,6 @@ if (!kodeProdukProvider) {
 
     orderId = bikinOrderId();
 
-    // Catat transaksi dulu supaya kalau Midtrans sukses tapi response error,
-    // order tetap punya jejak di database/admin.
     await db.query(
       `INSERT INTO transaksi
        (
@@ -265,13 +563,14 @@ if (!kodeProdukProvider) {
          id_player,
          zone_player,
          harga,
+         harga_modal,
          payment_type,
          status_bayar,
          status_topup,
          customer_whatsapp,
          customer_email
        )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         orderId,
         produk.game_id,
@@ -282,6 +581,7 @@ if (!kodeProdukProvider) {
         idPlayer,
         zonePlayer,
         hargaAsli,
+        hargaModal,
         metodeBayar,
         'pending',
         'pending',
@@ -294,30 +594,18 @@ if (!kodeProdukProvider) {
 
     const authString = Buffer.from(`${SERVER_KEY}:`).toString('base64');
     const midtransBaseUrl = getMidtransBaseUrl();
+    const finishUrl = bikinFinishUrl(request, orderId);
 
-    const payload = {
-      transaction_details: {
-        order_id: orderId,
-        gross_amount: hargaAsli
-      },
-      customer_details: {
-        first_name: 'Player',
-        last_name: idPlayer,
-        email: customerEmail || undefined,
-        phone: customerWhatsapp || undefined
-      }
-    };
-
-    if (metodeBayar === 'qris') {
-      payload.payment_type = 'qris';
-    }
-
-    if (metodeBayar === 'bca_va') {
-      payload.payment_type = 'bank_transfer';
-      payload.bank_transfer = {
-        bank: 'bca'
-      };
-    }
+    const payload = bikinPayloadMidtrans({
+      metodeBayar,
+      orderId,
+      hargaAsli,
+      idPlayer,
+      customerEmail,
+      customerWhatsapp,
+      namaProduk: produk.nama_produk,
+      finishUrl
+    });
 
     const response = await fetch(`${midtransBaseUrl}/v2/charge`, {
       method: 'POST',
@@ -343,83 +631,54 @@ if (!kodeProdukProvider) {
       return NextResponse.json(
         {
           sukses: false,
-          pesan: data.status_message || 'Gagal bikin tagihan Midtrans'
+          pesan: data.status_message || 'Gagal bikin tagihan Midtrans',
+          data_midtrans: data
         },
         { status: 400 }
       );
     }
 
-    if (metodeBayar === 'qris') {
-      const qrisAction = data.actions?.find(
-        (action) => action.name === 'generate-qr-code'
+    if (data.transaction_status === 'deny' || data.transaction_status === 'failure') {
+      await updateTransaksiGagal(
+        orderId,
+        `Midtrans menolak transaksi pada ${new Date().toISOString()}: ${JSON.stringify(data)}`
       );
 
-      if (!qrisAction?.url) {
-        await updateTransaksiGagal(
-          orderId,
-          `QRIS dari Midtrans tidak kebaca pada ${new Date().toISOString()}: ${JSON.stringify(data)}`
-        );
-
-        return NextResponse.json(
-          {
-            sukses: false,
-            pesan: 'QRIS dari Midtrans gak kebaca bre!'
-          },
-          { status: 500 }
-        );
-      }
-
-      return NextResponse.json({
-        sukses: true,
-        order_id: orderId,
-        tipe: 'qris',
-        qris_url: qrisAction.url,
-        harga: hargaAsli,
-        nama_produk: produk.nama_produk
-      });
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan: data.status_message || 'Transaksi ditolak Midtrans',
+          data_midtrans: data
+        },
+        { status: 400 }
+      );
     }
 
-    if (metodeBayar === 'bca_va') {
-      const vaNumber = data.va_numbers?.[0]?.va_number;
-
-      if (!vaNumber) {
-        await updateTransaksiGagal(
-          orderId,
-          `Nomor VA dari Midtrans tidak kebaca pada ${new Date().toISOString()}: ${JSON.stringify(data)}`
-        );
-
-        return NextResponse.json(
-          {
-            sukses: false,
-            pesan: 'Nomor VA dari Midtrans gak kebaca bre!'
-          },
-          { status: 500 }
-        );
-      }
-
-      return NextResponse.json({
-        sukses: true,
-        order_id: orderId,
-        tipe: 'va',
-        bank: 'BCA',
-        va_number: vaNumber,
-        harga: hargaAsli,
-        nama_produk: produk.nama_produk
-      });
-    }
-
-    await updateTransaksiGagal(
+    const responseBayar = bikinResponsePembayaran({
+      metodeBayar,
       orderId,
-      `Metode bayar belum didukung setelah charge pada ${new Date().toISOString()}`
-    );
+      hargaAsli,
+      namaProduk: produk.nama_produk,
+      dataMidtrans: data
+    });
 
-    return NextResponse.json(
-      {
-        sukses: false,
-        pesan: 'Metode bayar belum didukung bre!'
-      },
-      { status: 400 }
-    );
+    if (!responsePunyaInstruksiBayar(responseBayar)) {
+      await updateTransaksiGagal(
+        orderId,
+        `Instruksi bayar dari Midtrans tidak kebaca pada ${new Date().toISOString()}: ${JSON.stringify(data)}`
+      );
+
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan: 'Instruksi pembayaran dari Midtrans gak kebaca bre!',
+          data_midtrans: data
+        },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(responseBayar);
   } catch (error) {
     console.error('Dapur beli kebakaran:', error);
 

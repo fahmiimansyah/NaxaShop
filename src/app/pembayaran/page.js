@@ -46,7 +46,18 @@ export default function HalamanPembayaran() {
   const [providerOrder, setProviderOrder] = useState('apigames');
 
   const sedangSyncRef = useRef(false);
-  const nomorAdmin = process.env.NEXT_PUBLIC_ADMIN_WHATSAPP;
+
+const statusBayarRef = useRef('pending');
+const statusTopupRef = useRef('pending');
+const providerOrderRef = useRef('apigames');
+
+const nomorAdmin = process.env.NEXT_PUBLIC_ADMIN_WHATSAPP;
+
+useEffect(() => {
+  statusBayarRef.current = statusBayar;
+  statusTopupRef.current = statusTopup;
+  providerOrderRef.current = providerOrder;
+}, [statusBayar, statusTopup, providerOrder]);
 
   useEffect(() => {
     const simpenan = sessionStorage.getItem('dataTagihan');
@@ -168,28 +179,34 @@ export default function HalamanPembayaran() {
     return 'Status sedang dicek. Tunggu sebentar ya.';
   };
 
-  const updateProgress = ({ bayar, topup, pesan, provider }) => {
-    const providerFinal = normalisasiProvider(provider || providerOrder);
+const updateProgress = ({ bayar, topup, pesan, provider }) => {
+  const bayarFinal = bayar || 'pending';
+  const topupFinal = topup || 'pending';
+  const providerFinal = normalisasiProvider(provider || providerOrderRef.current);
 
-    setStatusBayar(bayar || 'pending');
-    setStatusTopup(topup || 'pending');
-    setProviderOrder(providerFinal);
-    setPesanSync(pesan || '');
+  statusBayarRef.current = bayarFinal;
+  statusTopupRef.current = topupFinal;
+  providerOrderRef.current = providerFinal;
 
-    if (dataBayar?.order_id) {
-      simpanProgressOrder({
-        orderId: dataBayar.order_id,
-        bayar: bayar || 'pending',
-        topup: topup || 'pending',
-        provider: providerFinal,
-        pesan: pesan || ''
-      });
-    }
+  setStatusBayar(bayarFinal);
+  setStatusTopup(topupFinal);
+  setProviderOrder(providerFinal);
+  setPesanSync(pesan || '');
 
-    if (bayar === 'sukses' && dataBayar?.order_id) {
-      sessionStorage.setItem('lastOrderId', dataBayar.order_id);
-    }
-  };
+  if (dataBayar?.order_id) {
+    simpanProgressOrder({
+      orderId: dataBayar.order_id,
+      bayar: bayarFinal,
+      topup: topupFinal,
+      provider: providerFinal,
+      pesan: pesan || ''
+    });
+  }
+
+  if (bayarFinal === 'sukses' && dataBayar?.order_id) {
+    sessionStorage.setItem('lastOrderId', dataBayar.order_id);
+  }
+};
 
   const cekStatusOrderDariDb = async ({ silent = true } = {}) => {
     if (!dataBayar?.order_id) return null;
@@ -212,8 +229,9 @@ export default function HalamanPembayaran() {
 
       const bayar = hasil.data?.status_bayar || 'pending';
       const topup = hasil.data?.status_topup || 'pending';
-      const provider = normalisasiProvider(hasil.data?.provider || providerOrder);
-
+      const provider = normalisasiProvider(
+  hasil.data?.provider || providerOrderRef.current
+);
       const pesan = bikinPesanProgress({
         bayar,
         topup,
@@ -258,7 +276,7 @@ export default function HalamanPembayaran() {
     const bayar = hasil.data?.status_bayar || 'sukses';
     const topup = hasil.data?.status_topup || 'proses';
     const providerFinal = normalisasiProvider(
-      hasil.data?.provider || provider || providerOrder
+      hasil.data?.provider || provider || providerOrderRef.current
     );
 
     const pesan = bikinPesanProgress({
@@ -321,8 +339,9 @@ export default function HalamanPembayaran() {
 
       let bayar = hasil.data?.status_bayar || 'pending';
       let topup = hasil.data?.status_topup || 'pending';
-      let provider = normalisasiProvider(hasil.data?.provider || providerOrder);
-
+      let provider = normalisasiProvider(
+  hasil.data?.provider || providerOrderRef.current
+);
       let pesan = bikinPesanProgress({
         bayar,
         topup,
@@ -334,16 +353,7 @@ export default function HalamanPembayaran() {
       const topupButuhCekProvider =
   bayar === 'sukses' && !['sukses', 'gagal'].includes(topup);
 
-console.log('CEK LANJUT PROVIDER?', {
-  orderId: dataBayar.order_id,
-  bayar,
-  topup,
-  provider,
-  topupButuhCekProvider
-});
-
 if (topupButuhCekProvider) {
-  console.log('GAS HIT /api/provider/sync 🚀');
 
   const hasilProvider = await syncProviderFinal({ provider, silent });
 
@@ -368,36 +378,37 @@ if (topupButuhCekProvider) {
     }
   };
 
-  useEffect(() => {
-    if (!dataBayar?.order_id) return;
+useEffect(() => {
+  if (!dataBayar?.order_id) return;
 
-    const pembayaranGagal = statusBayar === 'gagal';
-    const topupSelesai = statusTopup === 'sukses';
+  const jalaninCekOtomatis = () => {
+    const pembayaranGagal = statusBayarRef.current === 'gagal';
+    const topupSelesai = statusTopupRef.current === 'sukses';
 
     if (pembayaranGagal || topupSelesai) return;
 
-    if (statusBayar === 'sukses' && statusTopup === 'gagal') {
-      const intervalAdmin = setInterval(() => {
-        cekStatusOrderDariDb({ silent: true });
-      }, 10000);
-
-      return () => clearInterval(intervalAdmin);
+    if (
+      statusBayarRef.current === 'sukses' &&
+      statusTopupRef.current === 'gagal'
+    ) {
+      cekStatusOrderDariDb({ silent: true });
+      return;
     }
 
-    const firstCheck = setTimeout(() => {
-      cekPembayaran({ silent: true });
-    }, 1500);
+    cekPembayaran({ silent: true });
+  };
 
-    const interval = setInterval(() => {
-      cekPembayaran({ silent: true });
-    }, 10000);
+  const firstCheck = setTimeout(jalaninCekOtomatis, 1500);
+  const interval = setInterval(jalaninCekOtomatis, 10000);
 
-    return () => {
-      clearTimeout(firstCheck);
-      clearInterval(interval);
-    };
-  }, [dataBayar?.order_id, statusBayar, statusTopup, providerOrder]);
+  return () => {
+    clearTimeout(firstCheck);
+    clearInterval(interval);
+  };
 
+  // Sengaja cuma depend ke order_id biar gak restart loop setiap status berubah.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [dataBayar?.order_id]);
   const getStatusUi = () => {
     if (statusBayar === 'gagal') {
       return {
@@ -474,6 +485,46 @@ if (topupButuhCekProvider) {
     return `https://wa.me/${nomorAdmin}?text=${pesan}`;
   };
 
+  const ambilActionUrl = (namaActionList = []) => {
+  const actions = Array.isArray(dataBayar?.actions) ? dataBayar.actions : [];
+
+  for (const nama of namaActionList) {
+    const ketemu = actions.find((action) => action.name === nama);
+
+    if (ketemu?.url) {
+      return ketemu.url;
+    }
+  }
+
+  return '';
+};
+
+const getEwalletButtonUrl = () => {
+  return (
+    dataBayar?.payment_url ||
+    dataBayar?.deeplink_url ||
+    dataBayar?.redirect_url ||
+    ambilActionUrl([
+      'deeplink-redirect',
+      'mobile-redirect',
+      'app-deeplink-redirect',
+      'redirect-url',
+      'web-redirect',
+      'payment-page',
+      'get-checkout-url'
+    ])
+  );
+};
+
+const getEwalletQrUrl = () => {
+  return (
+    dataBayar?.qris_url ||
+    ambilActionUrl([
+      'generate-qr-code',
+      'generate-qr-code-v2'
+    ])
+  );
+};
   if (!dataBayar) {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center font-bold animate-pulse">
@@ -549,10 +600,6 @@ if (topupButuhCekProvider) {
                   {dataBayar.order_id}
                 </p>
               </div>
-
-              <span className="shrink-0 rounded-full bg-gray-800 border border-gray-700 px-3 py-1 text-[10px] font-black text-gray-300 uppercase">
-                {labelProvider(providerOrder)}
-              </span>
             </div>
 
             <div className="grid grid-cols-2 gap-3 mt-4 text-sm">
@@ -666,6 +713,190 @@ if (topupButuhCekProvider) {
                   </div>
                 </div>
               )}
+
+              {dataBayar.tipe === 'ewallet' && (
+  <div className="flex flex-col items-center space-y-5 animate-in zoom-in duration-500">
+    <div className="w-full bg-gray-800/40 border border-gray-800 rounded-2xl p-5 text-center">
+      <p className="text-xs text-gray-500 font-black uppercase tracking-wider">
+        Metode Pembayaran
+      </p>
+
+      <h3 className="text-2xl font-black text-white mt-1">
+        {dataBayar.label_metode_bayar || 'E-Wallet'}
+      </h3>
+
+    </div>
+
+    {getEwalletButtonUrl() && (
+      <a
+        href={getEwalletButtonUrl()}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block w-full rounded-2xl border border-emerald-300/30 bg-gradient-to-r from-emerald-600 to-green-500 px-5 py-4 text-center font-black text-white shadow-[0_0_25px_rgba(34,197,94,0.35)] transition-all hover:-translate-y-1 hover:from-emerald-500 hover:to-green-400 active:scale-[0.98]"
+      >
+        <span className="block text-xs uppercase tracking-widest text-emerald-100/80">
+          Klik untuk lanjut
+        </span>
+        <span className="mt-1 block text-base sm:text-lg">
+          Buka Pembayaran {dataBayar.label_metode_bayar || 'E-Wallet'} 🚀
+        </span>
+      </a>
+    )}
+
+    {getEwalletQrUrl() && (
+      <div className="w-full">
+        <div className="flex items-center gap-3 my-2">
+          <div className="h-px flex-1 bg-gray-700" />
+          <p className="text-[10px] text-gray-500 font-black uppercase tracking-wider">
+            Atau scan QR
+          </p>
+          <div className="h-px flex-1 bg-gray-700" />
+        </div>
+
+        <div className="mx-auto w-fit rounded-3xl border border-gray-200 bg-white p-4 shadow-[0_0_30px_rgba(34,197,94,0.25)]">
+          <div className="flex h-56 w-56 items-center justify-center rounded-2xl bg-white">
+            <img
+              src={getEwalletQrUrl()}
+              alt={dataBayar.label_metode_bayar || 'QR E-Wallet'}
+              className="max-h-full max-w-full object-contain"
+            />
+          </div>
+        </div>
+
+        <p className="mt-3 text-center text-[11px] text-gray-500">
+          Scan QR ini lewat aplikasi yang sesuai.
+        </p>
+      </div>
+    )}
+
+    {!getEwalletButtonUrl() && !getEwalletQrUrl() && (
+      <div className="w-full rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4 text-xs font-bold text-yellow-200">
+        Instruksi pembayaran e-wallet belum kebaca. Coba refresh atau cek ulang status.
+      </div>
+    )}
+
+    <div className="w-full bg-gray-800/40 border border-gray-800 rounded-2xl p-4 text-left">
+      <h3 className="font-bold text-white mb-2 text-xs sm:text-sm border-b border-gray-700/60 pb-2">
+        Cara Bayar {dataBayar.label_metode_bayar || 'E-Wallet'}:
+      </h3>
+
+      <ul className="text-xs sm:text-sm text-gray-400 space-y-2">
+        <li className="flex gap-2">
+          <span className="font-black text-cyan-400">1.</span>
+          Klik tombol pembayaran kalau tersedia.
+        </li>
+        <li className="flex gap-2">
+          <span className="font-black text-cyan-400">2.</span>
+          Kalau muncul QR, scan lewat aplikasi yang sesuai.
+        </li>
+        <li className="flex gap-2">
+          <span className="font-black text-cyan-400">3.</span>
+          Selesaikan pembayaran, lalu tunggu status otomatis berubah.
+        </li>
+      </ul>
+
+    </div>
+  </div>
+)}
+
+{dataBayar.tipe === 'mandiri_bill' && (
+  <div className="flex flex-col items-center space-y-5 animate-in zoom-in duration-500">
+    <div className="w-full bg-gray-800/40 border border-gray-800 rounded-2xl p-5 text-center">
+      <p className="text-xs text-gray-500 font-black uppercase tracking-wider">
+        Mandiri Bill Payment
+      </p>
+
+      <h3 className="text-2xl font-black text-white mt-1">
+        Mandiri Bill
+      </h3>
+    </div>
+
+    <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="bg-gray-800 p-4 rounded-xl border border-gray-600">
+        <p className="text-xs text-gray-500 font-black uppercase mb-1">
+          Biller Code
+        </p>
+        <p className="text-2xl font-black text-cyan-400 font-mono break-all select-all">
+          {dataBayar.biller_code}
+        </p>
+      </div>
+
+      <div className="bg-gray-800 p-4 rounded-xl border border-gray-600">
+        <p className="text-xs text-gray-500 font-black uppercase mb-1">
+          Bill Key
+        </p>
+        <p className="text-2xl font-black text-emerald-400 font-mono break-all select-all">
+          {dataBayar.bill_key}
+        </p>
+      </div>
+    </div>
+
+    <div className="w-full bg-gray-800/40 border border-gray-800 rounded-2xl p-4 text-left">
+      <h3 className="font-bold text-white mb-2 text-xs sm:text-sm border-b border-gray-700/60 pb-2">
+        Cara Bayar Mandiri Bill:
+      </h3>
+
+      <ul className="text-xs sm:text-sm text-gray-400 space-y-2">
+        <li>1. Buka Livin / ATM Mandiri.</li>
+        <li>2. Pilih menu Bayar / Payment.</li>
+        <li>3. Masukkan Biller Code dan Bill Key.</li>
+        <li>4. Pastikan nominal sesuai, lalu bayar.</li>
+      </ul>
+    </div>
+  </div>
+)}
+
+{dataBayar.tipe === 'cstore' && (
+  <div className="flex flex-col items-center space-y-5 animate-in zoom-in duration-500">
+    <div className="w-full bg-gray-800/40 border border-gray-800 rounded-2xl p-5 text-center">
+      <p className="text-xs text-gray-500 font-black uppercase tracking-wider">
+        Bayar di Minimarket
+      </p>
+
+      <h3 className="text-2xl font-black text-white mt-1">
+        {dataBayar.label_metode_bayar || dataBayar.store || 'Minimarket'}
+      </h3>
+    </div>
+
+    <div className="w-full bg-gray-800 p-4 rounded-xl border border-gray-600 text-center">
+      <p className="text-xs text-gray-500 font-black uppercase mb-1">
+        Kode Pembayaran
+      </p>
+
+      <p className="text-3xl font-black text-yellow-400 font-mono break-all select-all">
+        {dataBayar.payment_code}
+      </p>
+
+      <button
+        onClick={() => {
+          navigator.clipboard.writeText(dataBayar.payment_code || '');
+          setSudahSalin(true);
+          setTimeout(() => setSudahSalin(false), 2000);
+        }}
+        className={`mt-3 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+          sudahSalin
+            ? 'bg-green-500 text-white'
+            : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+        }`}
+      >
+        {sudahSalin ? 'Tersalin! ✓' : 'Salin Kode'}
+      </button>
+    </div>
+
+    <div className="w-full bg-gray-800/40 border border-gray-800 rounded-2xl p-4 text-left">
+      <h3 className="font-bold text-white mb-2 text-xs sm:text-sm border-b border-gray-700/60 pb-2">
+        Cara Bayar:
+      </h3>
+
+      <ul className="text-xs sm:text-sm text-gray-400 space-y-2">
+        <li>1. Datang ke kasir {dataBayar.label_metode_bayar || dataBayar.store || 'minimarket'}.</li>
+        <li>2. Bilang mau bayar tagihan online / payment code.</li>
+        <li>3. Tunjukkan kode pembayaran di atas.</li>
+        <li>4. Simpan struk sampai status order sukses.</li>
+      </ul>
+    </div>
+  </div>
+)}
             </>
           )}
 
