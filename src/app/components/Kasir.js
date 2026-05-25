@@ -114,8 +114,8 @@ const namaMetodeBayar = daftarMetodeBayar
     if (kodeGame.includes('genshin') || kodeGame.includes('gi')) {
       return {
         title: 'Cara isi UID Genshin Impact',
-        badge: 'Verifikasi Manual',
-        type: 'manual',
+        badge: 'Auto Check Nickname',
+        type: 'auto',
         items: [
           'Buka Genshin Impact.',
           'UID ada di pojok kanan bawah layar.',
@@ -129,8 +129,8 @@ const namaMetodeBayar = daftarMetodeBayar
     if (kodeGame.includes('hsr') || kodeGame.includes('honkai') || kodeGame.includes('star')) {
       return {
         title: 'Cara isi UID Honkai: Star Rail',
-        badge: 'Verifikasi Manual',
-        type: 'manual',
+        badge: 'Auto Check Nickname',
+        type: 'auto',
         items: [
           'Buka Honkai: Star Rail.',
           'UID ada di bagian profil / pojok layar.',
@@ -245,177 +245,60 @@ const namaMetodeBayar = daftarMetodeBayar
   });
 };
   const handleBeli = async () => {
-    if (!produkDipilih) {
+    const alertBase = {
+      background: '#1f2937',
+      color: '#fff'
+    };
+
+    const tampilWarning = (text, title = 'Waduh!') => {
       Swal.fire({
-        title: 'Waduh!',
-        text: 'Pilih nominal dulu bree!',
+        ...alertBase,
+        title,
+        text,
         icon: 'warning',
-        background: '#1f2937',
-        color: '#fff',
         confirmButtonColor: '#3b82f6'
       });
+    };
+
+    if (!produkDipilih) {
+      tampilWarning('Pilih nominal dulu bree!');
       return;
     }
 
     if (!inputUserId) {
-      Swal.fire({
-        title: 'Waduh!',
-        text: 'ID-nya isi dulu!',
-        icon: 'warning',
-        background: '#1f2937',
-        color: '#fff',
-        confirmButtonColor: '#3b82f6'
-      });
+      tampilWarning('ID-nya isi dulu!');
       return;
     }
 
     if (butuhZoneId && !inputZoneId) {
-      Swal.fire({
-        title: 'Waduh!',
-        text: 'Zone ID nya isi bree',
-        icon: 'warning',
-        background: '#1f2937',
-        color: '#fff',
-        confirmButtonColor: '#3b82f6'
-      });
+      tampilWarning('Zone ID nya isi bree');
       return;
     }
 
     if (butuhServer && !inputZoneId) {
-      Swal.fire({
-        title: 'Waduh!',
-        text: 'Pilih Server lu dulu bre!',
-        icon: 'warning',
-        background: '#1f2937',
-        color: '#fff',
-        confirmButtonColor: '#3b82f6'
-      });
+      tampilWarning('Pilih Server lu dulu bre!');
       return;
     }
 
     if (!metodeBayar) {
-      Swal.fire({
-        title: 'Eits!',
-        text: 'Pilih metode pembayaran dulu bre!',
-        icon: 'warning',
-        background: '#1f2937',
-        color: '#fff',
-        confirmButtonColor: '#3b82f6'
-      });
+      tampilWarning('Pilih metode pembayaran dulu bre!', 'Eits!');
       return;
     }
 
     if (!setujuAturan) {
-      Swal.fire({
-        title: 'Setujui aturan dulu bre',
-        text: 'Pastikan ID, Zone, atau Server sudah benar sebelum checkout.',
-        icon: 'warning',
-        background: '#1f2937',
-        color: '#fff',
-        confirmButtonColor: '#3b82f6'
-      });
+      tampilWarning(
+        'Pastikan ID, Zone, atau Server sudah benar sebelum checkout.',
+        'Setujui aturan dulu bre'
+      );
       return;
     }
 
-    setIsProsesBeli(true);
-
-    try {
-      const responCek = await fetch('/api/cekId', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id_player: inputUserId,
-          server_player: inputZoneId,
-          kode_game: dataGame.kode_game || dataGame.server_game
-        })
-      });
-
-      const dataCek = await responCek.json();
-
-      let namaTarget = '';
-
-      if (!responCek.ok) {
-        Swal.fire({
-          icon: 'error',
-          title: 'ID Gak Ketemu!',
-          text: dataCek.pesan || 'Gagal cek ID bre.',
-          background: '#1f2937',
-          color: '#fff'
-        });
-
-        setIsProsesBeli(false);
-        return;
-      }
-
-      if (dataCek.sukses) {
-        namaTarget = dataCek.nickname;
-      } else if (dataCek.support_cek_nickname === false) {
-        namaTarget = 'ID akan diproses tanpa cek otomatis';
-
-        const lanjutManual = await Swal.fire({
-          title: 'Cek Nickname Belum Tersedia',
-          html: `
-            <p>${dataCek.pesan}</p>
-            <br/>
-            <b>Pastikan ID dan server lu sudah benar ya bre.</b>
-          `,
-          icon: 'info',
-          showCancelButton: true,
-          confirmButtonText: 'Lanjut, ID sudah benar',
-          cancelButtonText: 'Batal dulu',
-          background: '#1f2937',
-          color: '#fff',
-          confirmButtonColor: '#06b6d4',
-          cancelButtonColor: '#374151'
-        });
-
-        if (!lanjutManual.isConfirmed) {
-          setIsProsesBeli(false);
-          return;
-        }
-      } else {
-        Swal.fire({
-          icon: 'error',
-          title: 'ID Gak Ketemu!',
-          text: dataCek.pesan || 'ID tidak valid bre.',
-          background: '#1f2937',
-          color: '#fff'
-        });
-
-        setIsProsesBeli(false);
-        return;
-      }
-
-      const yakin = await Swal.fire({
-        title: 'Konfirmasi Pesanan',
-        html: `
-          <div style="text-align:left; line-height:1.7">
-            <b>Produk:</b> ${produkDipilih.nama_produk}<br/>
-            <b>Target:</b> ${namaTarget}<br/>
-            <b>ID:</b> ${inputUserId}<br/>
-            <b>Server/Zone:</b> ${inputZoneId || '-'}<br/>
-            <b>Metode:</b> ${namaMetodeBayar[metodeBayar] || metodeBayar}
-          </div>
-        `,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: 'Gas Bayar',
-        cancelButtonText: 'Batal',
-        confirmButtonColor: '#06b6d4',
-        cancelButtonColor: '#374151',
-        background: '#1f2937',
-        color: '#fff'
-      });
-
-      if (!yakin.isConfirmed) {
-        setIsProsesBeli(false);
-        return;
-      }
-
+    const bikinTagihan = async () => {
       Swal.fire({
+        ...alertBase,
         title: 'Menyiapkan Tagihan...',
-        background: '#1f2937',
-        color: '#fff',
+        text: 'Bentar bree, lagi nyiapin pembayaran.',
+        allowOutsideClick: false,
         didOpen: () => Swal.showLoading()
       });
 
@@ -436,27 +319,134 @@ const namaMetodeBayar = daftarMetodeBayar
 
       const dataSistem = await responBeli.json();
 
-      if (responBeli.ok) {
-        Swal.close();
-        sessionStorage.setItem('dataTagihan', JSON.stringify(dataSistem));
-        router.push('/pembayaran');
-      } else {
+      if (!responBeli.ok) {
         Swal.fire({
+          ...alertBase,
           title: 'Gagal bre',
           text: dataSistem.pesan || dataSistem.error || 'Gagal bikin tagihan.',
-          icon: 'error',
-          background: '#1f2937',
-          color: '#fff'
+          icon: 'error'
         });
+        return;
       }
-    } catch (error) {
+
+      Swal.close();
+      sessionStorage.setItem('dataTagihan', JSON.stringify(dataSistem));
+      router.push('/pembayaran');
+    };
+
+    setIsProsesBeli(true);
+
+    try {
       Swal.fire({
-        icon: 'error',
-        title: 'Waduh Error',
-        text: 'Koneksi dapur lagi ngadat bre!',
-        background: '#1f2937',
-        color: '#fff'
+        ...alertBase,
+        title: 'Ngecek Username...',
+        text: 'Bentar bree, lagi cek data akun.',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
       });
+
+      const responCek = await fetch('/api/cekId', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id_player: inputUserId,
+          server_player: inputZoneId,
+          kode_game: dataGame.kode_game || dataGame.server_game
+        })
+      });
+
+      const dataCek = await responCek.json();
+
+      const statusCek =
+        dataCek.status ||
+        (dataCek.sukses
+          ? 'FOUND'
+          : dataCek.boleh_checkout
+            ? 'UNAVAILABLE'
+            : 'INVALID');
+
+      if (statusCek === 'FOUND') {
+        const username = dataCek.username || dataCek.nickname || '-';
+
+        const yakin = await Swal.fire({
+          ...alertBase,
+          title: 'Konfirmasi Pesanan!!',
+          html: `
+            <div style="text-align:left; line-height:1.7">
+              <b>Username:</b> ${username}<br/>
+              <b>Produk:</b> ${produkDipilih.nama_produk}<br/>
+              <b>ID:</b> ${inputUserId}<br/>
+              <b>Server/Zone:</b> ${inputZoneId || '-'}<br/>
+              <b>Metode:</b> ${namaMetodeBayar[metodeBayar] || metodeBayar}
+              <br/><br/>
+              <span style="color:#94a3b8">Kalau datanya sudah benar, lanjut bikin tagihan?</span>
+            </div>
+          `,
+          icon: 'question',
+          showCancelButton: true,
+          confirmButtonText: 'OK, Lanjut Bayar',
+          cancelButtonText: 'Batal dulu',
+          confirmButtonColor: '#06b6d4',
+          cancelButtonColor: '#374151'
+        });
+
+        if (!yakin.isConfirmed) return;
+
+        await bikinTagihan();
+        return;
+      }
+
+      if (statusCek === 'UNAVAILABLE') {
+        const lanjutManual = await Swal.fire({
+          ...alertBase,
+          title: 'Cek Username Belum Tersedia',
+          html: `
+            <div style="text-align:left; line-height:1.7">
+              <p style="margin:0 0 10px">
+                ${dataCek.message || dataCek.pesan || 'Server cek username lagi sibuk.'}
+              </p>
+              <b>Pastikan ID, Zone, atau Server sudah benar sebelum lanjut.</b>
+            </div>
+          `,
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonText: 'Lanjut top up manual',
+          cancelButtonText: 'Batal dulu',
+          confirmButtonColor: '#06b6d4',
+          cancelButtonColor: '#374151'
+        });
+
+        if (!lanjutManual.isConfirmed) return;
+
+        await bikinTagihan();
+        return;
+      }
+
+      Swal.fire({
+        ...alertBase,
+        icon: 'error',
+        title: 'ID Tidak Valid',
+        text: dataCek.message || dataCek.pesan || 'ID / UID tidak valid atau tidak ditemukan.'
+      });
+    } catch (error) {
+      console.error('HANDLE BELI ERROR:', error);
+
+      const lanjutManual = await Swal.fire({
+        background: '#1f2937',
+        color: '#fff',
+        icon: 'warning',
+        title: 'Server cek username lagi sibuk',
+        text: 'Mau lanjut top up manual?',
+        showCancelButton: true,
+        confirmButtonText: 'Lanjut top up manual',
+        cancelButtonText: 'Batal dulu',
+        confirmButtonColor: '#06b6d4',
+        cancelButtonColor: '#374151'
+      });
+
+      if (!lanjutManual.isConfirmed) return;
+
+      await bikinTagihan();
     } finally {
       setIsProsesBeli(false);
     }

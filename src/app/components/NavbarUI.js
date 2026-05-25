@@ -11,10 +11,9 @@ export default function NavbarUI({ session }) { // <--- TERIMA DATA DARI SERVER
 
   const menuItems = [
     { name: "Home", href: "/" },
-    { name: "Games", href: "/games" },
+    { name: "Games", href: "/" },
     { name: "Cek Pesanan", href: "/lacak" },
-    { name: "Contact", href: "/contact" },
-    { name: "Bantuan", href: '/bantuan'}
+    { name: "Bantuan", href: '/support'}
   ]
 
   return (
