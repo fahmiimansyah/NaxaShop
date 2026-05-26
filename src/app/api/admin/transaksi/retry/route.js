@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../auth/[...nextauth]/route';
 import crypto from 'crypto';
+import { orderVipReseller } from '../../../../lib/vipreseller';
 import db from '../../../../lib/db';
 import { kirimEmailAdmin, kirimEmailTopupSukses } from '../../../../lib/mailer';
 import { transaksiDigiflazz } from '../../../../lib/digiflazz';
@@ -245,6 +246,39 @@ async function tembakApiGames(trx) {
   };
 }
 
+async function tembakVipReseller(trx) {
+  const hasil = await orderVipReseller({
+    kodeProduk: trx.kode_produk_provider || trx.kode_produk,
+    idPlayer: trx.id_player,
+    zonePlayer: trx.zone_player
+  });
+
+  const dataStatus = Array.isArray(hasil.data?.data)
+    ? hasil.data.data[0]
+    : hasil.data?.data || hasil.data;
+
+  const statusRaw =
+    dataStatus?.status ||
+    hasil.data?.status ||
+    hasil.data?.message ||
+    '';
+
+  return {
+    provider: 'vipreseller',
+    gagal:
+      !hasil.ok ||
+      hasil.data?.result === false ||
+      statusProviderGagal(statusRaw),
+    suksesFinal: statusProviderSukses(statusRaw),
+    masihProses:
+      statusProviderMasihProses(statusRaw) ||
+      ['waiting', 'process', 'processing'].includes(normalisasiStatus(statusRaw)),
+    statusRaw,
+    statusNormal: normalisasiStatus(statusRaw),
+    data: hasil.data
+  };
+}
+
 async function tembakDigiflazz(trx) {
   const refId = trx.order_id;
   const buyerSkuCode = trx.kode_produk_provider || trx.kode_produk;
@@ -304,6 +338,10 @@ async function tembakProvider(trx) {
 
   if (provider === 'digiflazz') {
     return tembakDigiflazz(trx);
+  }
+
+  if (provider === 'vipreseller') {
+  return tembakVipReseller(trx);
   }
 
   if (provider === 'mock') {

@@ -42,7 +42,7 @@ const LABEL_METODE_BAYAR = {
   indomaret: 'Indomaret'
 };
 
-const PROVIDER_VALID = ['apigames', 'digiflazz', 'mock'];
+const PROVIDER_VALID = ['apigames', 'digiflazz', 'vipreseller', 'mock'];
 
 function bersihinText(value) {
   return String(value || '').trim();

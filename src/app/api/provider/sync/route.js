@@ -3,6 +3,7 @@ import db from '../../../lib/db';
 import { rateLimit } from '../../../lib/rate-limit';
 import { kirimEmailAdmin, kirimEmailTopupSukses } from '../../../lib/mailer';
 import { transaksiDigiflazz } from '../../../lib/digiflazz';
+import { cekStatusVipReseller, orderVipReseller, ambilVipResellerTrxIdDariResponse } from '../../../lib/vipreseller';
 import crypto from 'crypto';
 function bersihinText(value) {
   return String(value || '').trim();
@@ -101,6 +102,74 @@ async function syncMock(trx) {
       status: 'Sukses',
       message: 'Mock provider sukses dari /api/provider/sync'
     }
+  };
+}
+
+function bacaJsonAman(value) {
+  if (!value) return null;
+
+  if (typeof value === 'object') return value;
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function ambilDataStatusVipReseller(data) {
+  if (Array.isArray(data?.data)) return data.data[0] || null;
+  if (data?.data && typeof data.data === 'object') return data.data;
+  return data || null;
+}
+
+async function syncVipReseller(trx) {
+  const responseSebelumnya = bacaJsonAman(trx.apigames_response);
+  const trxidSebelumnya = ambilVipResellerTrxIdDariResponse(responseSebelumnya);
+
+  const harusCekStatus =
+    trxidSebelumnya &&
+    ['proses', 'processing', 'pending'].includes(normalisasiStatus(trx.status_topup));
+
+  const hasil = harusCekStatus
+    ? await cekStatusVipReseller({ trxid: trxidSebelumnya })
+    : await orderVipReseller({
+        kodeProduk: trx.kode_produk_provider || trx.kode_produk,
+        idPlayer: trx.id_player,
+        zonePlayer: trx.zone_player
+      });
+
+  const detailStatus = ambilDataStatusVipReseller(hasil.data);
+  const statusRaw =
+    detailStatus?.status ||
+    hasil.data?.status ||
+    hasil.data?.message ||
+    '';
+
+  const statusNormal = normalisasiStatus(statusRaw);
+  const suksesFinal = hasil.ok && statusSukses(statusRaw);
+  const gagal =
+    !hasil.ok ||
+    hasil.data?.result === false ||
+    statusGagal(statusRaw);
+
+  const masihProses =
+    hasil.ok &&
+    !suksesFinal &&
+    !gagal &&
+    (
+      statusProses(statusRaw) ||
+      ['waiting', 'process', 'processing'].includes(statusNormal)
+    );
+
+  return {
+    provider: 'vipreseller',
+    statusRaw,
+    statusNormal,
+    suksesFinal,
+    gagal,
+    masihProses,
+    data: hasil.data
   };
 }
 
@@ -240,7 +309,7 @@ async function syncApiGamesLangsung(orderId) {
   if (trx.status_topup === 'pending') {
     return NextResponse.json({
       sukses: true,
-      pesan: 'Top-up belum dikirim ke APIGames.',
+      pesan: 'Top-up belum dikirim ke sistem.',
       data: {
         provider: 'apigames',
         status_bayar: 'sukses',
@@ -263,7 +332,7 @@ async function syncApiGamesLangsung(orderId) {
     return NextResponse.json(
       {
         sukses: false,
-        pesan: 'Gagal cek status APIGames bre.',
+        pesan: 'Gagal cek status top-up bre.',
         data: {
           provider: 'apigames',
           status_bayar: trx.status_bayar,
@@ -282,8 +351,8 @@ async function syncApiGamesLangsung(orderId) {
       `UPDATE transaksi
        SET status_topup = 'sukses',
            apigames_response = ?,
-           catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nAPIGames sync SUKSES pada ', NOW())
-            updated_at = NOW()
+           catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nAPIGames sync SUKSES pada ', NOW()),
+           updated_at = NOW()
            WHERE order_id = ?`,
       [JSON.stringify(hasilStatus.data), orderId]
     );
@@ -313,7 +382,7 @@ async function syncApiGamesLangsung(orderId) {
 
     return NextResponse.json({
       sukses: true,
-      pesan: 'Top-up sukses dari APIGames.',
+      pesan: 'Top-up sukses.',
       data: {
         provider: 'apigames',
         status_bayar: 'sukses',
@@ -358,7 +427,7 @@ async function syncApiGamesLangsung(orderId) {
 
   return NextResponse.json({
     sukses: true,
-    pesan: 'Top-up masih diproses APIGames.',
+    pesan: 'Top-up masih diproses.',
     data: {
       provider: 'apigames',
       status_bayar: 'sukses',
@@ -463,13 +532,15 @@ export async function POST(request) {
 
     if (provider === 'digiflazz') {
       hasilProvider = await syncDigiflazz(trx);
+    } else if (provider === 'vipreseller') {
+      hasilProvider = await syncVipReseller(trx);
     } else if (provider === 'mock') {
       hasilProvider = await syncMock(trx);
     } else {
       return NextResponse.json(
         {
           sukses: false,
-          pesan: `Provider tidak dikenali: ${provider}`
+          pesan: 'Jalur top-up produk belum dikenali.'
         },
         { status: 400 }
       );
@@ -504,7 +575,7 @@ export async function POST(request) {
 
       return NextResponse.json({
         sukses: true,
-        pesan: 'Top-up gagal dari provider.',
+        pesan: 'Top-up gagal atau butuh pengecekan admin.',
         data: {
           provider: hasilProvider.provider,
           status_bayar: 'sukses',
@@ -555,7 +626,7 @@ export async function POST(request) {
 
       return NextResponse.json({
         sukses: true,
-        pesan: 'Top-up berhasil dari provider.',
+        pesan: 'Top-up berhasil.',
         data: {
           provider: hasilProvider.provider,
           status_bayar: 'sukses',
@@ -583,7 +654,7 @@ export async function POST(request) {
 
     return NextResponse.json({
       sukses: true,
-      pesan: 'Top-up masih diproses provider.',
+      pesan: 'Top-up masih diproses.',
       data: {
         provider: hasilProvider.provider,
         status_bayar: 'sukses',

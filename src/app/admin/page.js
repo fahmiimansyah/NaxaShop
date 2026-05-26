@@ -132,6 +132,7 @@ const labelProvider = (provider) => {
   if (p === 'digiflazz') return 'Digiflazz';
   if (p === 'apigames') return 'APIGames';
   if (p === 'mock') return 'Mock Provider';
+  if (p === 'vipreseller') return 'Vip Reseller'
 
   return 'Provider';
 };
@@ -146,7 +147,9 @@ const warnaProvider = (provider) => {
   if (p === 'apigames') {
     return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20';
   }
-
+  if (p === 'vipreseller') {
+  return 'bg-violet-500/10 text-violet-400 border-violet-500/20';
+}
   if (p === 'mock') {
     return 'bg-gray-500/10 text-gray-300 border-gray-500/20';
   }
@@ -497,16 +500,19 @@ const handleUpdateTransaksi = async (trx, payload, teksKonfirmasi) => {
 };
 
 const handleRetryTopup = async (trx) => {
-  const providerRaw = String(trx.provider || 'provider').toLowerCase();
+const providerRaw = String(trx.provider || 'provider').toLowerCase();
 
-  const providerLabel =
-    providerRaw === 'digiflazz'
-      ? 'Digiflazz'
-      : providerRaw === 'apigames'
-        ? 'APIGames'
-        : providerRaw === 'mock'
-          ? 'Mock Provider'
-          : 'Provider';
+const providerLabel =
+  providerRaw === 'digiflazz'
+    ? 'Digiflazz'
+    : providerRaw === 'apigames'
+      ? 'APIGames'
+      : providerRaw === 'mock'
+        ? 'Mock Provider'
+        : 'Provider'
+        providerRaw === 'vipreseller'
+? 'VIP Reseller'
+:'vipreseller';
 
   const konfirmasi = await Swal.fire({
     title: 'Retry top-up?',
@@ -2312,6 +2318,7 @@ const handleEditCatatan = async (trx) => {
     <option value="apigames">APIGames</option>
     <option value="digiflazz">Digiflazz</option>
     <option value="mock">Mock / Simulasi</option>
+    <option value="vipreseller">VIP Reseller</option>
   </select>
 </div>
 

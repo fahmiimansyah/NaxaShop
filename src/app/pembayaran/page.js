@@ -143,18 +143,8 @@ useEffect(() => {
     setTimeout(() => setSudahSalin(false), 2000);
   };
 
-  const labelProvider = (provider) => {
-    const p = normalisasiProvider(provider);
 
-    if (p === 'digiflazz') return 'Digiflazz';
-    if (p === 'apigames') return 'APIGames';
-    if (p === 'mock') return 'Mock Provider';
-
-    return 'Provider';
-  };
-
-  const bikinPesanProgress = ({ bayar, topup, provider }) => {
-    const namaProvider = labelProvider(provider);
+  const bikinPesanProgress = ({ bayar, topup, }) => {
 
     if (bayar === 'pending') {
       return 'Pembayaran belum kebaca lunas. Sistem akan cek otomatis.';
@@ -173,7 +163,7 @@ useEffect(() => {
     }
 
     if (bayar === 'sukses' && topup === 'proses') {
-      return `Pembayaran sukses. ${namaProvider} sedang memproses top-up kamu.`;
+      return `Pembayaran sukses. sedang memproses top-up kamu.`;
     }
 
     return 'Status sedang dicek. Tunggu sebentar ya.';
@@ -349,12 +339,10 @@ const updateProgress = ({ bayar, topup, pesan, provider }) => {
       });
 
       updateProgress({ bayar, topup, provider, pesan });
-
-      const topupButuhCekProvider =
-  bayar === 'sukses' && !['sukses', 'gagal'].includes(topup);
+const topupButuhCekProvider =
+  bayar === 'sukses' && topup === 'proses';
 
 if (topupButuhCekProvider) {
-
   const hasilProvider = await syncProviderFinal({ provider, silent });
 
   if (hasilProvider) {
@@ -363,6 +351,7 @@ if (topupButuhCekProvider) {
     provider = hasilProvider.provider || provider;
   }
 }
+
     } catch (error) {
       console.error('Gagal sync pembayaran:', error);
 
@@ -399,7 +388,7 @@ useEffect(() => {
   };
 
   const firstCheck = setTimeout(jalaninCekOtomatis, 1500);
-  const interval = setInterval(jalaninCekOtomatis, 10000);
+  const interval = setInterval(jalaninCekOtomatis, 8000);
 
   return () => {
     clearTimeout(firstCheck);
@@ -448,7 +437,7 @@ useEffect(() => {
         step: 3,
         icon: '🚀',
         title: 'Top-up Sedang Diproses',
-        desc: `Pembayaran sudah sukses. Sistem sedang menunggu status final dari ${labelProvider(providerOrder)}.`,
+        desc: `Pembayaran sudah sukses. tunggu bentar ya`,
         box: 'bg-purple-500/10 border-purple-500/20 text-purple-300',
         glow: 'bg-purple-500/20 text-purple-400'
       };
@@ -475,15 +464,15 @@ useEffect(() => {
 
   const progressWidth = `${((statusUi.step - 1) / (steps.length - 1)) * 100}%`;
 
-  const linkChatAdmin = () => {
-    if (!nomorAdmin || !dataBayar?.order_id) return '#';
+const linkChatAdmin = () => {
+  if (!nomorAdmin || !dataBayar?.order_id) return '#';
 
-    const pesan = encodeURIComponent(
-      `Halo admin NaXaShop, saya butuh bantuan.\n\nOrder ID: ${dataBayar.order_id}\nProduk: ${dataBayar.nama_produk || '-'}\nStatus Bayar: ${statusBayar}\nStatus Top-up: ${statusTopup}\nProvider: ${labelProvider(providerOrder)}`
-    );
+  const pesan = encodeURIComponent(
+    `Halo admin NaXaShop, saya butuh bantuan.\n\nOrder ID: ${dataBayar.order_id}\nProduk: ${dataBayar.nama_produk || '-'}\nStatus Bayar: ${statusBayar}\nStatus Top-up: ${statusTopup}`
+  );
 
-    return `https://wa.me/${nomorAdmin}?text=${pesan}`;
-  };
+  return `https://wa.me/${nomorAdmin}?text=${pesan}`;
+};
 
   const ambilActionUrl = (namaActionList = []) => {
   const actions = Array.isArray(dataBayar?.actions) ? dataBayar.actions : [];
