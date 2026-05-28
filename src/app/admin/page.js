@@ -26,6 +26,7 @@ export default function DashboardAdmin() {
     kode_produk: '',
     nama_produk: '',
     harga: '',
+    harga_coret: '',
     harga_modal: '',
     status_produk: 'aktif',
     provider: 'apigames',
@@ -195,6 +196,7 @@ const kodeProviderEfektif = (item) => {
       kode_produk: '',
       nama_produk: '',
       harga: '',
+      harga_coret: '',
       harga_modal: '',
       status_produk: 'aktif',
       provider: 'apigames',
@@ -500,19 +502,7 @@ const handleUpdateTransaksi = async (trx, payload, teksKonfirmasi) => {
 };
 
 const handleRetryTopup = async (trx) => {
-const providerRaw = String(trx.provider || 'provider').toLowerCase();
-
-const providerLabel =
-  providerRaw === 'digiflazz'
-    ? 'Digiflazz'
-    : providerRaw === 'apigames'
-      ? 'APIGames'
-      : providerRaw === 'mock'
-        ? 'Mock Provider'
-        : 'Provider'
-        providerRaw === 'vipreseller'
-? 'VIP Reseller'
-:'vipreseller';
+  const providerLabel = labelProvider(trx.provider);
 
   const konfirmasi = await Swal.fire({
     title: 'Retry top-up?',
@@ -1040,6 +1030,7 @@ const handleEditCatatan = async (trx) => {
           ...formProduk,
           id: produkEditId,
           harga: parseInt(formProduk.harga),
+          harga_coret: parseInt(formProduk.harga_coret || 0),
           harga_modal: parseInt(formProduk.harga_modal || 0)
         })
       });
@@ -1090,6 +1081,7 @@ const handleEditCatatan = async (trx) => {
       kode_produk: item.kode_produk || '',
       nama_produk: item.nama_produk || '',
       harga: String(item.harga || ''),
+      harga_coret: item.harga_coret || '',
       harga_modal: String(item.harga_modal || ''),
       status_produk: item.status_produk || 'aktif',
       provider: item.provider || 'apigames',
@@ -1128,6 +1120,7 @@ const handleEditCatatan = async (trx) => {
         kode_produk: item.kode_produk,
         nama_produk: item.nama_produk,
         harga: item.harga,
+        harga_coret: item.harga_coret || 0,
         harga_modal: item.harga_modal || 0,
         status_produk: statusBaru,
           provider: item.provider || 'apigames',
@@ -2397,6 +2390,7 @@ const handleEditCatatan = async (trx) => {
 
                 <div>
                   <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">Harga Jual (Rp)</label>
+                  
                   <input
                     type="number"
                     required
@@ -2405,6 +2399,15 @@ const handleEditCatatan = async (trx) => {
                     onChange={(e) => setFormProduk({ ...formProduk, harga: e.target.value })}
                     className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-cyan-500"
                   />
+                  <input
+  type="number"
+  placeholder="Harga coret / harga asli, contoh: 50000"
+  value={formProduk.harga_coret}
+  onChange={(e) =>
+    setFormProduk({ ...formProduk, harga_coret: e.target.value })
+  }
+  className="w-full rounded-2xl border border-gray-700 bg-gray-900 px-4 py-3 text-white outline-none focus:border-blue-500"
+/>
                 </div>
 
                 <div>
@@ -2544,6 +2547,11 @@ const handleEditCatatan = async (trx) => {
   >
     Profit: {formatRupiah(Number(item.harga || 0) - Number(item.harga_modal || 0))}
   </p>
+  {Number(item.harga_coret || 0) > Number(item.harga || 0) && (
+  <p className="text-xs text-gray-500 line-through">
+    {formatRupiah(item.harga_coret)}
+  </p>
+)}
 
   {item.kode_produk_provider && item.kode_produk_provider !== item.kode_produk && (
     <p className="text-[10px] text-orange-400 font-black mt-1">

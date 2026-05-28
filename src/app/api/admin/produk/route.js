@@ -52,8 +52,20 @@ function validasiHargaModal(value) {
   return hargaModal;
 }
 
+function validasiHargaCoret(value) {
+  const hargaCoret = Number(value || 0);
+
+  if (Number.isNaN(hargaCoret) || hargaCoret < 0) {
+    return null;
+  }
+
+  return hargaCoret;
+}
+
 export async function GET() {
   const adminValid = await cekAdmin();
+
+  
 
   if (!adminValid) {
     return NextResponse.json(
@@ -70,6 +82,7 @@ export async function GET() {
          nama_produk,
          harga,
          harga_modal,
+         harga_coret,
          game_id,
          status_produk,
          provider,
@@ -101,14 +114,13 @@ export async function POST(request) {
       { status: 403 }
     );
   }
-
   try {
     const dataBaru = await request.json();
-
     const kode_produk = bersihinText(dataBaru.kode_produk);
     const nama_produk = bersihinText(dataBaru.nama_produk);
     const game_id = dataBaru.game_id;
     const harga = validasiHarga(dataBaru.harga);
+  const harga_coret = validasiHargaCoret(dataBaru.harga_coret);
     const harga_modal = validasiHargaModal(dataBaru.harga_modal);
     const status_produk = normalisasiStatusProduk(dataBaru.status_produk);
 
@@ -117,7 +129,7 @@ export async function POST(request) {
       dataBaru.kode_produk_provider || kode_produk
     );
 
-    if (!kode_produk || !nama_produk || !harga || harga_modal === null || !game_id) {
+    if (!kode_produk || !nama_produk || !harga || harga_modal === null || harga_coret === null || !game_id) {
       return NextResponse.json(
         { sukses: false, pesan: 'Data produk belum lengkap bre!' },
         { status: 400 }
@@ -130,6 +142,13 @@ export async function POST(request) {
         { status: 400 }
       );
     }
+
+    if (harga_coret > 0 && harga_coret <= harga) {
+  return NextResponse.json(
+    { sukses: false, pesan: 'Harga coret harus lebih besar dari harga jual bre!' },
+    { status: 400 }
+  );
+}
 
     if (!provider) {
       return NextResponse.json(
@@ -175,17 +194,19 @@ export async function POST(request) {
          kode_produk,
          nama_produk,
          harga,
+         harga_coret,
          harga_modal,
          game_id,
          status_produk,
          provider,
          kode_produk_provider
        )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         kode_produk,
         nama_produk,
         harga,
+        harga_coret,
         harga_modal,
         game_id,
         status_produk,
@@ -210,7 +231,6 @@ export async function POST(request) {
 
 export async function PATCH(request) {
   const adminValid = await cekAdmin();
-
   if (!adminValid) {
     return NextResponse.json(
       { sukses: false, pesan: 'Akses ditolak bre! Lu bukan admin.' },
@@ -220,12 +240,12 @@ export async function PATCH(request) {
 
   try {
     const body = await request.json();
-
     const id = body.id;
     const game_id = body.game_id;
     const kode_produk = bersihinText(body.kode_produk);
     const nama_produk = bersihinText(body.nama_produk);
     const harga = validasiHarga(body.harga);
+    const harga_coret = validasiHargaCoret(body.harga_coret);
     const harga_modal = validasiHargaModal(body.harga_modal);
     const status_produk = normalisasiStatusProduk(body.status_produk);
 
@@ -234,12 +254,26 @@ export async function PATCH(request) {
       body.kode_produk_provider || kode_produk
     );
 
-    if (!id || !game_id || !kode_produk || !nama_produk || !harga || harga_modal === null) {
-      return NextResponse.json(
-        { sukses: false, pesan: 'Data produk belum lengkap bre!' },
-        { status: 400 }
-      );
-    }
+    if (
+  !id ||
+  !game_id ||
+  !kode_produk ||
+  !nama_produk ||
+  !harga ||
+  harga_modal === null ||
+  harga_coret === null
+) {
+  return NextResponse.json(
+    { sukses: false, pesan: 'Data produk belum lengkap bre!' },
+    { status: 400 }
+  );
+}
+    if (harga_coret > 0 && harga_coret <= harga) {
+  return NextResponse.json(
+    { sukses: false, pesan: 'Harga coret harus lebih besar dari harga jual bre!' },
+    { status: 400 }
+  );
+}
 
     if (harga_modal > harga) {
       return NextResponse.json(
@@ -304,6 +338,7 @@ export async function PATCH(request) {
            kode_produk = ?,
            nama_produk = ?,
            harga = ?,
+           harga_coret = ?,
            harga_modal = ?,
            status_produk = ?,
            provider = ?,
@@ -314,6 +349,7 @@ export async function PATCH(request) {
         kode_produk,
         nama_produk,
         harga,
+        harga_coret,
         harga_modal,
         status_produk,
         provider,

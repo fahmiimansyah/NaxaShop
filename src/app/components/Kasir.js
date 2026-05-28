@@ -23,7 +23,16 @@ export default function FormKasir({ dataGame }) {
     return `Rp ${Number(angka || 0).toLocaleString('id-ID')}`;
   };
 
-const daftarMetodeBayar = [
+  const hitungDiskon = (hargaCoret, hargaJual) => {
+  const coret = Number(hargaCoret || 0);
+  const jual = Number(hargaJual || 0);
+
+  if (!coret || !jual || coret <= jual) return null;
+
+  return Math.round(((coret - jual) / coret) * 100);
+};
+
+  const daftarMetodeBayar = [
   {
     grup: 'QR & E-Wallet',
     items: [
@@ -339,8 +348,7 @@ const namaMetodeBayar = daftarMetodeBayar
     try {
       Swal.fire({
         ...alertBase,
-        title: 'Ngecek Username...',
-        text: 'Bentar bree, lagi cek data akun.',
+        title: 'Bantar Cek akun kamu duluu',
         allowOutsideClick: false,
         didOpen: () => Swal.showLoading()
       });
@@ -478,9 +486,33 @@ const namaMetodeBayar = daftarMetodeBayar
                 <p className="text-white font-black text-base leading-tight">
                   {item.nama_produk}
                 </p>
-                <p className="text-sm font-bold text-cyan-400">
-                  Rp {item.harga.toLocaleString('id-ID')}
-                </p>
+<div className="mt-3 space-y-1">
+  {Number(item.harga_coret || 0) > Number(item.harga || 0) && (
+    <div className="flex items-center gap-2">
+      <p className="text-[11px] font-bold text-gray-400">
+        Dari
+      </p>
+
+      <p className="text-xs font-bold text-gray-500 line-through">
+        {formatRupiah(item.harga_coret)}
+      </p>
+
+      {hitungDiskon(item.harga_coret, item.harga) && (
+        <span className="rounded-full border border-green-500/20 bg-green-500/10 px-2 py-0.5 text-[10px] font-black text-green-400">
+          -{hitungDiskon(item.harga_coret, item.harga)}%
+        </span>
+      )}
+    </div>
+  )}
+
+  <div className="flex items-end gap-2">
+    {Number(item.harga_coret || 0) > Number(item.harga || 0)}
+
+    <p className="text-base font-black text-cyan-400">
+      {formatRupiah(item.harga)}
+    </p>
+  </div>
+</div>
               </div>
             ))}
           </div>
