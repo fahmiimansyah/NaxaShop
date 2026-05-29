@@ -52,9 +52,7 @@ export async function GET() {
 
 export async function POST(request) {
   const adminValid = await cekAdmin();
-  const status_game = ['aktif', 'nonaktif'].includes(body.status_game)
-  ? body.status_game
-  : 'aktif';
+
   if (!adminValid) {
     return NextResponse.json(
       { sukses: false, pesan: 'Akses ditolak bre! Lu bukan admin.' },
@@ -64,7 +62,9 @@ export async function POST(request) {
 
   try {
     const body = await request.json();
-
+      const status_game = ['aktif', 'nonaktif'].includes(body.status_game)
+  ? body.status_game
+  : 'aktif';
     const nama = bersihinText(body.nama);
     const publisher = bersihinText(body.publisher);
     const gambar = bersihinText(body.gambar);

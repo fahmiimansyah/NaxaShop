@@ -243,61 +243,6 @@ const updateProgress = ({ bayar, topup, pesan, provider }) => {
   };
 
 
-  const syncProviderFinal = async ({ provider, silent = true } = {}) => {
-  if (!dataBayar?.order_id) return null;
-
-  try {
-    const respon = await fetch('/api/provider/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order_id: dataBayar.order_id })
-    });
-
-    const hasil = await respon.json();
-
-    if (!respon.ok || !hasil.sukses) {
-      if (!silent) {
-        setPesanSync(hasil.pesan || 'Gagal cek status provider.');
-      }
-
-      return null;
-    }
-
-    const bayar = hasil.data?.status_bayar || 'sukses';
-    const topup = hasil.data?.status_topup || 'proses';
-    const providerFinal = normalisasiProvider(
-      hasil.data?.provider || provider || providerOrderRef.current
-    );
-
-    const pesan = bikinPesanProgress({
-      bayar,
-      topup,
-      provider: providerFinal
-    });
-
-    updateProgress({
-      bayar,
-      topup,
-      provider: providerFinal,
-      pesan
-    });
-
-    return {
-      bayar,
-      topup,
-      provider: providerFinal
-    };
-  } catch (error) {
-    console.error('Gagal sync provider:', error);
-
-    if (!silent) {
-      setPesanSync('Gagal cek status provider.');
-    }
-
-    return null;
-  }
-};
-
   const cekPembayaran = async ({ silent = false } = {}) => {
     if (!dataBayar?.order_id) return;
 
@@ -339,18 +284,9 @@ const updateProgress = ({ bayar, topup, pesan, provider }) => {
       });
 
       updateProgress({ bayar, topup, provider, pesan });
-const topupButuhCekProvider =
-  bayar === 'sukses' && topup === 'proses';
-
-if (topupButuhCekProvider) {
-  const hasilProvider = await syncProviderFinal({ provider, silent });
-
-  if (hasilProvider) {
-    bayar = hasilProvider.bayar;
-    topup = hasilProvider.topup;
-    provider = hasilProvider.provider || provider;
-  }
-}
+// Frontend cukup cek payment + baca status database.
+      // Jangan panggil /api/provider/sync dari halaman user,
+      // karena endpoint itu nembak provider dan sekarang khusus admin.
 
     } catch (error) {
       console.error('Gagal sync pembayaran:', error);

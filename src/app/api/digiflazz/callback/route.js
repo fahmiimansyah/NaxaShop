@@ -33,7 +33,8 @@ function statusProviderMasihProses(status) {
     'pending',
     'proses',
     'process',
-    'processing'
+    'processing',
+    'waiting'
   ].includes(s);
 }
 
@@ -49,9 +50,11 @@ function bikinCustomerNoDigiflazz(trx) {
 }
 
 function signatureDigiflazzValid({ rawBody, signatureHeader, secret }) {
-  if (!secret) return true;
+  if (!secret) return false;
 
-  const signatureDariDigiflazz = String(signatureHeader || '').trim();
+  const signatureDariDigiflazz = bersihinText(signatureHeader);
+
+  if (!signatureDariDigiflazz) return false;
 
   const hash = crypto
     .createHmac('sha1', secret)
@@ -114,14 +117,25 @@ export async function POST(request) {
   try {
     rawBody = await request.text();
 
-    if (
-      secret &&
-      !signatureDigiflazzValid({
-        rawBody,
-        signatureHeader,
-        secret
-      })
-    ) {
+    if (!secret) {
+      console.error('DIGIFLAZZ_WEBHOOK_SECRET belum diset.');
+
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan: 'Webhook secret Digiflazz belum diset.'
+        },
+        { status: 500 }
+      );
+    }
+
+    const signatureValid = signatureDigiflazzValid({
+      rawBody,
+      signatureHeader,
+      secret
+    });
+
+    if (!signatureValid) {
       console.error('Signature callback Digiflazz tidak valid:', {
         event,
         userAgent
@@ -133,12 +147,6 @@ export async function POST(request) {
           pesan: 'Signature Digiflazz tidak valid.'
         },
         { status: 403 }
-      );
-    }
-
-    if (!secret) {
-      console.warn(
-        'DIGIFLAZZ_WEBHOOK_SECRET belum diset. Callback diterima tanpa validasi signature.'
       );
     }
 
@@ -179,6 +187,7 @@ export async function POST(request) {
     const customerNo = bersihinText(data.customer_no);
     const statusRaw = ambilStatusCallback(data);
     const statusNormal = normalisasiStatus(statusRaw);
+
     const responseText = JSON.stringify({
       event,
       user_agent: userAgent,
@@ -372,7 +381,10 @@ export async function POST(request) {
             paymentType: trx.payment_type
           });
         } catch (error) {
-          console.error('Gagal kirim email sukses customer dari callback Digiflazz:', error);
+          console.error(
+            'Gagal kirim email sukses customer dari callback Digiflazz:',
+            error
+          );
 
           await kirimNotifAman({
             subject: `⚠️ Gagal Kirim Email Customer - ${orderId}`,

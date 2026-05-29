@@ -41,14 +41,20 @@ export async function GET(request, { params }) {
     }
 
     // 2. Ambil daftar produk/diamond buat game itu
-    const [produkResult] = await db.query(
-      `SELECT *
-       FROM produk
-       WHERE game_id = ?
-       AND status_produk = 'aktif'
-       ORDER BY harga ASC`,
-      [gameId]
-    );
+const [produkResult] = await db.query(
+  `SELECT
+     id,
+     game_id,
+     kode_produk,
+     nama_produk,
+     harga,
+     harga_coret
+   FROM produk
+   WHERE game_id = ?
+     AND status_produk = 'aktif'
+   ORDER BY harga ASC`,
+  [gameId]
+);
 
     const dataLengkap = {
       ...gameResult[0],

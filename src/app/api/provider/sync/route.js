@@ -1,10 +1,25 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../../auth/[...nextauth]/route';
 import db from '../../../lib/db';
 import { rateLimit } from '../../../lib/rate-limit';
 import { kirimEmailAdmin, kirimEmailTopupSukses } from '../../../lib/mailer';
 import { transaksiDigiflazz } from '../../../lib/digiflazz';
-import { cekStatusVipReseller, orderVipReseller, ambilVipResellerTrxIdDariResponse } from '../../../lib/vipreseller';
+import { cekStatusVipReseller, ambilVipResellerTrxIdDariResponse } from '../../../lib/vipreseller';
 import crypto from 'crypto';
+
+const EMAIL_CEO = 'fahmiimansyah28@gmail.com';
+
+async function cekAdmin() {
+  const session = await getServerSession(authOptions);
+
+  if (!session || session.user?.email !== EMAIL_CEO) {
+    return false;
+  }
+
+  return true;
+}
+
 function bersihinText(value) {
   return String(value || '').trim();
 }
@@ -126,18 +141,19 @@ function ambilDataStatusVipReseller(data) {
 async function syncVipReseller(trx) {
   const responseSebelumnya = bacaJsonAman(trx.apigames_response);
   const trxidSebelumnya = ambilVipResellerTrxIdDariResponse(responseSebelumnya);
-
-  const harusCekStatus =
-    trxidSebelumnya &&
-    ['proses', 'processing', 'pending'].includes(normalisasiStatus(trx.status_topup));
-
-  const hasil = harusCekStatus
-    ? await cekStatusVipReseller({ trxid: trxidSebelumnya })
-    : await orderVipReseller({
-        kodeProduk: trx.kode_produk_provider || trx.kode_produk,
-        idPlayer: trx.id_player,
-        zonePlayer: trx.zone_player
-      });
+  if (!trxidSebelumnya) {
+  return {
+    provider: 'vipreseller',
+    gagal: false,
+    suksesFinal: false,
+    masihProses: true,
+    statusRaw: 'trxid tidak ditemukan',
+    statusNormal: 'butuh_admin',
+    data: { message: 'trxid VIPReseller tidak ditemukan, cek manual admin.' }
+  };
+}
+const hasil = await cekStatusVipReseller({ trxid: trxidSebelumnya });
+    
 
   const detailStatus = ambilDataStatusVipReseller(hasil.data);
   const statusRaw =
@@ -171,6 +187,7 @@ async function syncVipReseller(trx) {
     masihProses,
     data: hasil.data
   };
+  
 }
 
 function bikinSignatureApiGames({ merchantId, secretKey, refId }) {
@@ -438,6 +455,15 @@ async function syncApiGamesLangsung(orderId) {
 }
 
 export async function POST(request) {
+  const adminValid = await cekAdmin();
+
+  if (!adminValid) {
+    return NextResponse.json(
+      { sukses: false, pesan: 'Akses provider sync ditolak. Khusus admin.' },
+      { status: 403 }
+    );
+  }
+
   try {
     const limit = rateLimit(request, {
       key: 'provider-sync',
