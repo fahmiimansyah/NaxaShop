@@ -3,7 +3,7 @@ import FormKasir from '../../components/Kasir';
 export default async function HalamanTopUp({ params }) {
   const { id } = await params;
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
 
   const respon = await fetch(`${baseUrl}/api/games/${id}`, {
     cache: 'no-store',

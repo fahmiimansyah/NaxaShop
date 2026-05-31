@@ -31,10 +31,10 @@ export async function GET() {
 
   try {
     const [games] = await db.query(
-      `SELECT id, nama, publisher, gambar, zone_id, server_game, kode_game, status_game
-      FROM games
-      ORDER BY id DESC`
-    );
+  `SELECT id, nama, publisher, gambar, zone_id, server_game, kode_game, status_game, badge_label, badge_tipe
+   FROM games
+   ORDER BY id DESC`
+);
 
     return NextResponse.json({
       sukses: true,
@@ -65,6 +65,10 @@ export async function POST(request) {
       const status_game = ['aktif', 'nonaktif'].includes(body.status_game)
   ? body.status_game
   : 'aktif';
+  const badge_label = bersihinText(body.badge_label) || null;
+const badge_tipe = ['none', 'popular', 'promo', 'fast', 'new'].includes(body.badge_tipe)
+  ? body.badge_tipe
+  : 'none';
     const nama = bersihinText(body.nama);
     const publisher = bersihinText(body.publisher);
     const gambar = bersihinText(body.gambar);
@@ -105,10 +109,11 @@ export async function POST(request) {
     }
 
     await db.query(
-      `INSERT INTO games (nama, publisher, gambar, zone_id, server_game, kode_game, status_game)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [nama, publisher, gambar, zone_id, server_game, kode_game, status_game]
-    );
+      `INSERT INTO games 
+ (nama, publisher, gambar, zone_id, server_game, kode_game, status_game, badge_label, badge_tipe)
+ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+[nama, publisher, gambar, zone_id, server_game, kode_game, status_game, badge_label, badge_tipe]
+);
 
     return NextResponse.json({
       sukses: true,
@@ -153,7 +158,10 @@ export async function PATCH(request) {
     const status_game = ['aktif', 'nonaktif'].includes(body.status_game)
     ? body.status_game
     : 'aktif';
-
+    const badge_label = bersihinText(body.badge_label) || null;
+const badge_tipe = ['none', 'popular', 'promo', 'fast', 'new'].includes(body.badge_tipe)
+  ? body.badge_tipe
+  : 'none';
     if (!id) {
       return NextResponse.json(
         { sukses: false, pesan: 'ID game wajib dikirim bre!' },
@@ -200,9 +208,22 @@ export async function PATCH(request) {
        zone_id = ?,
        server_game = ?,
        kode_game = ?,
-       status_game = ?
+       status_game = ?,
+       badge_label = ?,
+       badge_tipe = ?
    WHERE id = ?`,
-  [nama, publisher, gambar, zone_id, server_game, kode_game, status_game, id]
+  [
+    nama,
+    publisher,
+    gambar,
+    zone_id,
+    server_game,
+    kode_game,
+    status_game,
+    badge_label,
+    badge_tipe,
+    id
+  ]
 );
 
     return NextResponse.json({

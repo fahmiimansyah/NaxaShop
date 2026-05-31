@@ -33,7 +33,7 @@ export default function HalamanRegister() {
 
       if (respon.ok) {
         Swal.fire({
-          title: 'MANTAP BRE! 🎉',
+          title: 'MANTAP BRE! ',
           text: data.pesan || 'Akun berhasil dibikin!',
           icon: 'success',
           background: '#1f2937',
@@ -88,7 +88,7 @@ export default function HalamanRegister() {
             Bikin Akun <span className="text-blue-500">Baru</span>
           </h1>
           <p className="text-gray-400">
-            Join jadi member NaXaShop sekarang 🔥
+            Join jadi member NaXaShop sekarang 
           </p>
         </div>
 
@@ -104,7 +104,7 @@ export default function HalamanRegister() {
               value={nama}
               onChange={(e) => setNama(e.target.value)}
               className="w-full bg-gray-900 text-white px-5 py-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 border border-gray-700 transition-all"
-              placeholder="Vibe Coder"
+              placeholder="Nama Panggilan"
             />
           </div>
 
@@ -118,7 +118,7 @@ export default function HalamanRegister() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-gray-900 text-white px-5 py-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 border border-gray-700 transition-all"
-              placeholder="email@lu.com"
+              placeholder="emailkamu@gmail.com"
             />
           </div>
 
@@ -158,7 +158,7 @@ export default function HalamanRegister() {
                 : 'bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:shadow-[0_0_30px_rgba(59,130,246,0.6)] hover:-translate-y-1'
             }`}
           >
-            {loading ? 'Daftarin OTW...' : 'Daftar Sekarang 🚀'}
+            {loading ? 'Daftarin OTW...' : 'Daftar Sekarang '}
           </button>
         </form>
 

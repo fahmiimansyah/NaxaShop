@@ -12,7 +12,6 @@ export default function FormKasir({ dataGame }) {
   const [inputZoneId, setInputZoneId] = useState('');
   const [metodeBayar, setMetodeBayar] = useState('');
   const [isProsesBeli, setIsProsesBeli] = useState(false);
-  const [setujuAturan, setSetujuAturan] = useState(false);
   const [customerWhatsapp, setCustomerWhatsapp] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
 
@@ -23,50 +22,81 @@ export default function FormKasir({ dataGame }) {
     return `Rp ${Number(angka || 0).toLocaleString('id-ID')}`;
   };
 
+  const biayaAdminMap = {
+    qris: 0,
+    gopay: 0,
+    shopeepay: 0,
+
+    bca_va: 4000,
+    bni_va: 4000,
+    bri_va: 4000,
+    cimb_va: 4000,
+    permata_va: 4000,
+    mandiri_bill: 4000,
+
+    alfamart: 5000,
+    indomaret: 5000,
+  };
+
+  const getBiayaAdmin = (metode) => biayaAdminMap[metode] || 0;
+
+  const getTotalBayar = (produk = produkDipilih, metode = metodeBayar) => {
+    return Number(produk?.harga || 0) + getBiayaAdmin(metode);
+  };
+
+  const getLabelBiayaAdmin = (metode) => {
+    const biaya = getBiayaAdmin(metode);
+
+    if (!metode) return 'Pilih metode pembayaran dulu';
+    if (biaya <= 0) return 'Tanpa biaya admin';
+
+    return `Fee admin ${formatRupiah(biaya)}`;
+  };
+
   const hitungDiskon = (hargaCoret, hargaJual) => {
-  const coret = Number(hargaCoret || 0);
-  const jual = Number(hargaJual || 0);
+    const coret = Number(hargaCoret || 0);
+    const jual = Number(hargaJual || 0);
 
-  if (!coret || !jual || coret <= jual) return null;
+    if (!coret || !jual || coret <= jual) return null;
 
-  return Math.round(((coret - jual) / coret) * 100);
-};
+    return Math.round(((coret - jual) / coret) * 100);
+  };
 
   const daftarMetodeBayar = [
-  {
-    grup: 'QR & E-Wallet',
-    items: [
-      { value: 'qris', label: 'QRIS', desc: 'Gopay, OVO, Dana', logo: '/payment/qris.png', fallback: 'QR' },
-      { value: 'gopay', label: 'GoPay', desc: 'QR / deeplink GoPay', logo: '/payment/gopay.png', fallback: 'GP' },
-      { value: 'shopeepay', label: 'ShopeePay', desc: 'Bayar via ShopeePay', logo: '/payment/shopeepay.png', fallback: 'SP' }
-    ]
-  },
-  {
-    grup: 'Virtual Account',
-    items: [
-      { value: 'bca_va', label: 'BCA VA', desc: 'Virtual Account BCA', logo: '/payment/bca.svg', fallback: 'BCA' },
-      { value: 'bni_va', label: 'BNI VA', desc: 'Virtual Account BNI', logo: '/payment/bni.png', fallback: 'BNI' },
-      { value: 'bri_va', label: 'BRI VA', desc: 'Virtual Account BRI', logo: '/payment/bri.png', fallback: 'BRI' },
-      { value: 'cimb_va', label: 'CIMB VA', desc: 'Virtual Account CIMB', logo: '/payment/cimb.png', fallback: 'CIMB' },
-      { value: 'permata_va', label: 'Permata VA', desc: 'Virtual Account Permata', logo: '/payment/permata.png', fallback: 'PRMT' },
-      { value: 'mandiri_bill', label: 'Mandiri Bill', desc: 'Mandiri Bill Payment', logo: '/payment/mandiri.png', fallback: 'MDR' }
-    ]
-  },
-  {
-    grup: 'Minimarket',
-    items: [
-      { value: 'alfamart', label: 'Alfamart', desc: 'Bayar di kasir Alfamart', logo: '/payment/alfa.png', fallback: 'ALFA' },
-      { value: 'indomaret', label: 'Indomaret', desc: 'Bayar di kasir Indomaret', logo: '/payment/indomaret.png', fallback: 'INDO' }
-    ]
-  }
-];
+    {
+      grup: 'QR & E-Wallet',
+      items: [
+        { value: 'qris', label: 'QRIS', desc: 'Gopay, OVO, Dana', logo: '/payment/qris.png', fallback: 'QR' },
+        { value: 'gopay', label: 'GoPay', desc: 'QR / deeplink GoPay', logo: '/payment/gopay.png', fallback: 'GP' },
+        { value: 'shopeepay', label: 'ShopeePay', desc: 'Bayar via ShopeePay', logo: '/payment/shopeepay.png', fallback: 'SP' }
+      ]
+    },
+    {
+      grup: 'Virtual Account',
+      items: [
+        { value: 'bca_va', label: 'BCA VA', desc: 'Virtual Account BCA', logo: '/payment/bca.svg', fallback: 'BCA' },
+        { value: 'bni_va', label: 'BNI VA', desc: 'Virtual Account BNI', logo: '/payment/bni.png', fallback: 'BNI' },
+        { value: 'bri_va', label: 'BRI VA', desc: 'Virtual Account BRI', logo: '/payment/bri.png', fallback: 'BRI' },
+        { value: 'cimb_va', label: 'CIMB VA', desc: 'Virtual Account CIMB', logo: '/payment/cimb.png', fallback: 'CIMB' },
+        { value: 'permata_va', label: 'Permata VA', desc: 'Virtual Account Permata', logo: '/payment/permata.png', fallback: 'PRMT' },
+        { value: 'mandiri_bill', label: 'Mandiri Bill', desc: 'Mandiri Bill Payment', logo: '/payment/mandiri.png', fallback: 'MDR' }
+      ]
+    },
+    {
+      grup: 'Minimarket',
+      items: [
+        { value: 'alfamart', label: 'Alfamart', desc: 'Bayar di kasir Alfamart', logo: '/payment/alfa.png', fallback: 'ALFA' },
+        { value: 'indomaret', label: 'Indomaret', desc: 'Bayar di kasir Indomaret', logo: '/payment/indomaret.png', fallback: 'INDO' }
+      ]
+    }
+  ];
 
-const namaMetodeBayar = daftarMetodeBayar
-  .flatMap((grup) => grup.items)
-  .reduce((hasil, item) => {
-    hasil[item.value] = item.label;
-    return hasil;
-  }, {});
+  const namaMetodeBayar = daftarMetodeBayar
+    .flatMap((grup) => grup.items)
+    .reduce((hasil, item) => {
+      hasil[item.value] = item.label;
+      return hasil;
+    }, {});
 
   const checkoutDisabled =
     !produkDipilih ||
@@ -74,7 +104,6 @@ const namaMetodeBayar = daftarMetodeBayar
     (butuhZoneId && !inputZoneId) ||
     (butuhServer && !inputZoneId) ||
     !metodeBayar ||
-    !setujuAturan ||
     isProsesBeli;
 
   const kodeGame = String(dataGame.kode_game || dataGame.server_game || '').toLowerCase();
@@ -150,36 +179,6 @@ const namaMetodeBayar = daftarMetodeBayar
       };
     }
 
-    if (kodeGame.includes('wuwa') || kodeGame.includes('wuthering')) {
-      return {
-        title: 'Cara isi UID Wuthering Waves',
-        badge: 'Verifikasi Manual',
-        type: 'manual',
-        items: [
-          'Buka Wuthering Waves.',
-          'Masuk ke profil akun.',
-          'Salin UID dengan teliti.',
-          'Jika ada pilihan server, pastikan server sesuai akun.'
-        ],
-        contoh: 'UID akun game'
-      };
-    }
-
-    if (kodeGame.includes('zzz') || kodeGame.includes('zenless')) {
-      return {
-        title: 'Cara isi UID Zenless Zone Zero',
-        badge: 'Verifikasi Manual',
-        type: 'manual',
-        items: [
-          'Buka Zenless Zone Zero.',
-          'Cek UID di profil akun.',
-          'Pilih server sesuai akun.',
-          'Pastikan data benar sebelum pembayaran.'
-        ],
-        contoh: 'UID akun game'
-      };
-    }
-
     return {
       title: 'Panduan isi data akun',
       badge: gameSupportAutoCheck ? 'Auto Check Nickname' : 'Verifikasi Manual',
@@ -194,65 +193,65 @@ const namaMetodeBayar = daftarMetodeBayar
   };
 
   const panduanGame = getPanduanGame();
+
   const handleBukaPanduan = () => {
-  const isAuto = panduanGame.type === 'auto';
+    const isAuto = panduanGame.type === 'auto';
 
-  const warnaBadge = isAuto
-    ? 'background:rgba(34,197,94,0.12); color:#4ade80; border:1px solid rgba(34,197,94,0.25);'
-    : 'background:rgba(234,179,8,0.12); color:#fde047; border:1px solid rgba(234,179,8,0.25);';
+    const warnaBadge = isAuto
+      ? 'background:rgba(34,197,94,0.12); color:#4ade80; border:1px solid rgba(34,197,94,0.25);'
+      : 'background:rgba(234,179,8,0.12); color:#fde047; border:1px solid rgba(234,179,8,0.25);';
 
-  const warnaNomor = isAuto
-    ? 'background:#22c55e;'
-    : 'background:#eab308;';
+    const warnaNomor = isAuto ? 'background:#22c55e;' : 'background:#eab308;';
 
-  Swal.fire({
-    title: panduanGame.title,
-    width: 620,
-    background: '#111827',
-    color: '#fff',
-    confirmButtonText: 'Paham, lanjut isi ID 🔥',
-    confirmButtonColor: '#06b6d4',
-    html: `
-      <div style="text-align:left;">
-        <div style="display:flex; justify-content:center; margin-bottom:14px;">
-          <span style="${warnaBadge} display:inline-block; padding:6px 12px; border-radius:999px; font-size:11px; font-weight:900;">
-            ${panduanGame.badge}
-          </span>
-        </div>
+    Swal.fire({
+      title: panduanGame.title,
+      width: 620,
+      background: '#111827',
+      color: '#fff',
+      confirmButtonText: 'Paham, lanjut isi ID 🔥',
+      confirmButtonColor: '#06b6d4',
+      html: `
+        <div style="text-align:left;">
+          <div style="display:flex; justify-content:center; margin-bottom:14px;">
+            <span style="${warnaBadge} display:inline-block; padding:6px 12px; border-radius:999px; font-size:11px; font-weight:900;">
+              ${panduanGame.badge}
+            </span>
+          </div>
 
-        <div style="display:grid; gap:10px; margin-top:10px;">
-          ${panduanGame.items
-            .map(
-              (item, index) => `
-                <div style="display:flex; gap:12px; align-items:flex-start; background:#020617; border:1px solid #1f2937; padding:12px; border-radius:14px;">
-                  <span style="${warnaNomor} flex:0 0 auto; width:26px; height:26px; display:flex; align-items:center; justify-content:center; border-radius:999px; color:white; font-weight:900; font-size:12px;">
-                    ${index + 1}
-                  </span>
-                  <p style="margin:0; color:#d1d5db; font-size:13px; line-height:1.55;">
-                    ${item}
-                  </p>
-                </div>
-              `
-            )
-            .join('')}
-        </div>
+          <div style="display:grid; gap:10px; margin-top:10px;">
+            ${panduanGame.items
+              .map(
+                (item, index) => `
+                  <div style="display:flex; gap:12px; align-items:flex-start; background:#020617; border:1px solid #1f2937; padding:12px; border-radius:14px;">
+                    <span style="${warnaNomor} flex:0 0 auto; width:26px; height:26px; display:flex; align-items:center; justify-content:center; border-radius:999px; color:white; font-weight:900; font-size:12px;">
+                      ${index + 1}
+                    </span>
+                    <p style="margin:0; color:#d1d5db; font-size:13px; line-height:1.55;">
+                      ${item}
+                    </p>
+                  </div>
+                `
+              )
+              .join('')}
+          </div>
 
-        <div style="margin-top:14px; background:rgba(15,23,42,0.95); border:1px dashed #334155; padding:12px; border-radius:14px;">
-          <p style="margin:0 0 5px; color:#64748b; font-size:10px; font-weight:900; letter-spacing:0.08em; text-transform:uppercase;">
-            Contoh
+          <div style="margin-top:14px; background:rgba(15,23,42,0.95); border:1px dashed #334155; padding:12px; border-radius:14px;">
+            <p style="margin:0 0 5px; color:#64748b; font-size:10px; font-weight:900; letter-spacing:0.08em; text-transform:uppercase;">
+              Contoh
+            </p>
+            <code style="color:#67e8f9; font-size:13px; font-weight:800;">
+              ${panduanGame.contoh}
+            </code>
+          </div>
+
+          <p style="margin:14px 0 0; color:#94a3b8; font-size:12px; line-height:1.6; text-align:center;">
+            Pastikan data sesuai akun game sebelum lanjut checkout.
           </p>
-          <code style="color:#67e8f9; font-size:13px; font-weight:800;">
-            ${panduanGame.contoh}
-          </code>
         </div>
+      `
+    });
+  };
 
-        <p style="margin:14px 0 0; color:#94a3b8; font-size:12px; line-height:1.6; text-align:center;">
-          Pastikan data sesuai akun game sebelum lanjut checkout.
-        </p>
-      </div>
-    `
-  });
-};
   const handleBeli = async () => {
     const alertBase = {
       background: '#1f2937',
@@ -291,14 +290,6 @@ const namaMetodeBayar = daftarMetodeBayar
 
     if (!metodeBayar) {
       tampilWarning('Pilih metode pembayaran dulu bre!', 'Eits!');
-      return;
-    }
-
-    if (!setujuAturan) {
-      tampilWarning(
-        'Pastikan ID, Zone, atau Server sudah benar sebelum checkout.',
-        'Setujui aturan dulu bre'
-      );
       return;
     }
 
@@ -348,7 +339,7 @@ const namaMetodeBayar = daftarMetodeBayar
     try {
       Swal.fire({
         ...alertBase,
-        title: 'Bantar Cek akun kamu duluu',
+        title: 'Bentar, cek akun kamu dulu',
         allowOutsideClick: false,
         didOpen: () => Swal.showLoading()
       });
@@ -378,14 +369,18 @@ const namaMetodeBayar = daftarMetodeBayar
 
         const yakin = await Swal.fire({
           ...alertBase,
-          title: 'Konfirmasi Pesanan!!',
+          title: 'Konfirmasi Pesanan',
           html: `
             <div style="text-align:left; line-height:1.7">
               <b>Username:</b> ${username}<br/>
               <b>Produk:</b> ${produkDipilih.nama_produk}<br/>
               <b>ID:</b> ${inputUserId}<br/>
               <b>Server/Zone:</b> ${inputZoneId || '-'}<br/>
-              <b>Metode:</b> ${namaMetodeBayar[metodeBayar] || metodeBayar}
+              <b>Metode:</b> ${namaMetodeBayar[metodeBayar] || metodeBayar}<br/>
+              <b>Total:</b> ${formatRupiah(getTotalBayar())}<br/>
+              <span style="color:#94a3b8; font-size:12px">
+                ${getLabelBiayaAdmin(metodeBayar)}
+              </span>
               <br/><br/>
               <span style="color:#94a3b8">Kalau datanya sudah benar, lanjut bikin tagihan?</span>
             </div>
@@ -461,7 +456,7 @@ const namaMetodeBayar = daftarMetodeBayar
   };
 
   return (
-    <div className="mt-8 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6 items-start pb-40 xl:pb-0">
+    <div className="mt-8 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6 items-start pb-4 xl:pb-0">
       <div className="space-y-6">
         {/* 1. PILIH NOMINAL */}
         <div className="bg-gray-800 p-6 rounded-3xl border border-gray-700 shadow-lg">
@@ -472,47 +467,44 @@ const namaMetodeBayar = daftarMetodeBayar
             <h2 className="text-xl font-bold text-white">Pilih Nominal</h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-2 2xl:grid-cols-3 gap-3 sm:gap-4">
             {dataGame.produk.map((item) => (
               <div
                 key={item.id}
                 onClick={() => setProdukDipilih(item)}
-                className={`p-5 rounded-2xl border-2 cursor-pointer transition-all duration-300 flex flex-col justify-between min-h-28 ${
+                className={`p-3 sm:p-5 rounded-2xl border-2 cursor-pointer transition-all duration-300 flex flex-col justify-between min-h-28 ${
                   produkDipilih?.id === item.id
                     ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)]'
                     : 'bg-gray-900 border-gray-700 hover:border-blue-400'
                 }`}
               >
-                <p className="text-white font-black text-base leading-tight">
+                <p className="text-white font-black text-sm sm:text-base leading-tight">
                   {item.nama_produk}
                 </p>
-<div className="mt-3 space-y-1">
-  {Number(item.harga_coret || 0) > Number(item.harga || 0) && (
-    <div className="flex items-center gap-2">
-      <p className="text-[11px] font-bold text-gray-400">
-        Dari
-      </p>
 
-      <p className="text-xs font-bold text-gray-500 line-through">
-        {formatRupiah(item.harga_coret)}
-      </p>
+                <div className="mt-3 space-y-1">
+                  {Number(item.harga_coret || 0) > Number(item.harga || 0) && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-[11px] font-bold text-gray-400">
+                        Dari
+                      </p>
 
-      {hitungDiskon(item.harga_coret, item.harga) && (
-        <span className="rounded-full border border-green-500/20 bg-green-500/10 px-2 py-0.5 text-[10px] font-black text-green-400">
-          -{hitungDiskon(item.harga_coret, item.harga)}%
-        </span>
-      )}
-    </div>
-  )}
+                      <p className="text-xs font-bold text-gray-500 line-through">
+                        {formatRupiah(item.harga_coret)}
+                      </p>
 
-  <div className="flex items-end gap-2">
-    {Number(item.harga_coret || 0) > Number(item.harga || 0)}
+                      {hitungDiskon(item.harga_coret, item.harga) && (
+                        <span className="rounded-full border border-green-500/20 bg-green-500/10 px-2 py-0.5 text-[10px] font-black text-green-400">
+                          -{hitungDiskon(item.harga_coret, item.harga)}%
+                        </span>
+                      )}
+                    </div>
+                  )}
 
-    <p className="text-base font-black text-cyan-400">
-      {formatRupiah(item.harga)}
-    </p>
-  </div>
-</div>
+                  <p className="text-sm sm:text-base font-black text-cyan-400">
+                    {formatRupiah(item.harga)}
+                  </p>
+                </div>
               </div>
             ))}
           </div>
@@ -528,19 +520,19 @@ const namaMetodeBayar = daftarMetodeBayar
               <h2 className="text-xl font-bold text-white">Masukkan User ID</h2>
             </div>
 
-          <button
-  type="button"
-  onClick={handleBukaPanduan}
-  className="h-10 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-3 text-cyan-300 font-black transition-all hover:bg-cyan-500/20 hover:border-cyan-400 flex items-center gap-2"
-  title="Lihat cara isi ID"
->
-  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-cyan-500 text-white text-xs">
-    ?
-  </span>
-  <span className="hidden sm:inline text-xs">
-    Cara isi ID
-  </span>
-</button> 
+            <button
+              type="button"
+              onClick={handleBukaPanduan}
+              className="h-10 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-3 text-cyan-300 font-black transition-all hover:bg-cyan-500/20 hover:border-cyan-400 flex items-center gap-2"
+              title="Lihat cara isi ID"
+            >
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-cyan-500 text-white text-xs">
+                ?
+              </span>
+              <span className="hidden sm:inline text-xs">
+                Cara isi ID
+              </span>
+            </button>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4">
@@ -578,98 +570,111 @@ const namaMetodeBayar = daftarMetodeBayar
           </div>
         </div>
 
-       {/* 3. PILIH METODE PEMBAYARAN */}
-<div className="bg-gray-800 p-6 rounded-3xl border border-gray-700 shadow-lg">
-  <div className="flex items-center gap-3 mb-4">
-    <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-black text-sm">
-      3
-    </div>
-    <div>
-      <h2 className="text-xl font-bold text-white">Pilih Pembayaran</h2>
-    </div>
-  </div>
+        {/* 3. PILIH METODE PEMBAYARAN */}
+        <div className="bg-gray-800 p-6 rounded-3xl border border-gray-700 shadow-lg">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-black text-sm">
+              3
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">Pilih Pembayaran</h2>
+              <p className="mt-1 text-xs text-gray-500">
+                Fee admin akan masuk ke total checkout.
+              </p>
+            </div>
+          </div>
 
-  <div className="space-y-5">
-    {daftarMetodeBayar.map((grup) => (
-      <div key={grup.grup}>
-        <div className="flex items-center gap-2 mb-3">
-          <div className="h-px flex-1 bg-gray-700" />
-          <p className="text-[11px] font-black uppercase tracking-wider text-gray-400">
-            {grup.grup}
-          </p>
-          <div className="h-px flex-1 bg-gray-700" />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-          {grup.items.map((item) => {
-            const aktif = metodeBayar === item.value;
-
-            return (
-              <button
-                key={item.value}
-                type="button"
-                onClick={() => setMetodeBayar(item.value)}
-                className={`p-4 rounded-2xl border-2 cursor-pointer text-left transition-all ${
-                  aktif
-                    ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)]'
-                    : 'bg-gray-900 border-gray-700 hover:border-blue-400'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-          <div
-  className={`w-14 h-10 rounded-xl flex items-center justify-center shrink-0 border overflow-hidden ${
-    aktif
-      ? 'bg-white border-blue-400'
-      : 'bg-white border-gray-700'
-  }`}
->
-  {item.logo ? (
-    <img
-      src={item.logo}
-      alt={item.label}
-      className="max-w-[42px] max-h-7 object-contain"
-      onError={(e) => {
-        e.currentTarget.style.display = 'none';
-        e.currentTarget.nextElementSibling.style.display = 'block';
-      }}
-    />
-  ) : null}
-
-  <span
-    className="hidden text-[10px] font-black text-gray-900"
-  >
-    {item.fallback}
-  </span>
-</div>
-
-                  <div className="min-w-0">
-                    <p className="font-black text-white text-sm">
-                      {item.label}
-                    </p>
-                    <p className="text-[11px] text-gray-400 mt-1 leading-snug">
-                      {item.desc}
-                    </p>
-                  </div>
+          <div className="space-y-5">
+            {daftarMetodeBayar.map((grup) => (
+              <div key={grup.grup}>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="h-px flex-1 bg-gray-700" />
+                  <p className="text-[11px] font-black uppercase tracking-wider text-gray-400">
+                    {grup.grup}
+                  </p>
+                  <div className="h-px flex-1 bg-gray-700" />
                 </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    ))}
-  </div>
 
-  {metodeBayar && (
-    <div className="mt-4 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4">
-      <p className="text-xs text-cyan-200">
-        Metode dipilih:{' '}
-        <span className="font-black text-white">
-          {namaMetodeBayar[metodeBayar]}
-        </span>
-      </p>
-    </div>
-  )}
-</div> 
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {grup.items.map((item) => {
+                    const aktif = metodeBayar === item.value;
+                    const biayaAdmin = getBiayaAdmin(item.value);
+
+                    return (
+                      <button
+                        key={item.value}
+                        type="button"
+                        onClick={() => setMetodeBayar(item.value)}
+                        className={`p-4 rounded-2xl border-2 cursor-pointer text-left transition-all ${
+                          aktif
+                            ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)]'
+                            : 'bg-gray-900 border-gray-700 hover:border-blue-400'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div
+                            className={`w-14 h-10 rounded-xl flex items-center justify-center shrink-0 border overflow-hidden ${
+                              aktif
+                                ? 'bg-white border-blue-400'
+                                : 'bg-white border-gray-700'
+                            }`}
+                          >
+                            {item.logo ? (
+                              <img
+                                src={item.logo}
+                                alt={item.label}
+                                className="max-w-[42px] max-h-7 object-contain"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  e.currentTarget.nextElementSibling.style.display = 'block';
+                                }}
+                              />
+                            ) : null}
+
+                            <span className="hidden text-[10px] font-black text-gray-900">
+                              {item.fallback}
+                            </span>
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="font-black text-white text-sm">
+                                  {item.label}
+                                </p>
+                                <p className="text-[11px] text-gray-400 mt-1 leading-snug">
+                                  {item.desc}
+                                </p>
+                              </div>
+
+                              {aktif && (
+                                <span className="shrink-0 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2 py-1 text-[10px] font-black text-cyan-300">
+                                  Dipilih
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="mt-3 rounded-xl border border-gray-700 bg-gray-950/70 px-3 py-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[10px] font-bold text-gray-500">
+                                  Fee admin
+                                </span>
+
+                                <span className={`text-[11px] font-black ${biayaAdmin > 0 ? 'text-yellow-300' : 'text-green-400'}`}>
+                                  {biayaAdmin > 0 ? formatRupiah(biayaAdmin) : 'Gratis'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* 4. KONTAK PEMBELI */}
         <div className="bg-gray-800 p-6 rounded-3xl border border-gray-700 shadow-lg">
@@ -679,7 +684,9 @@ const namaMetodeBayar = daftarMetodeBayar
             </div>
             <div>
               <h2 className="text-xl font-bold text-white">Kontak Pembeli</h2>
-              <p className="text-xs text-gray-500 mt-1">Opsional, buat bantuan kalau order perlu dicek.</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Opsional, buat bantuan kalau order perlu dicek.
+              </p>
             </div>
           </div>
 
@@ -706,19 +713,11 @@ const namaMetodeBayar = daftarMetodeBayar
           </p>
         </div>
 
-        {/* CHECKBOX USER */}
         <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl p-4">
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={setujuAturan}
-              onChange={(e) => setSetujuAturan(e.target.checked)}
-              className="mt-1 w-4 h-4 accent-cyan-500"
-            />
-            <span className="text-xs text-yellow-100/90 leading-relaxed">
-              Saya sudah memastikan User ID, Zone ID, dan Server benar. Saya paham kesalahan input bisa menyebabkan top-up gagal atau masuk ke akun lain.
-            </span>
-          </label>
+          <p className="text-xs text-yellow-100/90 leading-relaxed">
+            Pastikan User ID, Zone ID, dan Server sudah benar sebelum lanjut bayar.
+            Kesalahan input bisa menyebabkan top-up gagal atau masuk ke akun lain.
+          </p>
         </div>
       </div>
 
@@ -802,20 +801,27 @@ const namaMetodeBayar = daftarMetodeBayar
                   Total
                 </p>
                 <p className="text-[11px] text-gray-500 mt-1">
-                  Belum termasuk perubahan dari payment gateway jika ada.
+                  {metodeBayar ? getLabelBiayaAdmin(metodeBayar) : 'Pilih metode pembayaran dulu'}
                 </p>
               </div>
 
-              <p className="text-2xl font-black text-green-400 text-right">
-                {produkDipilih ? formatRupiah(produkDipilih.harga) : 'Rp 0'}
-              </p>
+              <div className="text-right">
+                {produkDipilih && metodeBayar && getBiayaAdmin(metodeBayar) > 0 && (
+                  <p className="mb-1 text-[11px] font-bold text-yellow-300">
+                    Admin {formatRupiah(getBiayaAdmin(metodeBayar))}
+                  </p>
+                )}
+
+                <p className="text-2xl font-black text-green-400">
+                  {produkDipilih ? formatRupiah(getTotalBayar()) : 'Rp 0'}
+                </p>
+              </div>
             </div>
           </div>
 
           <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl p-4">
             <p className="text-xs text-yellow-100/90 leading-relaxed">
               Pastikan User ID, Zone ID, atau Server sudah benar sebelum lanjut bayar.
-              Kesalahan input bisa menyebabkan top-up gagal atau masuk ke akun lain.
             </p>
           </div>
 
@@ -852,30 +858,53 @@ const namaMetodeBayar = daftarMetodeBayar
 
       {/* FLOATING CHECKOUT BAR UNTUK HP/TABLET */}
       {produkDipilih && (
-        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-slate-950/95 p-3 backdrop-blur-xl xl:hidden pb-6">
-          <div className="mx-auto flex max-w-7xl items-center gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-bold text-gray-400">
-                {produkDipilih.nama_produk}
-              </p>
-              <p className="text-lg font-black text-green-400">
-                {formatRupiah(produkDipilih.harga)}
-              </p>
-              <p className={`text-[10px] font-black ${checkoutDisabled ? 'text-yellow-400' : 'text-cyan-400'}`}>
-                {checkoutDisabled ? 'Lengkapi data dulu' : 'Siap checkout'}
-              </p>
+        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-slate-950/95 p-3 pb-6 backdrop-blur-xl xl:hidden">
+          <div className="mx-auto max-w-7xl rounded-3xl border border-white/10 bg-gray-900/80 p-4 shadow-2xl shadow-black/40">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-xs font-bold text-gray-400">
+                  {produkDipilih.nama_produk}
+                </p>
+
+                <p className="mt-1 text-xl font-black text-green-400">
+                  {metodeBayar
+                    ? formatRupiah(getTotalBayar())
+                    : formatRupiah(produkDipilih.harga)}
+                </p>
+
+                <p className={`mt-1 text-[11px] font-black ${metodeBayar ? 'text-cyan-300' : 'text-yellow-300'}`}>
+                  {metodeBayar
+                    ? `${namaMetodeBayar[metodeBayar]} • ${getLabelBiayaAdmin(metodeBayar)}`
+                    : 'Pilih metode pembayaran buat lihat total final'}
+                </p>
+              </div>
+
+              <div className="shrink-0 rounded-2xl border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-right">
+                <p className="text-[10px] font-black uppercase tracking-wider text-blue-300">
+                  Total
+                </p>
+                <p className="text-xs font-black text-white">
+                  {metodeBayar ? 'Final' : 'Produk'}
+                </p>
+              </div>
             </div>
 
             <button
               disabled={checkoutDisabled}
               onClick={handleBeli}
-              className={`shrink-0 rounded-2xl px-5 py-3 text-sm font-black transition-all ${
+              className={`relative w-full overflow-hidden rounded-2xl px-5 py-4 text-base font-black transition-all duration-300 ${
                 checkoutDisabled
-                  ? 'bg-gray-700 text-gray-500'
-                  : 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.35)]'
+                  ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 text-white shadow-[0_0_26px_rgba(59,130,246,0.45)] hover:-translate-y-0.5 active:scale-[0.98]'
               }`}
             >
-              {isProsesBeli ? '...' : 'Beli 🔥'}
+              {!checkoutDisabled && (
+                <span className="pointer-events-none absolute inset-0 animate-pulse bg-white/10" />
+              )}
+
+              <span className="relative">
+                {isProsesBeli ? 'Kalem Bre...' : 'Beli Sekarang 🔥'}
+              </span>
             </button>
           </div>
         </div>

@@ -38,14 +38,16 @@ export default function DashboardAdmin() {
 
   // State Form Game
   const [formGame, setFormGame] = useState({
-    nama: '',
-    publisher: '',
-    gambar: '',
-    zone_id: '0',
-    server_game: '',
-    kode_game: '',
-    status_game: 'aktif'
-  });
+  nama: '',
+  publisher: '',
+  gambar: '',
+  zone_id: '0',
+  server_game: '',
+  kode_game: '',
+  status_game: 'aktif',
+  badge_label: '',
+  badge_tipe: 'none'
+});
 
   const [modeEditGame, setModeEditGame] = useState(false);
   const [gameEditId, setGameEditId] = useState(null);
@@ -62,6 +64,22 @@ export default function DashboardAdmin() {
   const [loadingTransaksi, setLoadingTransaksi] = useState(false);
   const [loadingAksiTransaksi, setLoadingAksiTransaksi] = useState(null);
   const [filterProdukGame, setFilterProdukGame] = useState('all');
+  const [daftarPromo, setDaftarPromo] = useState([]);
+const [loadingPromo, setLoadingPromo] = useState(false);
+const [loadingPromoForm, setLoadingPromoForm] = useState(false);
+const [modeEditPromo, setModeEditPromo] = useState(false);
+const [promoEditId, setPromoEditId] = useState(null);
+
+const [formPromo, setFormPromo] = useState({
+  badge: '',
+  title: '',
+  description: '',
+  cta_text: 'Mulai Top Up',
+  cta_href: '#game-list',
+  gradient: 'from-blue-600/30 via-cyan-500/20 to-slate-900',
+  sort_order: 0,
+  is_active: 1
+});
   const [alerts, setAlerts] = useState(null);
   const [loadingAlerts, setLoadingAlerts] = useState(false);
   const [filterTransaksi, setFilterTransaksi] = useState({
@@ -93,6 +111,36 @@ export default function DashboardAdmin() {
   const formatRupiah = (angka) => {
   return `Rp ${Number(angka || 0).toLocaleString('id-ID')}`;
   };
+  const biayaAdminMap = {
+  qris: 0,
+  gopay: 0,
+  shopeepay: 0,
+
+  bca_va: 4000,
+  bni_va: 4000,
+  bri_va: 4000,
+  cimb_va: 4000,
+  permata_va: 4000,
+  mandiri_bill: 4000,
+
+  alfamart: 5000,
+  indomaret: 5000,
+};
+
+const getBiayaAdmin = (metode) => biayaAdminMap[metode] || 0;
+
+const getTotalBayar = (produk, metode) => {
+  return Number(produk?.harga || 0) + getBiayaAdmin(metode);
+};
+
+const getLabelBiayaAdmin = (metode) => {
+  const biaya = getBiayaAdmin(metode);
+
+  if (!metode) return 'Pilih metode dulu';
+  if (biaya <= 0) return 'Tanpa biaya admin';
+
+  return `+${formatRupiah(biaya)} admin`;
+};
 
   const escapeHtml = (value) => {
     return String(value ?? '')
@@ -174,14 +222,16 @@ const kodeProviderEfektif = (item) => {
 
   const resetFormGame = () => {
     setFormGame({
-      nama: '',
-      publisher: '',
-      gambar: '',
-      zone_id: '0',
-      server_game: '',
-      kode_game: '',
-      status_game: 'aktif'
-    });
+  nama: '',
+  publisher: '',
+  gambar: '',
+  zone_id: '0',
+  server_game: '',
+  kode_game: '',
+  status_game: 'aktif',
+  badge_label: '',
+  badge_tipe: 'none'
+});
 
     setModeEditGame(false);
     setGameEditId(null);
@@ -206,6 +256,227 @@ const kodeProviderEfektif = (item) => {
     setModeEditProduk(false);
     setProdukEditId(null);
   };
+
+  const gradientPromoOptions = [
+  'from-blue-600/30 via-cyan-500/20 to-slate-900',
+  'from-cyan-500/25 via-blue-600/20 to-slate-900',
+  'from-indigo-500/25 via-blue-500/20 to-slate-900',
+  'from-sky-500/25 via-cyan-500/20 to-slate-900',
+  'from-violet-500/25 via-blue-500/20 to-slate-900'
+];
+
+const resetFormPromo = () => {
+  setFormPromo({
+    badge: '',
+    title: '',
+    description: '',
+    cta_text: 'Mulai Top Up',
+    cta_href: '#game-list',
+    gradient: 'from-blue-600/30 via-cyan-500/20 to-slate-900',
+    sort_order: 0,
+    is_active: 1
+  });
+
+  setModeEditPromo(false);
+  setPromoEditId(null);
+};
+
+const ambilPromo = async () => {
+  setLoadingPromo(true);
+
+  try {
+    const respon = await fetch('/api/admin/promo');
+    const hasil = await respon.json();
+
+    if (hasil.sukses) {
+      setDaftarPromo(hasil.data || []);
+    } else {
+      Swal.fire({
+        title: 'Gagal ambil promo',
+        text: hasil.pesan,
+        icon: 'error',
+        background: '#1f2937',
+        color: '#fff'
+      });
+    }
+  } catch (error) {
+    Swal.fire({
+      title: 'ERROR SERVER!',
+      text: 'Gagal ambil promo bre',
+      icon: 'error',
+      background: '#1f2937',
+      color: '#fff'
+    });
+  } finally {
+    setLoadingPromo(false);
+  }
+};
+
+const handleSubmitPromo = async (e) => {
+  e.preventDefault();
+  setLoadingPromoForm(true);
+
+  try {
+    const respon = await fetch(
+      modeEditPromo ? `/api/admin/promo/${promoEditId}` : '/api/admin/promo',
+      {
+        method: modeEditPromo ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formPromo,
+          sort_order: Number(formPromo.sort_order || 0),
+          is_active: Number(formPromo.is_active)
+        })
+      }
+    );
+
+    const hasil = await respon.json();
+
+    if (respon.ok) {
+      Swal.fire({
+        title: modeEditPromo ? 'PROMO DIUPDATE! ✨' : 'PROMO MASUK! 🚀',
+        text: hasil.pesan,
+        icon: 'success',
+        background: '#1f2937',
+        color: '#fff'
+      });
+
+      resetFormPromo();
+      ambilPromo();
+    } else {
+      Swal.fire({
+        title: 'WADUH! ❌',
+        text: hasil.pesan,
+        icon: 'error',
+        background: '#1f2937',
+        color: '#fff'
+      });
+    }
+  } catch (error) {
+    Swal.fire({
+      title: 'ERROR SERVER!',
+      text: 'Gagal simpan promo bre',
+      icon: 'error',
+      background: '#1f2937',
+      color: '#fff'
+    });
+  } finally {
+    setLoadingPromoForm(false);
+  }
+};
+
+const handleEditPromo = (promo) => {
+  setTabAktif('promo');
+  setModeEditPromo(true);
+  setPromoEditId(promo.id);
+
+  setFormPromo({
+    badge: promo.badge || '',
+    title: promo.title || '',
+    description: promo.description || '',
+    cta_text: promo.cta_text || 'Mulai Top Up',
+    cta_href: promo.cta_href || '#game-list',
+    gradient: promo.gradient || 'from-blue-600/30 via-cyan-500/20 to-slate-900',
+    sort_order: promo.sort_order || 0,
+    is_active: Number(promo.is_active) === 1 ? 1 : 0
+  });
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+const handleTogglePromo = async (promo) => {
+  try {
+    const respon = await fetch(`/api/admin/promo/${promo.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        badge: promo.badge,
+        title: promo.title,
+        description: promo.description,
+        cta_text: promo.cta_text,
+        cta_href: promo.cta_href,
+        gradient: promo.gradient,
+        sort_order: promo.sort_order,
+        is_active: Number(promo.is_active) === 1 ? 0 : 1
+      })
+    });
+
+    const hasil = await respon.json();
+
+    if (respon.ok) {
+      ambilPromo();
+    } else {
+      Swal.fire({
+        title: 'Gagal update promo',
+        text: hasil.pesan,
+        icon: 'error',
+        background: '#1f2937',
+        color: '#fff'
+      });
+    }
+  } catch (error) {
+    Swal.fire({
+      title: 'ERROR SERVER!',
+      text: 'Gagal update promo bre',
+      icon: 'error',
+      background: '#1f2937',
+      color: '#fff'
+    });
+  }
+};
+
+const handleHapusPromo = async (promo) => {
+  const konfirmasi = await Swal.fire({
+    title: 'Hapus promo ini?',
+    html: `<b>${escapeHtml(promo.title)}</b>`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Iya, hapus!',
+    cancelButtonText: 'Batal',
+    background: '#1f2937',
+    color: '#fff',
+    confirmButtonColor: '#dc2626',
+    cancelButtonColor: '#374151'
+  });
+
+  if (!konfirmasi.isConfirmed) return;
+
+  try {
+    const respon = await fetch(`/api/admin/promo/${promo.id}`, {
+      method: 'DELETE'
+    });
+
+    const hasil = await respon.json();
+
+    if (respon.ok) {
+      Swal.fire({
+        title: 'PROMO KEHAPUS! 🗑️',
+        text: hasil.pesan,
+        icon: 'success',
+        background: '#1f2937',
+        color: '#fff'
+      });
+
+      ambilPromo();
+    } else {
+      Swal.fire({
+        title: 'Gagal hapus promo',
+        text: hasil.pesan,
+        icon: 'error',
+        background: '#1f2937',
+        color: '#fff'
+      });
+    }
+  } catch (error) {
+    Swal.fire({
+      title: 'ERROR SERVER!',
+      text: 'Gagal hapus promo bre',
+      icon: 'error',
+      background: '#1f2937',
+      color: '#fff'
+    });
+  }
+};
 
   // --- FUNGSI TARIK DATA ---
   const ambilDataSultan = async () => {
@@ -715,7 +986,7 @@ const handleEditCatatan = async (trx) => {
       ambilDataSultan();
       ambilTransaksi();
       ambilAlerts();
-
+      ambilPromo();
     }
   }, [session]);
 
@@ -885,7 +1156,9 @@ const handleEditCatatan = async (trx) => {
         zone_id: game.zone_id,
         server_game: game.server_game || '',
         kode_game: game.kode_game,
-        status_game: statusBaru
+        status_game: statusBaru,
+          badge_label: game.badge_label || '',
+  badge_tipe: game.badge_tipe || 'none'
       })
     });
 
@@ -932,7 +1205,9 @@ const handleEditCatatan = async (trx) => {
       zone_id: String(game.zone_id ?? '0'),
       server_game: game.server_game || '',
       kode_game: game.kode_game || '',
-      status_game: game.status_game || 'aktif'
+      status_game: game.status_game || 'aktif',
+      badge_label: game.badge_label || '',
+      badge_tipe: game.badge_tipe || 'none'
     });
 
     setFileGambar(null);
@@ -1308,6 +1583,16 @@ const handleEditCatatan = async (trx) => {
             >
               📦 Kelola Produk
             </button>
+            <button
+  onClick={() => setTabAktif('promo')}
+  className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+    tabAktif === 'promo'
+      ? 'bg-sky-600 text-white shadow-md'
+      : 'text-gray-400 hover:text-white'
+  }`}
+>
+  🎞️ Kelola Promo
+</button>
           </div>
         </div>
 
@@ -1627,7 +1912,7 @@ const handleEditCatatan = async (trx) => {
                                             'Tandai top-up ini gagal biar masuk antrean pengecekan?'
                                           )
                                         }
-                                        className="px-3 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black"
+                                        className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-red-500 text-white text-xs font-black"
                                       >
                                         ❌ Gagalkan
                                       </button>
@@ -1678,7 +1963,7 @@ const handleEditCatatan = async (trx) => {
                                             'Tandai order pending lama ini gagal/expired?'
                                           )
                                         }
-                                        className="px-3 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black"
+                                        className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-red-500 text-white text-xs font-black"
                                       >
                                         🧹 Expire Manual
                                       </button>
@@ -1972,7 +2257,7 @@ const handleEditCatatan = async (trx) => {
                   )
                 }
                 disabled={trx.status_topup === 'gagal'}
-                className="px-3 py-2 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-black hover:bg-red-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-3 py-2 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-black hover:bg-blue-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 ❌ Gagal
               </button>
@@ -2139,6 +2424,39 @@ const handleEditCatatan = async (trx) => {
                     className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-purple-500"
                   />
                 </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  <div>
+    <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">
+      Badge Game
+    </label>
+
+    <input
+      type="text"
+      value={formGame.badge_label}
+      onChange={(e) => setFormGame({ ...formGame, badge_label: e.target.value })}
+      placeholder="🔥 Populer / 💎 Promo"
+      className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-purple-500"
+    />
+  </div>
+
+  <div>
+    <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">
+      Tipe Badge
+    </label>
+
+    <select
+      value={formGame.badge_tipe}
+      onChange={(e) => setFormGame({ ...formGame, badge_tipe: e.target.value })}
+      className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-purple-500 font-bold"
+    >
+      <option value="none">Tanpa Badge</option>
+      <option value="popular">🔥 Populer</option>
+      <option value="promo">💎 Promo</option>
+      <option value="fast">⚡ Fast</option>
+      <option value="new">🆕 Baru</option>
+    </select>
+  </div>
+</div>
 
                 <button
                   type="submit"
@@ -2222,7 +2540,7 @@ const handleEditCatatan = async (trx) => {
                         onClick={() => handleToggleGame(game)}
                         className={`px-3 py-2 rounded-xl border text-xs font-black transition-all ${
                           game.status_game === 'aktif'
-                            ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-600 hover:text-white'
+                            ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-blue-600 hover:text-white'
                             : 'bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-600 hover:text-white'
                         }`}
                       >
@@ -2231,7 +2549,7 @@ const handleEditCatatan = async (trx) => {
                       <button
                         onClick={() => handleHapusGame(game)}
                         disabled={loadingHapusGame === game.id}
-                        className="px-3 py-2 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-black hover:bg-red-600 hover:text-white hover:border-red-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-3 py-2 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-black hover:bg-blue-600 hover:text-white hover:border-red-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {loadingHapusGame === game.id ? 'Hapus...' : '🗑️ Hapus'}
                       </button>
@@ -2572,7 +2890,7 @@ const handleEditCatatan = async (trx) => {
                           onClick={() => handleToggleProduk(item)}
                           className={`px-3 py-2 rounded-xl border text-xs font-black transition-all ${
                             item.status_produk === 'aktif'
-                              ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-600 hover:text-white'
+                              ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-blue-600 hover:text-white'
                               : 'bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-600 hover:text-white'
                           }`}
                         >
@@ -2581,7 +2899,7 @@ const handleEditCatatan = async (trx) => {
                       <button
                         onClick={() => handleHapusProduk(item)}
                         disabled={loadingHapus === item.id}
-                        className="px-3 py-2 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-black hover:bg-red-600 hover:text-white hover:border-red-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-3 py-2 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-black hover:bg-blue-600 hover:text-white hover:border-red-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {loadingHapus === item.id ? 'Hapus...' : '🗑️ Hapus'}
                       </button>
@@ -2600,7 +2918,265 @@ const handleEditCatatan = async (trx) => {
             </div>
           </div>
         )}
+        {/* TAB PROMO */}
+        {tabAktif === 'promo' && (
+  <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 grid grid-cols-1 lg:grid-cols-[420px_minmax(0,1fr)] gap-6 items-start">
+    <section className="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl">
+      <h2 className="text-xl font-black mb-4">
+        {modeEditPromo ? 'Edit Promo Slider' : 'Tambah Promo Slider'}
+      </h2>
 
+      <form onSubmit={handleSubmitPromo} className="space-y-4">
+        <div>
+          <label className="block text-xs font-bold text-gray-400 mb-1 uppercase">
+            Badge
+          </label>
+          <input
+            value={formPromo.badge}
+            onChange={(e) => setFormPromo({ ...formPromo, badge: e.target.value })}
+            placeholder="Promo Mingguan"
+            className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-sky-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-gray-400 mb-1 uppercase">
+            Judul Promo
+          </label>
+          <input
+            value={formPromo.title}
+            onChange={(e) => setFormPromo({ ...formPromo, title: e.target.value })}
+            placeholder="Top Up Lebih Hemat"
+            className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-sky-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-gray-400 mb-1 uppercase">
+            Deskripsi
+          </label>
+          <textarea
+            value={formPromo.description}
+            onChange={(e) => setFormPromo({ ...formPromo, description: e.target.value })}
+            placeholder="Tulis deskripsi promo..."
+            rows={4}
+            className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-sky-500 resize-none"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-bold text-gray-400 mb-1 uppercase">
+              Text Tombol
+            </label>
+            <input
+              value={formPromo.cta_text}
+              onChange={(e) => setFormPromo({ ...formPromo, cta_text: e.target.value })}
+              placeholder="Mulai Top Up"
+              className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-sky-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-400 mb-1 uppercase">
+              Link Tombol
+            </label>
+            <input
+              value={formPromo.cta_href}
+              onChange={(e) => setFormPromo({ ...formPromo, cta_href: e.target.value })}
+              placeholder="#game-list"
+              className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-sky-500"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-gray-400 mb-1 uppercase">
+            Tema Gradient
+          </label>
+          <select
+            value={formPromo.gradient}
+            onChange={(e) => setFormPromo({ ...formPromo, gradient: e.target.value })}
+            className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-sky-500"
+          >
+            {gradientPromoOptions.map((gradient) => (
+              <option key={gradient} value={gradient}>
+                {gradient}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-bold text-gray-400 mb-1 uppercase">
+              Urutan
+            </label>
+            <input
+              type="number"
+              value={formPromo.sort_order}
+              onChange={(e) => setFormPromo({ ...formPromo, sort_order: e.target.value })}
+              className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-sky-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-400 mb-1 uppercase">
+              Status
+            </label>
+            <select
+              value={formPromo.is_active}
+              onChange={(e) => setFormPromo({ ...formPromo, is_active: Number(e.target.value) })}
+              className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-sky-500"
+            >
+              <option value={1}>Aktif</option>
+              <option value={0}>Nonaktif</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-gray-800 bg-slate-950 p-4">
+          <p className="text-xs font-black text-gray-500 mb-2">
+            Preview Mini
+          </p>
+
+          <div className={`rounded-2xl bg-gradient-to-br ${formPromo.gradient} p-4`}>
+            <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-[10px] font-black text-cyan-200">
+              {formPromo.badge || 'Badge'}
+            </span>
+
+            <h3 className="mt-3 text-lg font-black">
+              {formPromo.title || 'Judul Promo'}
+            </h3>
+
+            <p className="mt-2 text-xs text-gray-300">
+              {formPromo.description || 'Deskripsi promo akan tampil di sini.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            disabled={loadingPromoForm}
+            type="submit"
+            className="flex-1 py-3 rounded-xl bg-gradient-to-r from-sky-600 to-cyan-600 hover:from-sky-500 hover:to-cyan-500 text-white font-black disabled:opacity-50"
+          >
+            {loadingPromoForm
+              ? 'Nyimpan...'
+              : modeEditPromo
+                ? 'Update Promo'
+                : 'Tambah Promo'}
+          </button>
+
+          {modeEditPromo && (
+            <button
+              type="button"
+              onClick={resetFormPromo}
+              className="px-5 py-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-white font-black"
+            >
+              Batal
+            </button>
+          )}
+        </div>
+      </form>
+    </section>
+
+    <section className="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl">
+      <div className="flex items-center justify-between gap-4 mb-5">
+        <div>
+          <h2 className="text-xl font-black">Daftar Promo</h2>
+          <p className="text-xs text-gray-500 mt-1">
+            Promo aktif bakal tampil di homepage.
+          </p>
+        </div>
+
+        <button
+          onClick={ambilPromo}
+          disabled={loadingPromo}
+          className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-white text-xs font-black disabled:opacity-50"
+        >
+          {loadingPromo ? 'Refresh...' : '🔄 Refresh'}
+        </button>
+      </div>
+
+      {loadingPromo ? (
+        <div className="p-10 text-center text-gray-400 font-bold animate-pulse">
+          Ngambil promo...
+        </div>
+      ) : daftarPromo.length === 0 ? (
+        <div className="rounded-2xl border border-gray-800 bg-slate-950 p-8 text-center text-gray-500 font-bold">
+          Belum ada promo bre.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {daftarPromo.map((promo) => (
+            <div
+              key={promo.id}
+              className="rounded-2xl border border-gray-800 bg-slate-950 p-4"
+            >
+              <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    <span className="px-3 py-1 rounded-full border border-cyan-500/20 bg-cyan-500/10 text-cyan-300 text-[10px] font-black">
+                      {promo.badge}
+                    </span>
+
+                    <span className={`px-3 py-1 rounded-full border text-[10px] font-black ${
+                      Number(promo.is_active) === 1
+                        ? 'border-green-500/20 bg-green-500/10 text-green-400'
+                        : 'border-red-500/20 bg-red-500/10 text-red-400'
+                    }`}>
+                      {Number(promo.is_active) === 1 ? 'Aktif' : 'Nonaktif'}
+                    </span>
+
+                    <span className="px-3 py-1 rounded-full border border-gray-700 bg-gray-900 text-gray-400 text-[10px] font-black">
+                      Urutan {promo.sort_order}
+                    </span>
+                  </div>
+
+                  <h3 className="text-lg font-black text-white">
+                    {promo.title}
+                  </h3>
+
+                  <p className="mt-1 text-sm text-gray-400 line-clamp-2">
+                    {promo.description}
+                  </p>
+
+                  <p className="mt-2 text-xs text-gray-500 font-bold">
+                    Tombol: {promo.cta_text} → {promo.cta_href}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2 shrink-0">
+                  <button
+                    onClick={() => handleTogglePromo(promo)}
+                    className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-white text-xs font-black"
+                  >
+                    {Number(promo.is_active) === 1 ? 'Nonaktifkan' : 'Aktifkan'}
+                  </button>
+
+                  <button
+                    onClick={() => handleEditPromo(promo)}
+                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black"
+                  >
+                    Edit
+                  </button>
+
+                  <button
+                    onClick={() => handleHapusPromo(promo)}
+                    className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black"
+                  >
+                    Hapus
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  </div>
+)}
       </div>
     </div>
   );

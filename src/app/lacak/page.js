@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-
+import Swal from 'sweetalert2';
 export default function CekOrderPage() {
   const searchParams = useSearchParams();
   const fromPage = searchParams.get('from');
@@ -181,6 +181,57 @@ const linkChatAdmin = () => {
   return `https://wa.me/${nomorAdmin}?text=${pesan}`;
 };
 
+const bukaTutorialLacak = () => {
+  Swal.fire({
+    title: 'Cara Cek Order',
+    width: 620,
+    background: '#111827',
+    color: '#fff',
+    confirmButtonText: 'Paham bree 🔥',
+    confirmButtonColor: '#06b6d4',
+    html: `
+      <div style="text-align:left;">
+        <div style="display:grid; gap:10px;">
+          <div style="display:flex; gap:12px; background:#020617; border:1px solid #1f2937; padding:12px; border-radius:14px;">
+            <span style="flex:0 0 auto; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:999px; background:#06b6d4; color:white; font-weight:900; font-size:12px;">1</span>
+            <div>
+              <b style="color:white; font-size:13px;">Salin Order ID</b>
+              <p style="margin:4px 0 0; color:#94a3b8; font-size:12px; line-height:1.5;">
+                Order ID biasanya formatnya seperti <code style="color:#67e8f9;">NX-xxxxxxxxxxxxx</code>. Bisa dilihat di halaman pembayaran atau struk.
+              </p>
+            </div>
+          </div>
+
+          <div style="display:flex; gap:12px; background:#020617; border:1px solid #1f2937; padding:12px; border-radius:14px;">
+            <span style="flex:0 0 auto; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:999px; background:#3b82f6; color:white; font-weight:900; font-size:12px;">2</span>
+            <div>
+              <b style="color:white; font-size:13px;">Tempel ke kolom cek order</b>
+              <p style="margin:4px 0 0; color:#94a3b8; font-size:12px; line-height:1.5;">
+                Masukkan Order ID ke kolom yang tersedia, lalu klik tombol <b>Cek</b>.
+              </p>
+            </div>
+          </div>
+
+          <div style="display:flex; gap:12px; background:#020617; border:1px solid #1f2937; padding:12px; border-radius:14px;">
+            <span style="flex:0 0 auto; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:999px; background:#22c55e; color:white; font-weight:900; font-size:12px;">3</span>
+            <div>
+              <b style="color:white; font-size:13px;">Lihat status transaksi</b>
+              <p style="margin:4px 0 0; color:#94a3b8; font-size:12px; line-height:1.5;">
+                Kalau pembayaran sudah sukses, status top-up akan berubah menjadi diproses atau berhasil. Kalau bermasalah, klik tombol Chat Admin.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:14px; background:rgba(234,179,8,0.10); border:1px solid rgba(234,179,8,0.22); padding:12px; border-radius:14px;">
+          <p style="margin:0; color:#fde68a; font-size:12px; line-height:1.6;">
+            Tips: simpan Order ID sampai top-up berhasil. Jangan bikin order baru dulu kalau pembayaran sudah sukses tapi top-up belum masuk.
+          </p>
+        </div>
+      </div>
+    `
+  });
+};
   return (
     <main className="min-h-screen bg-slate-950 text-white px-4 py-6 flex items-center justify-center">
       <div className="w-full max-w-xl">
@@ -203,8 +254,16 @@ const linkChatAdmin = () => {
                 Cek <span className="text-cyan-400">Order</span>
               </h1>
               <p className="text-gray-500 text-xs mt-1">
-                Masukin resi transaksi lu.
-              </p>
+  Masukin resi transaksi lu.
+</p>
+
+<button
+  type="button"
+  onClick={bukaTutorialLacak}
+  className="mt-3 inline-flex items-center gap-2 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-2 text-xs font-black text-cyan-300 transition-all hover:border-cyan-400 hover:bg-cyan-500/20"
+>
+  ❔ Cara cek order
+</button>
             </div>
 
             <form onSubmit={handleCekOrder} className="flex flex-col sm:flex-row gap-3">
@@ -224,6 +283,31 @@ const linkChatAdmin = () => {
                 {loading ? 'Cek...' : 'Cek 🔍'}
               </button>
             </form>
+
+            {!dataOrder && !pesanError && (
+  <div className="mt-4 grid grid-cols-3 gap-2">
+    <div className="rounded-2xl border border-gray-800 bg-slate-950/70 p-3 text-center">
+      <p className="text-lg">📋</p>
+      <p className="mt-1 text-[10px] font-black text-gray-400">
+        Salin Order ID
+      </p>
+    </div>
+
+    <div className="rounded-2xl border border-gray-800 bg-slate-950/70 p-3 text-center">
+      <p className="text-lg">🔍</p>
+      <p className="mt-1 text-[10px] font-black text-gray-400">
+        Klik Cek
+      </p>
+    </div>
+
+    <div className="rounded-2xl border border-gray-800 bg-slate-950/70 p-3 text-center">
+      <p className="text-lg">🧾</p>
+      <p className="mt-1 text-[10px] font-black text-gray-400">
+        Lihat Status
+      </p>
+    </div>
+  </div>
+)}
 
             {pesanError && (
               <div className="mt-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-2xl p-3 text-xs font-bold">
