@@ -34,12 +34,6 @@ export default function GameSearch({ games = [] }) {
 };
   return (
     <div id="game-list" className="max-w-7xl mx-auto">
-      {/* HEADER */}
-      <div className="text-center mb-1.5">
-        <h3 className="font-black uppercase tracking-[0.25em] text-blue-400 mb-1">
-          NaXaShop Games
-        </h3>
-      </div>
 
       {/* KOLOM PENCARIAN */}
 <div className="mb-4 max-w-md mx-auto">

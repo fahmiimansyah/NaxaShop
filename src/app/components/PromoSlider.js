@@ -88,7 +88,7 @@ export default function PromoSlider() {
                     </span>
                   </div>
 
-                  <h1 className="max-w-2xl text-2xl font-black leading-tight text-white sm:text-4xl lg:text-5xl">
+                  <h1 className="max-w-2xl text-2xl font-black leading-tight text-white sm:text-xl lg:text-2xl">
                     {promo.title}
                   </h1>
 

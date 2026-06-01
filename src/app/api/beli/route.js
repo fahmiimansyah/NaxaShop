@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
+<<<<<<< HEAD
+=======
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../auth/[...nextauth]/route';
+>>>>>>> d0c4f1a (update fitur riwayat transaksi)
 import db from '../../lib/db';
 import { rateLimit } from '../../lib/rate-limit';
 
@@ -376,6 +381,12 @@ export async function POST(request) {
       );
     }
 
+<<<<<<< HEAD
+=======
+    const session = await getServerSession(authOptions);
+const userEmailLogin = bersihinText(session?.user?.email).toLowerCase() || null;
+
+>>>>>>> d0c4f1a (update fitur riwayat transaksi)
     const pesanan = await request.json();
 
     const gameId = Number(pesanan.game_id);
@@ -387,7 +398,11 @@ export async function POST(request) {
 
     const customerWhatsapp = bersihinWhatsapp(pesanan.customer_whatsapp);
     const customerEmail = bersihinText(pesanan.customer_email).toLowerCase();
+<<<<<<< HEAD
 
+=======
+    const emailUntukPayment = customerEmail || userEmailLogin || '';
+>>>>>>> d0c4f1a (update fitur riwayat transaksi)
     if (customerWhatsapp && !whatsappValid(customerWhatsapp)) {
       return NextResponse.json(
         {
@@ -568,9 +583,16 @@ export async function POST(request) {
          status_bayar,
          status_topup,
          customer_whatsapp,
+<<<<<<< HEAD
          customer_email
        )
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+=======
+         customer_email,
+         user_email
+       )
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+>>>>>>> d0c4f1a (update fitur riwayat transaksi)
       [
         orderId,
         produk.game_id,
@@ -586,7 +608,12 @@ export async function POST(request) {
         'pending',
         'pending',
         customerWhatsapp || null,
+<<<<<<< HEAD
         customerEmail || null
+=======
+        customerEmail || null,
+        userEmailLogin
+>>>>>>> d0c4f1a (update fitur riwayat transaksi)
       ]
     );
 
@@ -597,6 +624,7 @@ export async function POST(request) {
     const finishUrl = bikinFinishUrl(request, orderId);
 
     const payload = bikinPayloadMidtrans({
+<<<<<<< HEAD
       metodeBayar,
       orderId,
       hargaAsli,
@@ -606,6 +634,17 @@ export async function POST(request) {
       namaProduk: produk.nama_produk,
       finishUrl
     });
+=======
+  metodeBayar,
+  orderId,
+  hargaAsli,
+  idPlayer,
+  customerEmail: emailUntukPayment,
+  customerWhatsapp,
+  namaProduk: produk.nama_produk,
+  finishUrl
+});
+>>>>>>> d0c4f1a (update fitur riwayat transaksi)
 
     const response = await fetch(`${midtransBaseUrl}/v2/charge`, {
       method: 'POST',
@@ -697,4 +736,8 @@ export async function POST(request) {
       { status: 500 }
     );
   }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> d0c4f1a (update fitur riwayat transaksi)

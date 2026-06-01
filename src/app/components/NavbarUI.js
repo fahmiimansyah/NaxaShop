@@ -13,7 +13,8 @@ export default function NavbarUI({ session }) { // <--- TERIMA DATA DARI SERVER
     { name: "Home", href: "/" },
     { name: "Games", href: "/" },
     { name: "Cek Pesanan", href: "/lacak" },
-    { name: "Bantuan", href: '/support'}
+    { name: "Bantuan", href: '/support'},
+    { name: "Riwayat Transaksi", href: '/akun/riwayat'},
   ]
 
   return (
