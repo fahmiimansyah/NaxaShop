@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
-<<<<<<< HEAD
-=======
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/route';
->>>>>>> d0c4f1a (update fitur riwayat transaksi)
 import db from '../../lib/db';
 import { rateLimit } from '../../lib/rate-limit';
 
@@ -47,6 +44,22 @@ const LABEL_METODE_BAYAR = {
   indomaret: 'Indomaret'
 };
 
+const BIAYA_ADMIN_METODE = {
+  qris: 0,
+  gopay: 0,
+  shopeepay: 0,
+
+  bca_va: 4000,
+  bni_va: 4000,
+  bri_va: 4000,
+  cimb_va: 4000,
+  permata_va: 4000,
+  mandiri_bill: 4000,
+
+  alfamart: 5000,
+  indomaret: 5000
+};
+
 const PROVIDER_VALID = ['apigames', 'digiflazz', 'vipreseller', 'mock'];
 
 function bersihinText(value) {
@@ -69,6 +82,10 @@ function whatsappValid(value) {
 function emailValid(value) {
   if (!value) return true;
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function getBiayaAdmin(metodeBayar) {
+  return Number(BIAYA_ADMIN_METODE[metodeBayar] || 0);
 }
 
 function bikinOrderId() {
@@ -121,10 +138,34 @@ async function updateTransaksiGagal(orderId, catatan) {
   }
 }
 
+function bikinItemDetails({ namaProduk, hargaProduk, biayaAdmin }) {
+  const items = [
+    {
+      id: 'produk',
+      price: hargaProduk,
+      quantity: 1,
+      name: namaProduk?.slice(0, 50) || 'Produk NaXaShop'
+    }
+  ];
+
+  if (biayaAdmin > 0) {
+    items.push({
+      id: 'admin_fee',
+      price: biayaAdmin,
+      quantity: 1,
+      name: 'Biaya Admin'
+    });
+  }
+
+  return items;
+}
+
 function bikinPayloadMidtrans({
   metodeBayar,
   orderId,
-  hargaAsli,
+  hargaTotal,
+  hargaProduk,
+  biayaAdmin,
   idPlayer,
   customerEmail,
   customerWhatsapp,
@@ -134,7 +175,7 @@ function bikinPayloadMidtrans({
   const payload = {
     transaction_details: {
       order_id: orderId,
-      gross_amount: hargaAsli
+      gross_amount: hargaTotal
     },
     customer_details: {
       first_name: 'Player',
@@ -142,14 +183,11 @@ function bikinPayloadMidtrans({
       email: customerEmail || undefined,
       phone: customerWhatsapp || undefined
     },
-    item_details: [
-      {
-        id: namaProduk?.slice(0, 50) || 'Produk',
-        price: hargaAsli,
-        quantity: 1,
-        name: namaProduk?.slice(0, 50) || 'Produk NaXaShop'
-      }
-    ]
+    item_details: bikinItemDetails({
+      namaProduk,
+      hargaProduk,
+      biayaAdmin
+    })
   };
 
   if (metodeBayar === 'qris') {
@@ -235,7 +273,9 @@ function bikinPayloadMidtrans({
 function bikinResponsePembayaran({
   metodeBayar,
   orderId,
-  hargaAsli,
+  hargaProduk,
+  biayaAdmin,
+  hargaTotal,
   namaProduk,
   dataMidtrans
 }) {
@@ -246,7 +286,10 @@ function bikinResponsePembayaran({
     order_id: orderId,
     metode_bayar: metodeBayar,
     label_metode_bayar: labelMetode,
-    harga: hargaAsli,
+    harga: hargaTotal,
+    harga_produk: hargaProduk,
+    biaya_admin: biayaAdmin,
+    harga_total: hargaTotal,
     nama_produk: namaProduk
   };
 
@@ -381,12 +424,10 @@ export async function POST(request) {
       );
     }
 
-<<<<<<< HEAD
-=======
     const session = await getServerSession(authOptions);
-const userEmailLogin = bersihinText(session?.user?.email).toLowerCase() || null;
+    const userEmailLogin =
+      bersihinText(session?.user?.email).toLowerCase() || null;
 
->>>>>>> d0c4f1a (update fitur riwayat transaksi)
     const pesanan = await request.json();
 
     const gameId = Number(pesanan.game_id);
@@ -398,11 +439,8 @@ const userEmailLogin = bersihinText(session?.user?.email).toLowerCase() || null;
 
     const customerWhatsapp = bersihinWhatsapp(pesanan.customer_whatsapp);
     const customerEmail = bersihinText(pesanan.customer_email).toLowerCase();
-<<<<<<< HEAD
-
-=======
     const emailUntukPayment = customerEmail || userEmailLogin || '';
->>>>>>> d0c4f1a (update fitur riwayat transaksi)
+
     if (customerWhatsapp && !whatsappValid(customerWhatsapp)) {
       return NextResponse.json(
         {
@@ -521,10 +559,12 @@ const userEmailLogin = bersihinText(session?.user?.email).toLowerCase() || null;
       );
     }
 
-    const hargaAsli = Number(produk.harga);
+    const hargaProduk = Number(produk.harga);
     const hargaModal = Number(produk.harga_modal || 0);
+    const biayaAdmin = getBiayaAdmin(metodeBayar);
+    const hargaTotal = hargaProduk + biayaAdmin;
 
-    if (!hargaAsli || hargaAsli <= 0) {
+    if (!hargaProduk || hargaProduk <= 0) {
       return NextResponse.json(
         {
           sukses: false,
@@ -578,21 +618,18 @@ const userEmailLogin = bersihinText(session?.user?.email).toLowerCase() || null;
          id_player,
          zone_player,
          harga,
+         harga_produk,
+         biaya_admin,
+         harga_total,
          harga_modal,
          payment_type,
          status_bayar,
          status_topup,
          customer_whatsapp,
-<<<<<<< HEAD
-         customer_email
-       )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-=======
          customer_email,
          user_email
        )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
->>>>>>> d0c4f1a (update fitur riwayat transaksi)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         orderId,
         produk.game_id,
@@ -602,18 +639,17 @@ const userEmailLogin = bersihinText(session?.user?.email).toLowerCase() || null;
         kodeProdukProvider,
         idPlayer,
         zonePlayer,
-        hargaAsli,
+        hargaTotal,
+        hargaProduk,
+        biayaAdmin,
+        hargaTotal,
         hargaModal,
         metodeBayar,
         'pending',
         'pending',
         customerWhatsapp || null,
-<<<<<<< HEAD
-        customerEmail || null
-=======
         customerEmail || null,
         userEmailLogin
->>>>>>> d0c4f1a (update fitur riwayat transaksi)
       ]
     );
 
@@ -624,27 +660,17 @@ const userEmailLogin = bersihinText(session?.user?.email).toLowerCase() || null;
     const finishUrl = bikinFinishUrl(request, orderId);
 
     const payload = bikinPayloadMidtrans({
-<<<<<<< HEAD
       metodeBayar,
       orderId,
-      hargaAsli,
+      hargaTotal,
+      hargaProduk,
+      biayaAdmin,
       idPlayer,
-      customerEmail,
+      customerEmail: emailUntukPayment,
       customerWhatsapp,
       namaProduk: produk.nama_produk,
       finishUrl
     });
-=======
-  metodeBayar,
-  orderId,
-  hargaAsli,
-  idPlayer,
-  customerEmail: emailUntukPayment,
-  customerWhatsapp,
-  namaProduk: produk.nama_produk,
-  finishUrl
-});
->>>>>>> d0c4f1a (update fitur riwayat transaksi)
 
     const response = await fetch(`${midtransBaseUrl}/v2/charge`, {
       method: 'POST',
@@ -677,7 +703,10 @@ const userEmailLogin = bersihinText(session?.user?.email).toLowerCase() || null;
       );
     }
 
-    if (data.transaction_status === 'deny' || data.transaction_status === 'failure') {
+    if (
+      data.transaction_status === 'deny' ||
+      data.transaction_status === 'failure'
+    ) {
       await updateTransaksiGagal(
         orderId,
         `Midtrans menolak transaksi pada ${new Date().toISOString()}: ${JSON.stringify(data)}`
@@ -696,7 +725,9 @@ const userEmailLogin = bersihinText(session?.user?.email).toLowerCase() || null;
     const responseBayar = bikinResponsePembayaran({
       metodeBayar,
       orderId,
-      hargaAsli,
+      hargaProduk,
+      biayaAdmin,
+      hargaTotal,
       namaProduk: produk.nama_produk,
       dataMidtrans: data
     });
@@ -736,8 +767,4 @@ const userEmailLogin = bersihinText(session?.user?.email).toLowerCase() || null;
       { status: 500 }
     );
   }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> d0c4f1a (update fitur riwayat transaksi)
