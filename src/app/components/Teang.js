@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { FaSearch, FaTimes } from 'react-icons/fa';
 import { AnimatePresence, motion } from 'framer-motion';
 import PromoSlider from "../components/PromoSlider";
+import RequestGameBox from "../components/RequestGameBox";
 
 export default function GameSearch({ games = [] }) {
   const [kataKunci, setKataKunci] = useState('');
@@ -105,6 +106,7 @@ export default function GameSearch({ games = [] }) {
               Reset Pencarian
             </button>
           )}
+          <RequestGameBox defaultKeyword={kataKunci.trim()} compact />
         </div>
       ) : (
         <>

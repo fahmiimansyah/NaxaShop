@@ -6,8 +6,14 @@ export async function GET() {
     const [hasil] = await db.query(
       `SELECT *
        FROM games
-       WHERE status_game = 'aktif'
-       ORDER BY id ASC`
+       WHERE status_game IN ('aktif', 'coming_soon')
+       ORDER BY 
+         CASE status_game
+           WHEN 'aktif' THEN 1
+           WHEN 'coming_soon' THEN 2
+           ELSE 3
+         END,
+         id ASC`
     );
 
     return NextResponse.json(hasil);

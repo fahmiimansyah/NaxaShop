@@ -5,17 +5,12 @@ import db from '../../../lib/db';
 
 const EMAIL_CEO = 'fahmiimansyah28@gmail.com';
 
-const STATUS_PRODUK_VALID = ['aktif', 'nonaktif'];
+const STATUS_PRODUK_VALID = ['aktif', 'nonaktif', 'coming_soon'];
 const PROVIDER_VALID = ['apigames', 'digiflazz', 'mock', 'vipreseller'];
 
 async function cekAdmin() {
   const session = await getServerSession(authOptions);
-
-  if (!session || session.user?.email !== EMAIL_CEO) {
-    return false;
-  }
-
-  return true;
+  return Boolean(session && session.user?.email === EMAIL_CEO);
 }
 
 function bersihinText(value) {
@@ -62,10 +57,65 @@ function validasiHargaCoret(value) {
   return hargaCoret;
 }
 
+function payloadProdukDariBody(body) {
+  const kode_produk = bersihinText(body.kode_produk);
+
+  return {
+    game_id: body.game_id,
+    kode_produk,
+    nama_produk: bersihinText(body.nama_produk),
+    harga: validasiHarga(body.harga),
+    harga_coret: validasiHargaCoret(body.harga_coret),
+    harga_modal: validasiHargaModal(body.harga_modal),
+    status_produk: normalisasiStatusProduk(body.status_produk),
+    provider: normalisasiProvider(body.provider),
+    kode_produk_provider: bersihinText(body.kode_produk_provider || kode_produk)
+  };
+}
+
+function validasiPayloadProduk(produk, wajibId = false, id = null) {
+  if (wajibId && !id) return 'ID produk wajib dikirim bre!';
+
+  if (
+    !produk.game_id ||
+    !produk.kode_produk ||
+    !produk.nama_produk ||
+    !produk.harga ||
+    produk.harga_modal === null ||
+    produk.harga_coret === null
+  ) {
+    return 'Data produk belum lengkap bre!';
+  }
+
+  if (produk.harga_modal > produk.harga) {
+    return 'Harga modal gak boleh lebih gede dari harga jual bre!';
+  }
+
+  if (produk.harga_coret > 0 && produk.harga_coret <= produk.harga) {
+    return 'Harga coret harus lebih besar dari harga jual bre!';
+  }
+
+  if (!produk.provider) {
+    return 'Provider produk gak valid bre!';
+  }
+
+  if (!produk.kode_produk_provider) {
+    return 'Kode produk provider wajib diisi bre!';
+  }
+
+  if (
+    produk.kode_produk.length > 100 ||
+    produk.nama_produk.length > 150 ||
+    produk.kode_produk_provider.length > 100
+  ) {
+    return 'Ada input produk yang kepanjangan bre!';
+  }
+
+  return null;
+}
+
 export async function GET() {
   const adminValid = await cekAdmin();
-
-  
 
   if (!adminValid) {
     return NextResponse.json(
@@ -76,7 +126,7 @@ export async function GET() {
 
   try {
     const [daftarProduk] = await db.query(
-      `SELECT 
+      `SELECT
          id,
          kode_produk,
          nama_produk,
@@ -91,10 +141,7 @@ export async function GET() {
        ORDER BY id DESC`
     );
 
-    return NextResponse.json({
-      sukses: true,
-      data: daftarProduk
-    });
+    return NextResponse.json({ sukses: true, data: daftarProduk });
   } catch (error) {
     console.error('Gagal narik produk:', error);
 
@@ -114,59 +161,22 @@ export async function POST(request) {
       { status: 403 }
     );
   }
+
   try {
-    const dataBaru = await request.json();
-    const kode_produk = bersihinText(dataBaru.kode_produk);
-    const nama_produk = bersihinText(dataBaru.nama_produk);
-    const game_id = dataBaru.game_id;
-    const harga = validasiHarga(dataBaru.harga);
-  const harga_coret = validasiHargaCoret(dataBaru.harga_coret);
-    const harga_modal = validasiHargaModal(dataBaru.harga_modal);
-    const status_produk = normalisasiStatusProduk(dataBaru.status_produk);
+    const body = await request.json();
+    const produk = payloadProdukDariBody(body);
+    const pesanValidasi = validasiPayloadProduk(produk);
 
-    const provider = normalisasiProvider(dataBaru.provider);
-    const kode_produk_provider = bersihinText(
-      dataBaru.kode_produk_provider || kode_produk
-    );
-
-    if (!kode_produk || !nama_produk || !harga || harga_modal === null || harga_coret === null || !game_id) {
+    if (pesanValidasi) {
       return NextResponse.json(
-        { sukses: false, pesan: 'Data produk belum lengkap bre!' },
-        { status: 400 }
-      );
-    }
-
-    if (harga_modal > harga) {
-      return NextResponse.json(
-        { sukses: false, pesan: 'Harga modal gak boleh lebih gede dari harga jual bre!' },
-        { status: 400 }
-      );
-    }
-
-    if (harga_coret > 0 && harga_coret <= harga) {
-  return NextResponse.json(
-    { sukses: false, pesan: 'Harga coret harus lebih besar dari harga jual bre!' },
-    { status: 400 }
-  );
-}
-
-    if (!provider) {
-      return NextResponse.json(
-        { sukses: false, pesan: 'Provider produk gak valid bre!' },
-        { status: 400 }
-      );
-    }
-
-    if (!kode_produk_provider) {
-      return NextResponse.json(
-        { sukses: false, pesan: 'Kode produk provider wajib diisi bre!' },
+        { sukses: false, pesan: pesanValidasi },
         { status: 400 }
       );
     }
 
     const [cekGame] = await db.query(
       `SELECT id FROM games WHERE id = ? LIMIT 1`,
-      [game_id]
+      [produk.game_id]
     );
 
     if (cekGame.length === 0) {
@@ -178,7 +188,7 @@ export async function POST(request) {
 
     const [cekKode] = await db.query(
       `SELECT id FROM produk WHERE kode_produk = ? LIMIT 1`,
-      [kode_produk]
+      [produk.kode_produk]
     );
 
     if (cekKode.length > 0) {
@@ -203,21 +213,24 @@ export async function POST(request) {
        )
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        kode_produk,
-        nama_produk,
-        harga,
-        harga_coret,
-        harga_modal,
-        game_id,
-        status_produk,
-        provider,
-        kode_produk_provider
+        produk.kode_produk,
+        produk.nama_produk,
+        produk.harga,
+        produk.harga_coret,
+        produk.harga_modal,
+        produk.game_id,
+        produk.status_produk,
+        produk.provider,
+        produk.kode_produk_provider
       ]
     );
 
     return NextResponse.json({
       sukses: true,
-      pesan: 'Berhasil nambahin produk ke etalase!'
+      pesan:
+        produk.status_produk === 'coming_soon'
+          ? 'Produk berhasil disimpan sebagai Coming Soon! 🕒'
+          : 'Berhasil nambahin produk ke etalase!'
     });
   } catch (error) {
     console.error('Dapur input meledak:', error);
@@ -231,6 +244,7 @@ export async function POST(request) {
 
 export async function PATCH(request) {
   const adminValid = await cekAdmin();
+
   if (!adminValid) {
     return NextResponse.json(
       { sukses: false, pesan: 'Akses ditolak bre! Lu bukan admin.' },
@@ -241,57 +255,12 @@ export async function PATCH(request) {
   try {
     const body = await request.json();
     const id = body.id;
-    const game_id = body.game_id;
-    const kode_produk = bersihinText(body.kode_produk);
-    const nama_produk = bersihinText(body.nama_produk);
-    const harga = validasiHarga(body.harga);
-    const harga_coret = validasiHargaCoret(body.harga_coret);
-    const harga_modal = validasiHargaModal(body.harga_modal);
-    const status_produk = normalisasiStatusProduk(body.status_produk);
+    const produk = payloadProdukDariBody(body);
+    const pesanValidasi = validasiPayloadProduk(produk, true, id);
 
-    const provider = normalisasiProvider(body.provider);
-    const kode_produk_provider = bersihinText(
-      body.kode_produk_provider || kode_produk
-    );
-
-    if (
-  !id ||
-  !game_id ||
-  !kode_produk ||
-  !nama_produk ||
-  !harga ||
-  harga_modal === null ||
-  harga_coret === null
-) {
-  return NextResponse.json(
-    { sukses: false, pesan: 'Data produk belum lengkap bre!' },
-    { status: 400 }
-  );
-}
-    if (harga_coret > 0 && harga_coret <= harga) {
-  return NextResponse.json(
-    { sukses: false, pesan: 'Harga coret harus lebih besar dari harga jual bre!' },
-    { status: 400 }
-  );
-}
-
-    if (harga_modal > harga) {
+    if (pesanValidasi) {
       return NextResponse.json(
-        { sukses: false, pesan: 'Harga modal gak boleh lebih gede dari harga jual bre!' },
-        { status: 400 }
-      );
-    }
-
-    if (!provider) {
-      return NextResponse.json(
-        { sukses: false, pesan: 'Provider produk gak valid bre!' },
-        { status: 400 }
-      );
-    }
-
-    if (!kode_produk_provider) {
-      return NextResponse.json(
-        { sukses: false, pesan: 'Kode produk provider wajib diisi bre!' },
+        { sukses: false, pesan: pesanValidasi },
         { status: 400 }
       );
     }
@@ -310,7 +279,7 @@ export async function PATCH(request) {
 
     const [cekGame] = await db.query(
       `SELECT id FROM games WHERE id = ? LIMIT 1`,
-      [game_id]
+      [produk.game_id]
     );
 
     if (cekGame.length === 0) {
@@ -322,51 +291,51 @@ export async function PATCH(request) {
 
     const [cekKode] = await db.query(
       `SELECT id FROM produk WHERE kode_produk = ? AND id != ? LIMIT 1`,
-      [kode_produk, id]
+      [produk.kode_produk, id]
     );
 
     if (cekKode.length > 0) {
       return NextResponse.json(
-        { sukses: false, pesan: 'Kode produk udah dipakai produk lain bre!' },
+        { sukses: false, pesan: 'Kode Produk udah dipakai produk lain bre!' },
         { status: 400 }
       );
     }
 
     await db.query(
       `UPDATE produk
-       SET game_id = ?,
-           kode_produk = ?,
+       SET kode_produk = ?,
            nama_produk = ?,
            harga = ?,
            harga_coret = ?,
            harga_modal = ?,
+           game_id = ?,
            status_produk = ?,
            provider = ?,
            kode_produk_provider = ?
        WHERE id = ?`,
       [
-        game_id,
-        kode_produk,
-        nama_produk,
-        harga,
-        harga_coret,
-        harga_modal,
-        status_produk,
-        provider,
-        kode_produk_provider,
+        produk.kode_produk,
+        produk.nama_produk,
+        produk.harga,
+        produk.harga_coret,
+        produk.harga_modal,
+        produk.game_id,
+        produk.status_produk,
+        produk.provider,
+        produk.kode_produk_provider,
         id
       ]
     );
 
     return NextResponse.json({
       sukses: true,
-      pesan: 'Produk berhasil diedit bre!'
+      pesan: 'Produk berhasil diupdate bre!'
     });
   } catch (error) {
-    console.error('Edit produk error:', error);
+    console.error('Dapur update produk meledak:', error);
 
     return NextResponse.json(
-      { sukses: false, pesan: 'Dapur edit produk meledak bre!' },
+      { sukses: false, pesan: 'Dapur update produk meledak!' },
       { status: 500 }
     );
   }
@@ -405,20 +374,17 @@ export async function DELETE(request) {
       );
     }
 
-    await db.query(
-      `DELETE FROM produk WHERE id = ?`,
-      [id]
-    );
+    await db.query(`DELETE FROM produk WHERE id = ?`, [id]);
 
     return NextResponse.json({
       sukses: true,
-      pesan: 'Produk berhasil dihapus dari etalase!'
+      pesan: 'Produk berhasil dihapus bre!'
     });
   } catch (error) {
-    console.error('Gagal hapus produk:', error);
+    console.error('Dapur hapus produk meledak:', error);
 
     return NextResponse.json(
-      { sukses: false, pesan: 'Dapur hapus produk meledak bre!' },
+      { sukses: false, pesan: 'Dapur hapus produk meledak!' },
       { status: 500 }
     );
   }

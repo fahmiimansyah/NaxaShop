@@ -4,6 +4,9 @@ const VIPRESELLER_BASE_URL =
   process.env.VIPRESELLER_BASE_URL ||
   'https://vip-reseller.co.id/api/game-feature';
 
+const VIP_PROXY_URL = process.env.VIP_PROXY_URL || '';
+const VIP_PROXY_SECRET = process.env.VIP_PROXY_SECRET || '';
+
 function ambilEnvVipReseller() {
   const apiId =
     process.env.VIPRESELLER_API_ID ||
@@ -27,8 +30,17 @@ function bikinSignVipReseller(apiId, apiKey) {
     .digest('hex');
 }
 
-async function fetchVipReseller(payload, timeoutMs = 15000) {
+function pakaiProxyVipReseller() {
+  return Boolean(VIP_PROXY_URL && VIP_PROXY_SECRET);
+}
+
+function rapihinProxyUrl(url) {
+  return String(url || '').replace(/\/+$/, '');
+}
+
+async function fetchVipResellerLangsung(payload, timeoutMs = 15000) {
   const { apiId, apiKey } = ambilEnvVipReseller();
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -67,6 +79,52 @@ async function fetchVipReseller(payload, timeoutMs = 15000) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function fetchVipResellerViaProxy(payload, timeoutMs = 20000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const baseUrl = rapihinProxyUrl(VIP_PROXY_URL);
+
+    const response = await fetch(`${baseUrl}/vipreseller/api/game-feature`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'x-proxy-secret': VIP_PROXY_SECRET
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+      cache: 'no-store'
+    });
+
+    const raw = await response.text();
+
+    let hasilProxy;
+    try {
+      hasilProxy = JSON.parse(raw);
+    } catch {
+      hasilProxy = { raw_response: raw };
+    }
+
+    return {
+      ok: response.ok && hasilProxy?.sukses !== false,
+      status: response.status,
+      data: hasilProxy?.data || hasilProxy
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function fetchVipReseller(payload, timeoutMs = 15000) {
+  if (pakaiProxyVipReseller()) {
+    return fetchVipResellerViaProxy(payload, timeoutMs);
+  }
+
+  return fetchVipResellerLangsung(payload, timeoutMs);
 }
 
 export function ambilVipResellerTrxIdDariResponse(value) {

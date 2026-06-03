@@ -80,6 +80,16 @@ const [formPromo, setFormPromo] = useState({
   sort_order: 0,
   is_active: 1
 });
+// State request game
+  const [daftarRequestGame, setDaftarRequestGame] = useState([]);
+const [statsRequestGame, setStatsRequestGame] = useState(null);
+const [loadingRequestGame, setLoadingRequestGame] = useState(false);
+const [loadingAksiRequestGame, setLoadingAksiRequestGame] = useState(null);
+
+const [filterRequestGame, setFilterRequestGame] = useState({
+  search: '',
+  status: 'all'
+});
   const [alerts, setAlerts] = useState(null);
   const [loadingAlerts, setLoadingAlerts] = useState(false);
   const [filterTransaksi, setFilterTransaksi] = useState({
@@ -169,6 +179,21 @@ const getLabelBiayaAdmin = (metode) => {
     if (status === 'pending') return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
     if (status === 'gagal') return 'bg-red-500/10 text-red-400 border-red-500/20';
     return 'bg-gray-800 text-gray-400 border-gray-700';
+  };
+
+
+  const warnaStatusEtalase = (status) => {
+    if (status === 'aktif') return 'text-green-400 bg-green-500/10 border-green-500/20';
+    if (status === 'coming_soon') return 'text-yellow-300 bg-yellow-500/10 border-yellow-500/20';
+    if (status === 'nonaktif') return 'text-red-400 bg-red-500/10 border-red-500/20';
+    return 'text-gray-400 bg-gray-800 border-gray-700';
+  };
+
+  const labelStatusEtalase = (status) => {
+    if (status === 'aktif') return 'AKTIF';
+    if (status === 'coming_soon') return 'COMING SOON';
+    if (status === 'nonaktif') return 'NONAKTIF';
+    return 'UNKNOWN';
   };
 
   const normalisasiProvider = (value) => {
@@ -477,7 +502,32 @@ const handleHapusPromo = async (promo) => {
     });
   }
 };
+const warnaStatusRequest = (status) => {
+  if (status === 'baru') return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+  if (status === 'diproses') return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+  if (status === 'selesai') return 'bg-green-500/10 text-green-400 border-green-500/20';
+  if (status === 'ditolak') return 'bg-red-500/10 text-red-400 border-red-500/20';
 
+  return 'bg-gray-800 text-gray-400 border-gray-700';
+};
+
+const labelStatusRequest = (status) => {
+  if (status === 'baru') return 'Baru';
+  if (status === 'diproses') return 'Diproses';
+  if (status === 'selesai') return 'Selesai';
+  if (status === 'ditolak') return 'Ditolak';
+
+  return 'Unknown';
+};
+
+const formatTanggalAdmin = (value) => {
+  if (!value) return '-';
+
+  return new Date(value).toLocaleString('id-ID', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  });
+};
   // --- FUNGSI TARIK DATA ---
   const ambilDataSultan = async () => {
     setLoadingData(true);
@@ -981,12 +1031,56 @@ const handleEditCatatan = async (trx) => {
     'Simpan catatan admin untuk transaksi ini?'
   );
 };
+const ambilRequestGame = async (customFilter = filterRequestGame) => {
+  setLoadingRequestGame(true);
+
+  try {
+    const params = new URLSearchParams();
+
+    if (customFilter.status && customFilter.status !== 'all') {
+      params.set('status', customFilter.status);
+    }
+
+    if (customFilter.search) {
+      params.set('search', customFilter.search);
+    }
+
+    const queryString = params.toString();
+    const url = queryString
+      ? `/api/admin/request-game?${queryString}`
+      : '/api/admin/request-game';
+
+    const respon = await fetch(url, {
+      cache: 'no-store'
+    });
+
+    const hasil = await respon.json();
+
+    if (!respon.ok || !hasil.sukses) {
+      throw new Error(hasil.pesan || 'Gagal ambil request game.');
+    }
+
+    setDaftarRequestGame(hasil.data || []);
+    setStatsRequestGame(hasil.stats || null);
+  } catch (error) {
+    Swal.fire({
+      title: 'Waduh!',
+      text: error.message || 'Gagal ambil request game bre.',
+      icon: 'error',
+      background: '#1f2937',
+      color: '#fff'
+    });
+  } finally {
+    setLoadingRequestGame(false);
+  }
+};
   useEffect(() => {
     if (session?.user?.email === EMAIL_CEO) {
       ambilDataSultan();
       ambilTransaksi();
       ambilAlerts();
       ambilPromo();
+      ambilRequestGame();
     }
   }, [session]);
 
@@ -1495,6 +1589,104 @@ const handleEditCatatan = async (trx) => {
     }
   };
 
+  // fungsi update status gameRequest
+  const handleUpdateStatusRequestGame = async (item, statusBaru) => {
+  setLoadingAksiRequestGame(item.id);
+
+  try {
+    const respon = await fetch('/api/admin/request-game', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: item.id,
+        status_request: statusBaru
+      })
+    });
+
+    const hasil = await respon.json();
+
+    if (!respon.ok || !hasil.sukses) {
+      throw new Error(hasil.pesan || 'Gagal update status.');
+    }
+
+    Swal.fire({
+      title: 'Status diupdate! ✨',
+      text: hasil.pesan,
+      icon: 'success',
+      background: '#1f2937',
+      color: '#fff',
+      timer: 1300,
+      showConfirmButton: false
+    });
+
+    ambilRequestGame();
+  } catch (error) {
+    Swal.fire({
+      title: 'Gagal!',
+      text: error.message || 'Gagal update status request game.',
+      icon: 'error',
+      background: '#1f2937',
+      color: '#fff'
+    });
+  } finally {
+    setLoadingAksiRequestGame(null);
+  }
+};
+
+// Fungsi hapus request
+const handleHapusRequestGame = async (item) => {
+  const konfirmasi = await Swal.fire({
+    title: 'Hapus request ini?',
+    text: `Request "${item.nama_game}" bakal hilang dari admin.`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Ya, hapus',
+    cancelButtonText: 'Batal',
+    background: '#1f2937',
+    color: '#fff',
+    confirmButtonColor: '#dc2626',
+    cancelButtonColor: '#4b5563'
+  });
+
+  if (!konfirmasi.isConfirmed) return;
+
+  setLoadingAksiRequestGame(item.id);
+
+  try {
+    const respon = await fetch(`/api/admin/request-game?id=${item.id}`, {
+      method: 'DELETE'
+    });
+
+    const hasil = await respon.json();
+
+    if (!respon.ok || !hasil.sukses) {
+      throw new Error(hasil.pesan || 'Gagal hapus request.');
+    }
+
+    Swal.fire({
+      title: 'Request dihapus!',
+      text: hasil.pesan,
+      icon: 'success',
+      background: '#1f2937',
+      color: '#fff',
+      timer: 1300,
+      showConfirmButton: false
+    });
+
+    ambilRequestGame();
+  } catch (error) {
+    Swal.fire({
+      title: 'Gagal!',
+      text: error.message || 'Gagal hapus request game.',
+      icon: 'error',
+      background: '#1f2937',
+      color: '#fff'
+    });
+  } finally {
+    setLoadingAksiRequestGame(null);
+  }
+};
+
   // --- KEAMANAN CEO ---
   if (status === 'loading') {
     return (
@@ -1592,6 +1784,22 @@ const handleEditCatatan = async (trx) => {
   }`}
 >
   🎞️ Kelola Promo
+</button>
+
+<button
+  onClick={() => setTabAktif('request-game')}
+  className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+    tabAktif === 'request-game'
+      ? 'bg-blue-600 text-white shadow-md'
+      : 'text-gray-400 hover:text-white'
+  }`}
+>
+  💡 Request Game
+  {Number(statsRequestGame?.baru || 0) > 0 && (
+    <span className="ml-2 rounded-full bg-red-500 px-2 py-0.5 text-[10px] text-white">
+      {statsRequestGame.baru}
+    </span>
+  )}
 </button>
           </div>
         </div>
@@ -2424,6 +2632,19 @@ const handleEditCatatan = async (trx) => {
                     className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-purple-500"
                   />
                 </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">Status Game</label>
+                  <select
+                    value={formGame.status_game}
+                    onChange={(e) => setFormGame({ ...formGame, status_game: e.target.value })}
+                    className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-purple-500 font-bold"
+                  >
+                    <option value="aktif">Aktif - tampil & bisa dibeli</option>
+                    <option value="coming_soon">Coming Soon - tampil tapi belum bisa checkout</option>
+                    <option value="nonaktif">Nonaktif - sembunyi dari customer</option>
+                  </select>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
   <div>
     <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">
@@ -2511,12 +2732,8 @@ const handleEditCatatan = async (trx) => {
                           }`}>
                             {Number(game.zone_id) === 1 ? 'BUTUH ZONE' : 'NO ZONE'}
                           </span>
-                          <span className={`text-[10px] font-black px-2 py-1 rounded-md ${
-                            game.status_game === 'aktif'
-                              ? 'text-green-400 bg-green-500/10'
-                              : 'text-red-400 bg-red-500/10'
-                          }`}>
-                            {game.status_game === 'aktif' ? 'AKTIF' : 'NONAKTIF'}
+                          <span className={`text-[10px] font-black px-2 py-1 rounded-md border ${warnaStatusEtalase(game.status_game)}`}>
+                            {labelStatusEtalase(game.status_game)}
                           </span>
                         </div>
 
@@ -2632,6 +2849,19 @@ const handleEditCatatan = async (trx) => {
     <option value="vipreseller">VIP Reseller</option>
   </select>
 </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">Status Produk</label>
+                  <select
+                    value={formProduk.status_produk}
+                    onChange={(e) => setFormProduk({ ...formProduk, status_produk: e.target.value })}
+                    className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-cyan-500 font-bold"
+                  >
+                    <option value="aktif">Aktif - tampil & bisa dibeli</option>
+                    <option value="coming_soon">Coming Soon - tampil tapi belum bisa checkout</option>
+                    <option value="nonaktif">Nonaktif - sembunyi dari customer</option>
+                  </select>
+                </div>
 
                 <div>
                   <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">Kode Produk Internal</label>
@@ -2812,13 +3042,9 @@ const handleEditCatatan = async (trx) => {
                           </span>
 
                           <span
-                            className={`text-[10px] font-black px-2 py-1 rounded-md inline-block border ${
-                              item.status_produk === 'aktif'
-                                ? 'text-green-400 bg-green-500/10 border-green-500/20'
-                                : 'text-red-400 bg-red-500/10 border-red-500/20'
-                            }`}
+                            className={`text-[10px] font-black px-2 py-1 rounded-md inline-block border ${warnaStatusEtalase(item.status_produk)}`}
                           >
-                            {item.status_produk === 'aktif' ? 'AKTIF' : 'NONAKTIF'}
+                            {labelStatusEtalase(item.status_produk)}
                           </span>
 
                           <span className={`text-[10px] font-black px-2 py-1 rounded-md inline-block border ${warnaProvider(item.provider)}`}>
@@ -3175,6 +3401,218 @@ const handleEditCatatan = async (trx) => {
         </div>
       )}
     </section>
+  </div>
+)}
+
+        {/* TAB REQUEST gAME */}
+        {tabAktif === 'request-game' && (
+  <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-5">
+      <div className="rounded-3xl border border-gray-800 bg-gray-900 p-4">
+        <p className="text-[11px] font-black uppercase tracking-wider text-gray-500">
+          Total
+        </p>
+        <h3 className="mt-1 text-2xl font-black text-white">
+          {statsRequestGame?.total || 0}
+        </h3>
+      </div>
+
+      <div className="rounded-3xl border border-blue-500/20 bg-blue-500/10 p-4">
+        <p className="text-[11px] font-black uppercase tracking-wider text-blue-300">
+          Baru
+        </p>
+        <h3 className="mt-1 text-2xl font-black text-blue-300">
+          {statsRequestGame?.baru || 0}
+        </h3>
+      </div>
+
+      <div className="rounded-3xl border border-purple-500/20 bg-purple-500/10 p-4">
+        <p className="text-[11px] font-black uppercase tracking-wider text-purple-300">
+          Diproses
+        </p>
+        <h3 className="mt-1 text-2xl font-black text-purple-300">
+          {statsRequestGame?.diproses || 0}
+        </h3>
+      </div>
+
+      <div className="rounded-3xl border border-green-500/20 bg-green-500/10 p-4">
+        <p className="text-[11px] font-black uppercase tracking-wider text-green-300">
+          Selesai
+        </p>
+        <h3 className="mt-1 text-2xl font-black text-green-300">
+          {statsRequestGame?.selesai || 0}
+        </h3>
+      </div>
+
+      <div className="rounded-3xl border border-red-500/20 bg-red-500/10 p-4">
+        <p className="text-[11px] font-black uppercase tracking-wider text-red-300">
+          Ditolak
+        </p>
+        <h3 className="mt-1 text-2xl font-black text-red-300">
+          {statsRequestGame?.ditolak || 0}
+        </h3>
+      </div>
+    </div>
+
+    <div className="mb-5 rounded-3xl border border-gray-800 bg-gray-900 p-5">
+      <div className="mb-4">
+        <h2 className="text-xl font-black text-white">
+          💡 Request Game User
+        </h2>
+        <p className="mt-1 text-sm text-gray-400">
+          Lihat game yang dicari user tapi belum tersedia di NaXaShop.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_220px_auto]">
+        <input
+          type="text"
+          value={filterRequestGame.search}
+          onChange={(e) =>
+            setFilterRequestGame((prev) => ({
+              ...prev,
+              search: e.target.value
+            }))
+          }
+          placeholder="Cari nama game, kontak, atau catatan..."
+          className="rounded-2xl border border-gray-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-blue-500"
+        />
+
+        <select
+          value={filterRequestGame.status}
+          onChange={(e) =>
+            setFilterRequestGame((prev) => ({
+              ...prev,
+              status: e.target.value
+            }))
+          }
+          className="rounded-2xl border border-gray-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-blue-500"
+        >
+          <option value="all">Semua Status</option>
+          <option value="baru">Baru</option>
+          <option value="diproses">Diproses</option>
+          <option value="selesai">Selesai</option>
+          <option value="ditolak">Ditolak</option>
+        </select>
+
+        <button
+          type="button"
+          onClick={() => ambilRequestGame(filterRequestGame)}
+          className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white transition hover:bg-blue-500"
+        >
+          Filter
+        </button>
+      </div>
+    </div>
+
+    {loadingRequestGame ? (
+      <div className="rounded-3xl border border-gray-800 bg-gray-900 p-8 text-center text-gray-400">
+        Lagi ngambil request game...
+      </div>
+    ) : daftarRequestGame.length === 0 ? (
+      <div className="rounded-3xl border border-gray-800 bg-gray-900 p-8 text-center">
+        <p className="text-4xl">🕸️</p>
+        <h3 className="mt-3 text-lg font-black text-white">
+          Belum ada request game
+        </h3>
+        <p className="mt-1 text-sm text-gray-400">
+          Nanti kalau user nyari game yang belum ada, masuknya ke sini.
+        </p>
+      </div>
+    ) : (
+      <div className="grid grid-cols-1 gap-4">
+        {daftarRequestGame.map((item) => (
+          <div
+            key={item.id}
+            className="rounded-3xl border border-gray-800 bg-gray-900 p-5 shadow-xl shadow-black/20"
+          >
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0 flex-1">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <span
+                    className={`rounded-full border px-3 py-1 text-[11px] font-black ${warnaStatusRequest(
+                      item.status_request
+                    )}`}
+                  >
+                    {labelStatusRequest(item.status_request)}
+                  </span>
+
+                  <span className="rounded-full border border-gray-700 bg-gray-800 px-3 py-1 text-[11px] font-bold text-gray-400">
+                    #{item.id}
+                  </span>
+
+                  <span className="text-[11px] font-bold text-gray-500">
+                    {formatTanggalAdmin(item.created_at)}
+                  </span>
+                </div>
+
+                <h3 className="text-xl font-black text-white">
+                  {item.nama_game}
+                </h3>
+
+                <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <div className="rounded-2xl border border-gray-800 bg-slate-950/60 p-4">
+                    <p className="text-[11px] font-black uppercase tracking-wider text-gray-500">
+                      Kontak
+                    </p>
+                    <p className="mt-1 break-words text-sm font-bold text-gray-300">
+                      {item.kontak || 'Tidak diisi'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-gray-800 bg-slate-950/60 p-4">
+                    <p className="text-[11px] font-black uppercase tracking-wider text-gray-500">
+                      Catatan
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-gray-300">
+                      {item.catatan || 'Tidak ada catatan.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex w-full flex-col gap-2 lg:w-56">
+                <select
+                  value={item.status_request}
+                  disabled={loadingAksiRequestGame === item.id}
+                  onChange={(e) =>
+                    handleUpdateStatusRequestGame(item, e.target.value)
+                  }
+                  className="rounded-2xl border border-gray-700 bg-slate-950 px-4 py-3 text-sm font-bold text-white outline-none focus:border-blue-500 disabled:opacity-60"
+                >
+                  <option value="baru">Baru</option>
+                  <option value="diproses">Diproses</option>
+                  <option value="selesai">Selesai</option>
+                  <option value="ditolak">Ditolak</option>
+                </select>
+
+                {item.kontak && String(item.kontak).startsWith('62') && (
+                  <a
+                    href={`https://wa.me/${item.kontak}?text=${encodeURIComponent(
+                      `Halo, terima kasih sudah request ${item.nama_game} di NaXaShop.`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-2xl bg-green-600 px-4 py-3 text-center text-sm font-black text-white transition hover:bg-green-500"
+                  >
+                    Chat User
+                  </a>
+                )}
+
+                <button
+                  type="button"
+                  disabled={loadingAksiRequestGame === item.id}
+                  onClick={() => handleHapusRequestGame(item)}
+                  className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-black text-red-300 transition hover:bg-red-500/20 disabled:opacity-60"
+                >
+                  Hapus
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
   </div>
 )}
       </div>

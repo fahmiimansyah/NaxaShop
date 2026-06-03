@@ -28,6 +28,7 @@ export default async function HalamanTopUp({ params }) {
   }
 
   const dataGame = await respon.json();
+  const gameComingSoon = dataGame.status_game === 'coming_soon';
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
@@ -47,9 +48,17 @@ export default async function HalamanTopUp({ params }) {
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="mb-1 inline-flex rounded-full border border-blue-400/20 bg-blue-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-blue-300">
-                Top Up Game
-              </p>
+              <div className="mb-1 flex flex-wrap gap-2">
+                <p className="inline-flex rounded-full border border-blue-400/20 bg-blue-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-blue-300">
+                  Top Up Game
+                </p>
+
+                {gameComingSoon && (
+                  <p className="inline-flex rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-yellow-300">
+                    Coming Soon
+                  </p>
+                )}
+              </div>
 
               <h1 className="truncate text-2xl font-black leading-tight sm:text-3xl">
                 {dataGame.nama}
@@ -60,11 +69,33 @@ export default async function HalamanTopUp({ params }) {
               </p>
 
               <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-400 sm:text-sm">
-                Pilih nominal, isi data akun, lalu checkout. Pastikan ID benar sebelum bayar.
+                {gameComingSoon
+                  ? 'Etalase game ini sudah disiapkan, tapi checkout belum dibuka. Pantau terus update-nya.'
+                  : 'Pilih nominal, isi data akun, lalu checkout. Pastikan ID benar sebelum bayar.'}
               </p>
             </div>
           </div>
         </section>
+        {gameComingSoon && (
+          <section className="mt-4 rounded-[1.5rem] border border-yellow-400/20 bg-yellow-400/10 p-4 shadow-xl">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-yellow-400/20 bg-yellow-400/10 text-xl">
+                🕒
+              </div>
+
+              <div>
+                <h2 className="text-base font-black text-yellow-300">
+                  Coming Soon
+                </h2>
+
+                <p className="mt-1 text-xs leading-relaxed text-yellow-100/80 sm:text-sm">
+                  Game ini tampil dulu sebagai teaser. Produk bisa dilihat, tapi checkout belum dibuka sampai admin mengaktifkannya.
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* FORM KASIR */}
         <section className="mt-4">
           <div className="rounded-[1.5rem] border border-white/10 bg-slate-900/80 p-4 shadow-2xl md:p-6 xl:p-7">

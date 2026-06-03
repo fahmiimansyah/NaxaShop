@@ -20,12 +20,15 @@ export async function GET(request, { params }) {
       );
     }
 
-    // 1. Ambil detail gamenya
+    // 1. Ambil detail game.
+    // Aktif = bisa dibeli.
+    // Coming soon = tampil, tapi checkout dikunci di frontend.
+    // Nonaktif = disembunyikan total.
     const [gameResult] = await db.query(
       `SELECT *
        FROM games
        WHERE id = ?
-       AND status_game = 'aktif'
+         AND status_game IN ('aktif', 'coming_soon')
        LIMIT 1`,
       [gameId]
     );
@@ -40,21 +43,29 @@ export async function GET(request, { params }) {
       );
     }
 
-    // 2. Ambil daftar produk/diamond buat game itu
-const [produkResult] = await db.query(
-  `SELECT
-     id,
-     game_id,
-     kode_produk,
-     nama_produk,
-     harga,
-     harga_coret
-   FROM produk
-   WHERE game_id = ?
-     AND status_produk = 'aktif'
-   ORDER BY harga ASC`,
-  [gameId]
-);
+    // 2. Ambil produk buat game itu.
+    // Produk coming soon tetap tampil, tapi tidak bisa dipilih/beli.
+    const [produkResult] = await db.query(
+      `SELECT
+         id,
+         game_id,
+         kode_produk,
+         nama_produk,
+         harga,
+         harga_coret,
+         status_produk
+       FROM produk
+       WHERE game_id = ?
+         AND status_produk IN ('aktif', 'coming_soon')
+       ORDER BY 
+         CASE status_produk
+           WHEN 'aktif' THEN 1
+           WHEN 'coming_soon' THEN 2
+           ELSE 3
+         END,
+         harga ASC`,
+      [gameId]
+    );
 
     const dataLengkap = {
       ...gameResult[0],

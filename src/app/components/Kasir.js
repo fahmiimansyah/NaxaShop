@@ -17,6 +17,10 @@ export default function FormKasir({ dataGame }) {
 
   const butuhZoneId = dataGame.zone_id === 1;
   const butuhServer = dataGame.server_game && dataGame.server_game.trim() !== '';
+  const gameComingSoon = dataGame.status_game === 'coming_soon';
+
+  const isProdukComingSoon = (produk) => produk?.status_produk === 'coming_soon';
+  const isMetodeComingSoon = (metode) => Boolean(metode?.comingSoon);
 
   const formatRupiah = (angka) => {
     return `Rp ${Number(angka || 0).toLocaleString('id-ID')}`;
@@ -66,9 +70,10 @@ export default function FormKasir({ dataGame }) {
     {
       grup: 'QR & E-Wallet',
       items: [
-        { value: 'qris', label: 'QRIS', desc: 'Gopay, OVO, Dana', logo: '/payment/qris.png', fallback: 'QR' },
+        { value: 'qris', label: 'QRIS', desc: 'GoPay, OVO, DANA lewat scan QR', logo: '/payment/qris.png', fallback: 'QR' },
         { value: 'gopay', label: 'GoPay', desc: 'QR / deeplink GoPay', logo: '/payment/gopay.png', fallback: 'GP' },
-        { value: 'shopeepay', label: 'ShopeePay', desc: 'Bayar via ShopeePay', logo: '/payment/shopeepay.png', fallback: 'SP' }
+        { value: 'shopeepay', label: 'ShopeePay', desc: 'Lagi aktivasi, segera hadir', logo: '/payment/shopeepay.png', fallback: 'SP', comingSoon: true },
+        { value: 'dana', label: 'DANA', desc: 'Lagi disiapkan buat launch berikutnya', logo: '/payment/dana.png', fallback: 'DNA', comingSoon: true }
       ]
     },
     {
@@ -79,7 +84,8 @@ export default function FormKasir({ dataGame }) {
         { value: 'bri_va', label: 'BRI VA', desc: 'Virtual Account BRI', logo: '/payment/bri.png', fallback: 'BRI' },
         { value: 'cimb_va', label: 'CIMB VA', desc: 'Virtual Account CIMB', logo: '/payment/cimb.png', fallback: 'CIMB' },
         { value: 'permata_va', label: 'Permata VA', desc: 'Virtual Account Permata', logo: '/payment/permata.png', fallback: 'PRMT' },
-        { value: 'mandiri_bill', label: 'Mandiri Bill', desc: 'Mandiri Bill Payment', logo: '/payment/mandiri.png', fallback: 'MDR' }
+        { value: 'mandiri_bill', label: 'Mandiri Bill', desc: 'Mandiri Bill Payment', logo: '/payment/mandiri.png', fallback: 'MDR' },
+        { value: 'seabank', label: 'SeaBank', desc: 'Lagi aktivasi, segera hadir', logo: '/payment/seabank.png', fallback: 'SEA', comingSoon: true }
       ]
     },
     {
@@ -100,6 +106,8 @@ export default function FormKasir({ dataGame }) {
 
   const checkoutDisabled =
     !produkDipilih ||
+    gameComingSoon ||
+    isProdukComingSoon(produkDipilih) ||
     !inputUserId ||
     (butuhZoneId && !inputZoneId) ||
     (butuhServer && !inputZoneId) ||
@@ -270,6 +278,16 @@ export default function FormKasir({ dataGame }) {
 
     if (!produkDipilih) {
       tampilWarning('Pilih nominal dulu bree!');
+      return;
+    }
+
+    if (gameComingSoon) {
+      tampilWarning('Game ini masih Coming Soon. Tunggu launching dulu ya bree!', 'Segera Hadir');
+      return;
+    }
+
+    if (isProdukComingSoon(produkDipilih)) {
+      tampilWarning('Produk ini masih Coming Soon. Belum bisa dibeli dulu ya bree!', 'Segera Hadir');
       return;
     }
 
@@ -467,17 +485,53 @@ export default function FormKasir({ dataGame }) {
             <h2 className="text-xl font-bold text-white">Pilih Nominal</h2>
           </div>
 
+          {gameComingSoon && (
+            <div className="mb-4 rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4">
+              <p className="text-sm font-black text-yellow-300">🕒 Game ini Coming Soon</p>
+              <p className="mt-1 text-xs leading-relaxed text-yellow-100/80">
+                Etalase sudah disiapkan, tapi checkout belum dibuka. Pantau terus NaXaShop ya bree.
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 sm:grid-cols-2 2xl:grid-cols-3 gap-3 sm:gap-4">
-            {dataGame.produk.map((item) => (
+            {dataGame.produk.map((item) => {
+              const produkComingSoon = isProdukComingSoon(item) || gameComingSoon;
+              const produkAktif = produkDipilih?.id === item.id;
+
+              return (
               <div
                 key={item.id}
-                onClick={() => setProdukDipilih(item)}
-                className={`p-3 sm:p-5 rounded-2xl border-2 cursor-pointer transition-all duration-300 flex flex-col justify-between min-h-28 ${
-                  produkDipilih?.id === item.id
-                    ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)]'
-                    : 'bg-gray-900 border-gray-700 hover:border-blue-400'
+                onClick={() => {
+                  if (produkComingSoon) {
+                    Swal.fire({
+                      background: '#1f2937',
+                      color: '#fff',
+                      title: 'Coming Soon 🕒',
+                      text: gameComingSoon
+                        ? 'Game ini belum dibuka buat checkout.'
+                        : 'Produk ini belum bisa dibeli dulu bree.',
+                      icon: 'info',
+                      confirmButtonColor: '#06b6d4'
+                    });
+                    return;
+                  }
+
+                  setProdukDipilih(item);
+                }}
+                className={`relative overflow-hidden p-3 sm:p-5 rounded-2xl border-2 transition-all duration-300 flex flex-col justify-between min-h-28 ${
+                  produkComingSoon
+                    ? 'cursor-not-allowed bg-gray-950/80 border-yellow-500/20 opacity-75'
+                    : produkAktif
+                      ? 'cursor-pointer bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)]'
+                      : 'cursor-pointer bg-gray-900 border-gray-700 hover:border-blue-400'
                 }`}
               >
+                {produkComingSoon && (
+                  <div className="absolute right-2 top-2 rounded-full border border-yellow-500/20 bg-yellow-500/10 px-2 py-1 text-[10px] font-black text-yellow-300">
+                    Coming Soon
+                  </div>
+                )}
                 <p className="text-white font-black text-sm sm:text-base leading-tight">
                   {item.nama_produk}
                 </p>
@@ -506,7 +560,8 @@ export default function FormKasir({ dataGame }) {
                   </p>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -599,18 +654,41 @@ export default function FormKasir({ dataGame }) {
                   {grup.items.map((item) => {
                     const aktif = metodeBayar === item.value;
                     const biayaAdmin = getBiayaAdmin(item.value);
+                    const metodeComingSoon = isMetodeComingSoon(item);
 
                     return (
                       <button
                         key={item.value}
                         type="button"
-                        onClick={() => setMetodeBayar(item.value)}
-                        className={`p-4 rounded-2xl border-2 cursor-pointer text-left transition-all ${
-                          aktif
-                            ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)]'
-                            : 'bg-gray-900 border-gray-700 hover:border-blue-400'
+                        disabled={metodeComingSoon}
+                        onClick={() => {
+                          if (metodeComingSoon) {
+                            Swal.fire({
+                              background: '#1f2937',
+                              color: '#fff',
+                              title: `${item.label} Coming Soon 🕒`,
+                              text: 'Metode pembayaran ini lagi aktivasi. Pakai metode lain dulu ya bree.',
+                              icon: 'info',
+                              confirmButtonColor: '#06b6d4'
+                            });
+                            return;
+                          }
+
+                          setMetodeBayar(item.value);
+                        }}
+                        className={`relative overflow-hidden p-4 rounded-2xl border-2 text-left transition-all ${
+                          metodeComingSoon
+                            ? 'cursor-not-allowed bg-gray-950/80 border-yellow-500/20 opacity-70'
+                            : aktif
+                              ? 'cursor-pointer bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)]'
+                              : 'cursor-pointer bg-gray-900 border-gray-700 hover:border-blue-400'
                         }`}
                       >
+                        {metodeComingSoon && (
+                          <span className="absolute right-2 top-2 rounded-full border border-yellow-500/20 bg-yellow-500/10 px-2 py-1 text-[10px] font-black text-yellow-300">
+                            Coming Soon
+                          </span>
+                        )}
                         <div className="flex items-start gap-3">
                           <div
                             className={`w-14 h-10 rounded-xl flex items-center justify-center shrink-0 border overflow-hidden ${
@@ -873,9 +951,11 @@ export default function FormKasir({ dataGame }) {
                 </p>
 
                 <p className={`mt-1 text-[11px] font-black ${metodeBayar ? 'text-cyan-300' : 'text-yellow-300'}`}>
-                  {metodeBayar
-                    ? `${namaMetodeBayar[metodeBayar]} • ${getLabelBiayaAdmin(metodeBayar)}`
-                    : 'Pilih metode pembayaran buat lihat total final'}
+                  {gameComingSoon || isProdukComingSoon(produkDipilih)
+                    ? 'Coming Soon • checkout belum dibuka'
+                    : metodeBayar
+                      ? `${namaMetodeBayar[metodeBayar]} • ${getLabelBiayaAdmin(metodeBayar)}`
+                      : 'Pilih metode pembayaran buat lihat total final'}
                 </p>
               </div>
 
@@ -903,7 +983,11 @@ export default function FormKasir({ dataGame }) {
               )}
 
               <span className="relative">
-                {isProsesBeli ? 'Kalem Bre...' : 'Beli Sekarang 🔥'}
+                {isProsesBeli
+                  ? 'Kalem Bre...'
+                  : gameComingSoon || isProdukComingSoon(produkDipilih)
+                    ? 'Segera Hadir 🕒'
+                    : 'Beli Sekarang 🔥'}
               </span>
             </button>
           </div>

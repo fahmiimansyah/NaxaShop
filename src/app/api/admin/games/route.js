@@ -4,19 +4,60 @@ import { authOptions } from '../../auth/[...nextauth]/route';
 import db from '../../../lib/db';
 
 const EMAIL_CEO = 'fahmiimansyah28@gmail.com';
+const STATUS_GAME_VALID = ['aktif', 'nonaktif', 'coming_soon'];
+const BADGE_TIPE_VALID = ['none', 'popular', 'promo', 'fast', 'new'];
 
 async function cekAdmin() {
   const session = await getServerSession(authOptions);
-
-  if (!session || session.user?.email !== EMAIL_CEO) {
-    return false;
-  }
-
-  return true;
+  return Boolean(session && session.user?.email === EMAIL_CEO);
 }
 
 function bersihinText(value) {
   return String(value || '').trim();
+}
+
+function normalisasiStatusGame(value) {
+  const status = bersihinText(value).toLowerCase();
+  return STATUS_GAME_VALID.includes(status) ? status : 'aktif';
+}
+
+function normalisasiBadgeTipe(value) {
+  const tipe = bersihinText(value || 'none').toLowerCase();
+  return BADGE_TIPE_VALID.includes(tipe) ? tipe : 'none';
+}
+
+function payloadGameDariBody(body) {
+  return {
+    nama: bersihinText(body.nama),
+    publisher: bersihinText(body.publisher),
+    gambar: bersihinText(body.gambar),
+    zone_id: Number(body.zone_id) === 1 ? 1 : 0,
+    server_game: bersihinText(body.server_game) || null,
+    kode_game: bersihinText(body.kode_game),
+    status_game: normalisasiStatusGame(body.status_game),
+    badge_label: bersihinText(body.badge_label) || null,
+    badge_tipe: normalisasiBadgeTipe(body.badge_tipe)
+  };
+}
+
+function validasiPayloadGame(game) {
+  if (!game.nama || !game.publisher || !game.gambar || !game.kode_game) {
+    return 'Nama, publisher, gambar, dan kode game wajib diisi bre!';
+  }
+
+  if (
+    game.nama.length > 100 ||
+    game.publisher.length > 100 ||
+    game.gambar.length > 255 ||
+    game.kode_game.length > 100 ||
+    (game.server_game && game.server_game.length > 50) ||
+    (game.badge_label && game.badge_label.length > 50) ||
+    game.badge_tipe.length > 30
+  ) {
+    return 'Ada input yang kepanjangan bre!';
+  }
+
+  return null;
 }
 
 export async function GET() {
@@ -31,15 +72,12 @@ export async function GET() {
 
   try {
     const [games] = await db.query(
-  `SELECT id, nama, publisher, gambar, zone_id, server_game, kode_game, status_game, badge_label, badge_tipe
-   FROM games
-   ORDER BY id DESC`
-);
+      `SELECT id, nama, publisher, gambar, zone_id, server_game, kode_game, status_game, badge_label, badge_tipe
+       FROM games
+       ORDER BY id DESC`
+    );
 
-    return NextResponse.json({
-      sukses: true,
-      data: games
-    });
+    return NextResponse.json({ sukses: true, data: games });
   } catch (error) {
     console.error('Gagal ambil games admin:', error);
 
@@ -62,43 +100,19 @@ export async function POST(request) {
 
   try {
     const body = await request.json();
-      const status_game = ['aktif', 'nonaktif'].includes(body.status_game)
-  ? body.status_game
-  : 'aktif';
-  const badge_label = bersihinText(body.badge_label) || null;
-const badge_tipe = ['none', 'popular', 'promo', 'fast', 'new'].includes(body.badge_tipe)
-  ? body.badge_tipe
-  : 'none';
-    const nama = bersihinText(body.nama);
-    const publisher = bersihinText(body.publisher);
-    const gambar = bersihinText(body.gambar);
-    const kode_game = bersihinText(body.kode_game);
-    const server_game = bersihinText(body.server_game) || null;
-    const zone_id = Number(body.zone_id) === 1 ? 1 : 0;
+    const game = payloadGameDariBody(body);
+    const pesanValidasi = validasiPayloadGame(game);
 
-    if (!nama || !publisher || !gambar || !kode_game) {
+    if (pesanValidasi) {
       return NextResponse.json(
-        { sukses: false, pesan: 'Nama, publisher, gambar, dan kode game wajib diisi bre!' },
-        { status: 400 }
-      );
-    }
-
-    if (
-      nama.length > 100 ||
-      publisher.length > 100 ||
-      gambar.length > 255 ||
-      kode_game.length > 100 ||
-      (server_game && server_game.length > 50)
-    ) {
-      return NextResponse.json(
-        { sukses: false, pesan: 'Ada input yang kepanjangan bre!' },
+        { sukses: false, pesan: pesanValidasi },
         { status: 400 }
       );
     }
 
     const [gameLama] = await db.query(
       `SELECT id FROM games WHERE kode_game = ? LIMIT 1`,
-      [kode_game]
+      [game.kode_game]
     );
 
     if (gameLama.length > 0) {
@@ -109,15 +123,28 @@ const badge_tipe = ['none', 'popular', 'promo', 'fast', 'new'].includes(body.bad
     }
 
     await db.query(
-      `INSERT INTO games 
- (nama, publisher, gambar, zone_id, server_game, kode_game, status_game, badge_label, badge_tipe)
- VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-[nama, publisher, gambar, zone_id, server_game, kode_game, status_game, badge_label, badge_tipe]
-);
+      `INSERT INTO games
+       (nama, publisher, gambar, zone_id, server_game, kode_game, status_game, badge_label, badge_tipe)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        game.nama,
+        game.publisher,
+        game.gambar,
+        game.zone_id,
+        game.server_game,
+        game.kode_game,
+        game.status_game,
+        game.badge_label,
+        game.badge_tipe
+      ]
+    );
 
     return NextResponse.json({
       sukses: true,
-      pesan: 'Game baru berhasil masuk etalase CEO! 🎮'
+      pesan:
+        game.status_game === 'coming_soon'
+          ? 'Game berhasil masuk sebagai Coming Soon! 🕒'
+          : 'Game baru berhasil masuk etalase CEO! 🎮'
     });
   } catch (error) {
     console.error('Gagal tambah game:', error);
@@ -138,6 +165,7 @@ const badge_tipe = ['none', 'popular', 'promo', 'fast', 'new'].includes(body.bad
 
 export async function PATCH(request) {
   const adminValid = await cekAdmin();
+
   if (!adminValid) {
     return NextResponse.json(
       { sukses: false, pesan: 'Akses ditolak bre! Lu bukan admin.' },
@@ -147,21 +175,10 @@ export async function PATCH(request) {
 
   try {
     const body = await request.json();
-
     const id = body.id;
-    const nama = bersihinText(body.nama);
-    const publisher = bersihinText(body.publisher);
-    const gambar = bersihinText(body.gambar);
-    const kode_game = bersihinText(body.kode_game);
-    const server_game = bersihinText(body.server_game) || null;
-    const zone_id = Number(body.zone_id) === 1 ? 1 : 0;
-    const status_game = ['aktif', 'nonaktif'].includes(body.status_game)
-    ? body.status_game
-    : 'aktif';
-    const badge_label = bersihinText(body.badge_label) || null;
-const badge_tipe = ['none', 'popular', 'promo', 'fast', 'new'].includes(body.badge_tipe)
-  ? body.badge_tipe
-  : 'none';
+    const game = payloadGameDariBody(body);
+    const pesanValidasi = validasiPayloadGame(game);
+
     if (!id) {
       return NextResponse.json(
         { sukses: false, pesan: 'ID game wajib dikirim bre!' },
@@ -169,9 +186,9 @@ const badge_tipe = ['none', 'popular', 'promo', 'fast', 'new'].includes(body.bad
       );
     }
 
-    if (!nama || !publisher || !gambar || !kode_game) {
+    if (pesanValidasi) {
       return NextResponse.json(
-        { sukses: false, pesan: 'Data game belum lengkap bre!' },
+        { sukses: false, pesan: pesanValidasi },
         { status: 400 }
       );
     }
@@ -190,7 +207,7 @@ const badge_tipe = ['none', 'popular', 'promo', 'fast', 'new'].includes(body.bad
 
     const [cekKode] = await db.query(
       `SELECT id FROM games WHERE kode_game = ? AND id != ? LIMIT 1`,
-      [kode_game, id]
+      [game.kode_game, id]
     );
 
     if (cekKode.length > 0) {
@@ -201,30 +218,30 @@ const badge_tipe = ['none', 'popular', 'promo', 'fast', 'new'].includes(body.bad
     }
 
     await db.query(
-  `UPDATE games
-   SET nama = ?,
-       publisher = ?,
-       gambar = ?,
-       zone_id = ?,
-       server_game = ?,
-       kode_game = ?,
-       status_game = ?,
-       badge_label = ?,
-       badge_tipe = ?
-   WHERE id = ?`,
-  [
-    nama,
-    publisher,
-    gambar,
-    zone_id,
-    server_game,
-    kode_game,
-    status_game,
-    badge_label,
-    badge_tipe,
-    id
-  ]
-);
+      `UPDATE games
+       SET nama = ?,
+           publisher = ?,
+           gambar = ?,
+           zone_id = ?,
+           server_game = ?,
+           kode_game = ?,
+           status_game = ?,
+           badge_label = ?,
+           badge_tipe = ?
+       WHERE id = ?`,
+      [
+        game.nama,
+        game.publisher,
+        game.gambar,
+        game.zone_id,
+        game.server_game,
+        game.kode_game,
+        game.status_game,
+        game.badge_label,
+        game.badge_tipe,
+        id
+      ]
+    );
 
     return NextResponse.json({
       sukses: true,
@@ -285,17 +302,14 @@ export async function DELETE(request) {
       );
     }
 
-    await db.query(
-      `DELETE FROM games WHERE id = ?`,
-      [id]
-    );
+    await db.query(`DELETE FROM games WHERE id = ?`, [id]);
 
     return NextResponse.json({
       sukses: true,
       pesan: 'Game berhasil dihapus dari etalase!'
     });
   } catch (error) {
-    console.error('Gagal hapus game:', error);
+    console.error('Hapus game error:', error);
 
     return NextResponse.json(
       { sukses: false, pesan: 'Dapur hapus game meledak bre!' },
