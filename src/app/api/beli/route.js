@@ -9,6 +9,8 @@ const METODE_BAYAR_VALID = [
   'qris',
   'gopay',
   'shopeepay',
+  'dana',
+  'seabank',
 
   'bca_va',
   'bni_va',
@@ -32,6 +34,8 @@ const LABEL_METODE_BAYAR = {
   qris: 'QRIS',
   gopay: 'GoPay',
   shopeepay: 'ShopeePay',
+  dana: 'DANA',
+  seabank: 'SeaBank',
 
   bca_va: 'BCA Virtual Account',
   bni_va: 'BNI Virtual Account',
@@ -44,20 +48,27 @@ const LABEL_METODE_BAYAR = {
   indomaret: 'Indomaret'
 };
 
-const BIAYA_ADMIN_METODE = {
-  qris: 0,
-  gopay: 0,
-  shopeepay: 0,
+const ATURAN_METODE_BAYAR = {
+  qris: { biaya: 0, minimal: 0 },
+  gopay: { biaya: 0, minimal: 0 },
 
-  bca_va: 4000,
-  bni_va: 4000,
-  bri_va: 4000,
-  cimb_va: 4000,
-  permata_va: 4000,
-  mandiri_bill: 4000,
+  // Masih aktivasi / belum dibuka di NaXaShop.
+  // Tetap masuk whitelist metode supaya backend kasih pesan rapi, bukan "metode gak valid".
+  shopeepay: { biaya: 0, minimal: 0, comingSoon: true },
+  dana: { biaya: 0, minimal: 0, comingSoon: true },
+  seabank: { biaya: 0, minimal: 0, comingSoon: true },
 
-  alfamart: 5000,
-  indomaret: 5000
+  // Virtual Account cocok buat nominal menengah ke atas.
+  bca_va: { biaya: 4000, minimal: 20000, comingSoon: true },
+  bni_va: { biaya: 4000, minimal: 20000 },
+  bri_va: { biaya: 4000, minimal: 20000 },
+  cimb_va: { biaya: 4000, minimal: 20000 },
+  permata_va: { biaya: 4000, minimal: 20000 },
+  mandiri_bill: { biaya: 4000, minimal: 20000 },
+
+  // Minimarket fee gede, jadi dibuka buat nominal besar aja.
+  alfamart: { biaya: 5000, minimal: 50000, comingSoon: true },
+  indomaret: { biaya: 5000, minimal: 50000, comingSoon: true }
 };
 
 const PROVIDER_VALID = ['apigames', 'digiflazz', 'vipreseller', 'mock'];
@@ -84,8 +95,18 @@ function emailValid(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function getAturanMetodeBayar(metodeBayar) {
+  return ATURAN_METODE_BAYAR[metodeBayar] || null;
+}
+
 function getBiayaAdmin(metodeBayar) {
-  return Number(BIAYA_ADMIN_METODE[metodeBayar] || 0);
+  const aturan = getAturanMetodeBayar(metodeBayar);
+  return Number(aturan?.biaya || 0);
+}
+
+function getMinimalMetodeBayar(metodeBayar) {
+  const aturan = getAturanMetodeBayar(metodeBayar);
+  return Number(aturan?.minimal || 0);
 }
 
 function bikinOrderId() {
@@ -499,6 +520,28 @@ export async function POST(request) {
       );
     }
 
+    const aturanMetode = getAturanMetodeBayar(metodeBayar);
+
+    if (!aturanMetode) {
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan: 'Aturan metode bayar belum disetting bre!'
+        },
+        { status: 400 }
+      );
+    }
+
+    if (aturanMetode.comingSoon) {
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan: 'Metode pembayaran ini masih Coming Soon bre!'
+        },
+        { status: 400 }
+      );
+    }
+
     const [dataProduk] = await db.query(
       `SELECT 
          p.id,
@@ -561,8 +604,6 @@ export async function POST(request) {
 
     const hargaProduk = Number(produk.harga);
     const hargaModal = Number(produk.harga_modal || 0);
-    const biayaAdmin = getBiayaAdmin(metodeBayar);
-    const hargaTotal = hargaProduk + biayaAdmin;
 
     if (!hargaProduk || hargaProduk <= 0) {
       return NextResponse.json(
@@ -573,6 +614,21 @@ export async function POST(request) {
         { status: 400 }
       );
     }
+
+    const minimalMetode = getMinimalMetodeBayar(metodeBayar);
+
+    if (minimalMetode > 0 && hargaProduk < minimalMetode) {
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan: `Metode ${LABEL_METODE_BAYAR[metodeBayar] || metodeBayar} minimal transaksi Rp ${minimalMetode.toLocaleString('id-ID')}. Pakai QRIS buat nominal kecil ya bre.`
+        },
+        { status: 400 }
+      );
+    }
+
+    const biayaAdmin = getBiayaAdmin(metodeBayar);
+    const hargaTotal = hargaProduk + biayaAdmin;
 
     const butuhZoneId = Number(produk.zone_id) === 1;
     const butuhServer =

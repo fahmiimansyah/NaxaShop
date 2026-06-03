@@ -5,7 +5,7 @@ import db from '../../../lib/db';
 
 const EMAIL_CEO = 'fahmiimansyah28@gmail.com';
 const STATUS_GAME_VALID = ['aktif', 'nonaktif', 'coming_soon'];
-const BADGE_TIPE_VALID = ['none', 'popular', 'promo', 'fast', 'new'];
+const BADGE_TIPE_VALID = ['none', 'popular', 'promo', 'fast', 'new', 'comingsoon'];
 
 async function cekAdmin() {
   const session = await getServerSession(authOptions);

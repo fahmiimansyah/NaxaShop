@@ -2675,6 +2675,7 @@ const handleHapusRequestGame = async (item) => {
       <option value="promo">💎 Promo</option>
       <option value="fast">⚡ Fast</option>
       <option value="new">🆕 Baru</option>
+      <option value="comingsoon">🐣 Comingsoon</option>
     </select>
   </div>
 </div>

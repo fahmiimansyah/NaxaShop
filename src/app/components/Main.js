@@ -6,8 +6,14 @@ export default async function Beranda() {
 const [games] = await db.query(
   `SELECT id, nama, publisher, gambar, zone_id, server_game, kode_game, status_game, badge_label, badge_tipe
    FROM games
-   WHERE status_game = 'aktif'
-   ORDER BY id ASC`
+   WHERE status_game IN ('aktif', 'coming_soon')
+   ORDER BY 
+     CASE status_game
+       WHEN 'aktif' THEN 1
+       WHEN 'coming_soon' THEN 2
+       ELSE 3
+     END,
+     id ASC`
 );
 
   return (

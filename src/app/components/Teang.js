@@ -26,10 +26,11 @@ export default function GameSearch({ games = [] }) {
 
   const sedangMencari = keyword.length > 0;
   const warnaBadgeGame = (tipe) => {
-  if (tipe === 'popular') return 'bg-orange-500/90 text-white border-orange-300/30';
-  if (tipe === 'promo') return 'bg-cyan-500/90 text-white border-cyan-300/30';
+  if (tipe === 'comingsoon') return 'bg-indigo-500/90 text-white border-indigo-300/40';
+  if (tipe === 'popular') return 'bg-amber-500/90 text-white border-amber-300/30';
+  if (tipe === 'promo') return 'bg-red-500/90 text-white border-red-300/30';
   if (tipe === 'fast') return 'bg-purple-500/90 text-white border-purple-300/30';
-  if (tipe === 'new') return 'bg-green-500/90 text-white border-green-300/30';
+  if (tipe === 'new') return 'bg-emerald-500/90 text-white border-emerald-300/30';
 
   return 'bg-gray-800/90 text-white border-white/10';
 };

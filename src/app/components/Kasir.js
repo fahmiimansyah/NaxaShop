@@ -20,38 +20,128 @@ export default function FormKasir({ dataGame }) {
   const gameComingSoon = dataGame.status_game === 'coming_soon';
 
   const isProdukComingSoon = (produk) => produk?.status_produk === 'coming_soon';
-  const isMetodeComingSoon = (metode) => Boolean(metode?.comingSoon);
-
   const formatRupiah = (angka) => {
     return `Rp ${Number(angka || 0).toLocaleString('id-ID')}`;
   };
 
-  const biayaAdminMap = {
-    qris: 0,
-    gopay: 0,
-    shopeepay: 0,
+  const aturanMetodeBayar = {
+    qris: {
+      biaya: 0,
+      minimal: 0,
+      rekomendasi: true,
+    },
+    gopay: {
+      biaya: 0,
+      minimal: 0,
+    },
+    shopeepay: {
+      biaya: 0,
+      minimal: 0,
+      comingSoon: true,
+    },
+    dana: {
+      biaya: 0,
+      minimal: 0,
+      comingSoon: true,
+    },
+    seabank: {
+      biaya: 0,
+      minimal: 0,
+      comingSoon: true,
+    },
 
-    bca_va: 4000,
-    bni_va: 4000,
-    bri_va: 4000,
-    cimb_va: 4000,
-    permata_va: 4000,
-    mandiri_bill: 4000,
+    bca_va: {
+      biaya: 4000,
+      minimal: 20000,
+      comingSoon: true,
+    },
+    bni_va: {
+      biaya: 4000,
+      minimal: 20000,
+    },
+    bri_va: {
+      biaya: 4000,
+      minimal: 20000,
+    },
+    cimb_va: {
+      biaya: 4000,
+      minimal: 20000,
+    },
+    permata_va: {
+      biaya: 4000,
+      minimal: 20000,
+    },
+    mandiri_bill: {
+      biaya: 4000,
+      minimal: 20000,
+    },
 
-    alfamart: 5000,
-    indomaret: 5000,
+    alfamart: {
+      biaya: 5000,
+      minimal: 50000,
+      comingSoon: true,
+    },
+    indomaret: {
+      biaya: 5000,
+      minimal: 50000,
+      comingSoon: true,
+    },
   };
 
-  const getBiayaAdmin = (metode) => biayaAdminMap[metode] || 0;
+  const getValueMetode = (metode) => {
+    return typeof metode === 'string' ? metode : metode?.value;
+  };
+
+  const getAturanMetode = (metode) => {
+    return aturanMetodeBayar[getValueMetode(metode)] || {
+      biaya: 0,
+      minimal: 0,
+    };
+  };
+
+  const getBiayaAdmin = (metode) => Number(getAturanMetode(metode).biaya || 0);
+
+  const getMinimalMetode = (metode) => Number(getAturanMetode(metode).minimal || 0);
+
+  const isMetodeComingSoon = (metode) => {
+    return Boolean(metode?.comingSoon || getAturanMetode(metode).comingSoon);
+  };
+
+  const isMetodeTidakMemenuhiMinimal = (metode, produk = produkDipilih) => {
+    if (!metode || !produk) return false;
+
+    const minimal = getMinimalMetode(metode);
+    const hargaProduk = Number(produk?.harga || 0);
+
+    return minimal > 0 && hargaProduk < minimal;
+  };
+
+  const isMetodeBayarDisabled = (metode, produk = produkDipilih) => {
+    return (
+      isMetodeComingSoon(metode) ||
+      isMetodeTidakMemenuhiMinimal(metode, produk)
+    );
+  };
 
   const getTotalBayar = (produk = produkDipilih, metode = metodeBayar) => {
     return Number(produk?.harga || 0) + getBiayaAdmin(metode);
   };
 
-  const getLabelBiayaAdmin = (metode) => {
-    const biaya = getBiayaAdmin(metode);
+  const getLabelBiayaAdmin = (metode, produk = produkDipilih) => {
+    const aturan = getAturanMetode(metode);
+    const biaya = Number(aturan.biaya || 0);
+    const minimal = Number(aturan.minimal || 0);
 
     if (!metode) return 'Pilih metode pembayaran dulu';
+
+    if (aturan.comingSoon) {
+      return 'Segera hadir';
+    }
+
+    if (minimal > 0 && Number(produk?.harga || 0) < minimal) {
+      return `Minimal transaksi ${formatRupiah(minimal)}`;
+    }
+
     if (biaya <= 0) return 'Tanpa biaya admin';
 
     return `Fee admin ${formatRupiah(biaya)}`;
@@ -112,6 +202,7 @@ export default function FormKasir({ dataGame }) {
     (butuhZoneId && !inputZoneId) ||
     (butuhServer && !inputZoneId) ||
     !metodeBayar ||
+    isMetodeBayarDisabled(metodeBayar) ||
     isProsesBeli;
 
   const kodeGame = String(dataGame.kode_game || dataGame.server_game || '').toLowerCase();
@@ -311,6 +402,19 @@ export default function FormKasir({ dataGame }) {
       return;
     }
 
+    if (isMetodeComingSoon(metodeBayar)) {
+      tampilWarning('Metode pembayaran ini masih Coming Soon bree. Pakai metode lain dulu ya.', 'Segera Hadir');
+      return;
+    }
+
+    if (isMetodeTidakMemenuhiMinimal(metodeBayar)) {
+      tampilWarning(
+        `Metode ini minimal transaksi ${formatRupiah(getMinimalMetode(metodeBayar))}. Pakai QRIS buat nominal kecil ya bree.`,
+        'Minimal transaksi belum cukup'
+      );
+      return;
+    }
+
     const bikinTagihan = async () => {
       Swal.fire({
         ...alertBase,
@@ -489,7 +593,7 @@ export default function FormKasir({ dataGame }) {
             <div className="mb-4 rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4">
               <p className="text-sm font-black text-yellow-300">🕒 Game ini Coming Soon</p>
               <p className="mt-1 text-xs leading-relaxed text-yellow-100/80">
-                Etalase sudah disiapkan, tapi checkout belum dibuka. Pantau terus NaXaShop ya bree.
+                Etalase produk masih dalam persiapan atau percobaan, checkout juga belum dibuka sama admin. Pantau terus NaXaShopnya yaaa!
               </p>
             </div>
           )}
@@ -518,6 +622,10 @@ export default function FormKasir({ dataGame }) {
                   }
 
                   setProdukDipilih(item);
+
+                  if (metodeBayar && isMetodeBayarDisabled(metodeBayar, item)) {
+                    setMetodeBayar('');
+                  }
                 }}
                 className={`relative overflow-hidden p-3 sm:p-5 rounded-2xl border-2 transition-all duration-300 flex flex-col justify-between min-h-28 ${
                   produkComingSoon
@@ -654,13 +762,16 @@ export default function FormKasir({ dataGame }) {
                   {grup.items.map((item) => {
                     const aktif = metodeBayar === item.value;
                     const biayaAdmin = getBiayaAdmin(item.value);
+                    const minimalMetode = getMinimalMetode(item.value);
                     const metodeComingSoon = isMetodeComingSoon(item);
+                    const kurangMinimal = isMetodeTidakMemenuhiMinimal(item.value);
+                    const metodeDisabled = isMetodeBayarDisabled(item);
 
                     return (
                       <button
                         key={item.value}
                         type="button"
-                        disabled={metodeComingSoon}
+                        disabled={metodeDisabled}
                         onClick={() => {
                           if (metodeComingSoon) {
                             Swal.fire({
@@ -674,19 +785,31 @@ export default function FormKasir({ dataGame }) {
                             return;
                           }
 
+                          if (kurangMinimal) {
+                            Swal.fire({
+                              background: '#1f2937',
+                              color: '#fff',
+                              title: 'Minimal transaksi belum cukup',
+                              text: `${item.label} minimal ${formatRupiah(minimalMetode)}. Pakai QRIS buat nominal kecil ya bree.`,
+                              icon: 'warning',
+                              confirmButtonColor: '#06b6d4'
+                            });
+                            return;
+                          }
+
                           setMetodeBayar(item.value);
                         }}
                         className={`relative overflow-hidden p-4 rounded-2xl border-2 text-left transition-all ${
-                          metodeComingSoon
-                            ? 'cursor-not-allowed bg-gray-950/80 border-yellow-500/20 opacity-70'
+                          metodeDisabled
+                            ? 'cursor-not-allowed bg-gray-950/80 border-yellow-500/20 opacity-70 grayscale-[25%]'
                             : aktif
                               ? 'cursor-pointer bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)]'
-                              : 'cursor-pointer bg-gray-900 border-gray-700 hover:border-blue-400'
+                              : 'cursor-pointer bg-gray-900 border-gray-700 hover:border-blue-400 hover:-translate-y-0.5'
                         }`}
                       >
-                        {metodeComingSoon && (
+                        {(metodeComingSoon || kurangMinimal) && (
                           <span className="absolute right-2 top-2 rounded-full border border-yellow-500/20 bg-yellow-500/10 px-2 py-1 text-[10px] font-black text-yellow-300">
-                            Coming Soon
+                            {metodeComingSoon ? 'Coming Soon' : `Min ${formatRupiah(minimalMetode)}`}
                           </span>
                         )}
                         <div className="flex items-start gap-3">
@@ -738,8 +861,22 @@ export default function FormKasir({ dataGame }) {
                                   Fee admin
                                 </span>
 
-                                <span className={`text-[11px] font-black ${biayaAdmin > 0 ? 'text-yellow-300' : 'text-green-400'}`}>
-                                  {biayaAdmin > 0 ? formatRupiah(biayaAdmin) : 'Gratis'}
+                                <span
+                                  className={`text-[11px] font-black ${
+                                    metodeComingSoon || kurangMinimal
+                                      ? 'text-yellow-300'
+                                      : biayaAdmin > 0
+                                        ? 'text-yellow-300'
+                                        : 'text-green-400'
+                                  }`}
+                                >
+                                  {metodeComingSoon
+                                    ? 'Segera hadir'
+                                    : kurangMinimal
+                                      ? `Min ${formatRupiah(minimalMetode)}`
+                                      : biayaAdmin > 0
+                                        ? formatRupiah(biayaAdmin)
+                                        : 'Gratis'}
                                 </span>
                               </div>
                             </div>

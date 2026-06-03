@@ -70,7 +70,7 @@ export default async function HalamanTopUp({ params }) {
 
               <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-400 sm:text-sm">
                 {gameComingSoon
-                  ? 'Etalase game ini sudah disiapkan, tapi checkout belum dibuka. Pantau terus update-nya.'
+                  ? 'Etalase produk game ini masih dalam persiapan, juga checkout belum dibuka. Pantau terus update-nya yaa.'
                   : 'Pilih nominal, isi data akun, lalu checkout. Pastikan ID benar sebelum bayar.'}
               </p>
             </div>
@@ -89,7 +89,7 @@ export default async function HalamanTopUp({ params }) {
                 </h2>
 
                 <p className="mt-1 text-xs leading-relaxed text-yellow-100/80 sm:text-sm">
-                  Game ini tampil dulu sebagai teaser. Produk bisa dilihat, tapi checkout belum dibuka sampai admin mengaktifkannya.
+                  Game ini tampil dulu sebagai teaser. Checkout belum dibuka sampai admin mengaktifkannya.
                 </p>
               </div>
             </div>
@@ -104,24 +104,7 @@ export default async function HalamanTopUp({ params }) {
         </section>
         {/* INFO KECIL: CATATAN DULU, CARA TOP UP COLLAPSE */}
         <section className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[380px_minmax(0,1fr)]">
-          {/* CATATAN PENTING */}
-          <div className="rounded-[1.5rem] border border-yellow-400/20 bg-yellow-400/10 p-4 shadow-xl">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-yellow-400/20 bg-yellow-400/10 text-xl">
-                ⚠️
-              </div>
 
-              <div>
-                <h2 className="text-base font-black text-yellow-300">
-                  Catatan Penting
-                </h2>
-
-                <p className="mt-1 text-xs leading-relaxed text-yellow-100/80 sm:text-sm">
-                  Pastikan ID, Zone, atau Server benar sebelum bayar. Salah input bisa bikin top up gagal atau masuk ke akun lain.
-                </p>
-              </div>
-            </div>
-          </div>
 
           {/* CARA TOP UP COLLAPSE */}
           <details className="group rounded-[1.5rem] border border-white/10 bg-slate-900/80 p-4 shadow-xl">
