@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { v2 as cloudinary } from 'cloudinary';
 import { authOptions } from '../../auth/[...nextauth]/route';
-import fs from 'fs/promises';
-import path from 'path';
-import crypto from 'crypto';
 
 const EMAIL_CEO = 'fahmiimansyah28@gmail.com';
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+  secure: true
+});
 
 async function cekAdmin() {
   const session = await getServerSession(authOptions);
@@ -15,6 +20,28 @@ async function cekAdmin() {
   }
 
   return true;
+}
+
+function envCloudinaryLengkap() {
+  return Boolean(
+    process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET
+  );
+}
+
+function uploadKeCloudinary(buffer, options = {}) {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      options,
+      (error, result) => {
+        if (error) return reject(error);
+        return resolve(result);
+      }
+    );
+
+    stream.end(buffer);
+  });
 }
 
 export async function POST(request) {
@@ -28,6 +55,16 @@ export async function POST(request) {
   }
 
   try {
+    if (!envCloudinaryLengkap()) {
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan: 'Konfigurasi Cloudinary belum lengkap bre!'
+        },
+        { status: 500 }
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get('gambar');
 
@@ -38,9 +75,21 @@ export async function POST(request) {
       );
     }
 
-    if (!file.type.startsWith('image/')) {
+    if (!file.type?.startsWith('image/')) {
       return NextResponse.json(
         { sukses: false, pesan: 'File harus gambar bre!' },
+        { status: 400 }
+      );
+    }
+
+    const formatValid = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+    if (!formatValid.includes(file.type)) {
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan: 'Format gambar harus jpg, png, webp, atau gif bre!'
+        },
         { status: 400 }
       );
     }
@@ -54,45 +103,41 @@ export async function POST(request) {
       );
     }
 
-    const extDariMime = {
-      'image/jpeg': 'jpg',
-      'image/png': 'png',
-      'image/webp': 'webp',
-      'image/gif': 'gif'
-    };
-
-    const ext = extDariMime[file.type];
-
-    if (!ext) {
-      return NextResponse.json(
-        { sukses: false, pesan: 'Format gambar harus jpg, png, webp, atau gif bre!' },
-        { status: 400 }
-      );
-    }
-
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    const namaFile = `game-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
-
-    const folderUpload = path.join(process.cwd(), 'public', 'uploads', 'games');
-    await fs.mkdir(folderUpload, { recursive: true });
-
-    const lokasiFile = path.join(folderUpload, namaFile);
-    await fs.writeFile(lokasiFile, buffer);
-
-    const urlGambar = `/uploads/games/${namaFile}`;
+    const hasilUpload = await uploadKeCloudinary(buffer, {
+      folder: 'naxashop/games',
+      resource_type: 'image',
+      use_filename: false,
+      unique_filename: true,
+      overwrite: false,
+      transformation: [
+        {
+          width: 600,
+          height: 600,
+          crop: 'fill',
+          gravity: 'auto',
+          quality: 'auto',
+          fetch_format: 'auto'
+        }
+      ]
+    });
 
     return NextResponse.json({
       sukses: true,
-      pesan: 'Gambar berhasil diupload!',
-      url: urlGambar
+      pesan: 'Gambar berhasil diupload ke Cloudinary!',
+      url: hasilUpload.secure_url,
+      public_id: hasilUpload.public_id
     });
   } catch (error) {
-    console.error('Upload gambar error:', error);
+    console.error('Upload Cloudinary error:', error);
 
     return NextResponse.json(
-      { sukses: false, pesan: 'Upload gambar gagal bre!' },
+      {
+        sukses: false,
+        pesan: error?.message || 'Upload gambar gagal bre!'
+      },
       { status: 500 }
     );
   }
