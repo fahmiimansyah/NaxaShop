@@ -52,9 +52,11 @@ function statusProses(status) {
   return [
     '',
     'pending',
+    'waiting',
     'proses',
     'process',
-    'processing'
+    'processing',
+    'in progress'
   ].includes(s);
 }
 
@@ -141,32 +143,44 @@ function ambilDataStatusVipReseller(data) {
 async function syncVipReseller(trx) {
   const responseSebelumnya = bacaJsonAman(trx.apigames_response);
   const trxidSebelumnya = ambilVipResellerTrxIdDariResponse(responseSebelumnya);
+
   if (!trxidSebelumnya) {
   return {
     provider: 'vipreseller',
     gagal: false,
     suksesFinal: false,
-    masihProses: true,
+    masihProses: false,
+    butuhAdmin: true,
     statusRaw: 'trxid tidak ditemukan',
     statusNormal: 'butuh_admin',
-    data: { message: 'trxid VIPReseller tidak ditemukan, cek manual admin.' }
+    data: {
+      message:
+        'TRXID VIPReseller tidak ditemukan. Kemungkinan order provider belum pernah berhasil dibuat, jadi status provider belum bisa dicek.'
+    }
   };
 }
-const hasil = await cekStatusVipReseller({ trxid: trxidSebelumnya });
-    
+
+  const hasil = await cekStatusVipReseller({ trxid: trxidSebelumnya });
 
   const detailStatus = ambilDataStatusVipReseller(hasil.data);
+
   const statusRaw =
     detailStatus?.status ||
+    detailStatus?.message ||
     hasil.data?.status ||
     hasil.data?.message ||
     '';
 
   const statusNormal = normalisasiStatus(statusRaw);
-  const suksesFinal = hasil.ok && statusSukses(statusRaw);
+
+  const suksesFinal =
+    hasil.ok &&
+    statusSukses(statusRaw);
+
   const gagal =
     !hasil.ok ||
     hasil.data?.result === false ||
+    detailStatus?.result === false ||
     statusGagal(statusRaw);
 
   const masihProses =
@@ -187,7 +201,6 @@ const hasil = await cekStatusVipReseller({ trxid: trxidSebelumnya });
     masihProses,
     data: hasil.data
   };
-  
 }
 
 function bikinSignatureApiGames({ merchantId, secretKey, refId }) {
@@ -573,7 +586,34 @@ export async function POST(request) {
     }
 
     const responseText = JSON.stringify(hasilProvider.data);
+    if (hasilProvider.butuhAdmin) {
+  await db.query(
+    `UPDATE transaksi
+     SET apigames_response = ?,
+         catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nProvider ', ?, ' sync butuh admin pada ', NOW(), ': ', ?),
+         updated_at = NOW()
+     WHERE order_id = ?`,
+    [
+      responseText,
+      hasilProvider.provider,
+      hasilProvider.statusRaw || 'Butuh pengecekan admin',
+      orderId
+    ]
+  );
 
+  return NextResponse.json({
+    sukses: true,
+    pesan:
+      'Status provider belum bisa dicek karena TRXID belum ada. Status top-up tidak diubah.',
+    data: {
+      provider: hasilProvider.provider,
+      status_bayar: 'sukses',
+      status_topup: trx.status_topup,
+      status_provider: hasilProvider.statusNormal,
+      response_provider: hasilProvider.data
+    }
+  });
+}
     if (hasilProvider.gagal) {
       await db.query(
         `UPDATE transaksi
