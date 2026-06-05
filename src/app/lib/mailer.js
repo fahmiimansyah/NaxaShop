@@ -1,29 +1,6 @@
 import nodemailer from 'nodemailer';
-import dns from 'dns';
 
-dns.setDefaultResultOrder('ipv4first');
-
-try {
-  dns.setServers(['1.1.1.1', '8.8.8.8']);
-} catch (error) {
-  console.error('Gagal set DNS server Node:', error);
-}
-const EMAIL_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS || 10000);
-
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_SERVER_HOST || 'smtp.gmail.com',
-  port: Number(process.env.EMAIL_SERVER_PORT || 465),
-  secure: Number(process.env.EMAIL_SERVER_PORT || 465) === 465,
-  auth: {
-    user: process.env.EMAIL_SERVER_USER,
-    pass: process.env.EMAIL_SERVER_PASSWORD,
-  },
-
-  // Biar kalau Gmail/DNS ngadat, gak ngegantung kelamaan
-  connectionTimeout: EMAIL_TIMEOUT_MS,
-  greetingTimeout: EMAIL_TIMEOUT_MS,
-  socketTimeout: EMAIL_TIMEOUT_MS,
-});
+const EMAIL_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS || 15000);
 
 function formatRupiah(angka) {
   return `Rp ${Number(angka || 0).toLocaleString('id-ID')}`;
@@ -43,10 +20,7 @@ function getFromEmail() {
 }
 
 function getBaseUrl() {
-  return (
-    process.env.NEXT_PUBLIC_BASE_URL ||
-    process.env.NEXTAUTH_URL
-  );
+  return process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL;
 }
 
 function emailSiap() {
@@ -55,6 +29,31 @@ function emailSiap() {
       process.env.EMAIL_SERVER_PASSWORD &&
       getFromEmail()
   );
+}
+
+function bikinTransporter() {
+  const host = process.env.EMAIL_SERVER_HOST || 'smtp.gmail.com';
+  const port = Number(process.env.EMAIL_SERVER_PORT || 465);
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: {
+      user: process.env.EMAIL_SERVER_USER,
+      pass: process.env.EMAIL_SERVER_PASSWORD,
+    },
+
+    // Biar kalau Gmail/DNS ngadat, request gak gantung kelamaan
+    connectionTimeout: EMAIL_TIMEOUT_MS,
+    greetingTimeout: EMAIL_TIMEOUT_MS,
+    socketTimeout: EMAIL_TIMEOUT_MS,
+
+    // Kadang membantu TLS Gmail di environment serverless
+    tls: {
+      servername: host,
+    },
+  });
 }
 
 async function sendMailAman(options) {
@@ -70,32 +69,35 @@ async function sendMailAman(options) {
     };
   }
 
+  const transporter = bikinTransporter();
   return transporter.sendMail(options);
 }
 
 // EMAIL VERIFIKASI REGISTER
 export async function kirimEmailVerifikasi({ to, nama, link }) {
-  await sendMailAman({
-    from: getFromEmail(),
+  return sendMailAman({
+    from: `NaXaShop <${getFromEmail()}>`,
     to,
     subject: 'Verifikasi Email NaXaShop',
     html: `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <h2>Halo ${escapeHtml(nama)} 👋</h2>
-        <p>Makasih udah daftar di <b>NaXaShop</b>.</p>
-        <p>Klik tombol di bawah buat verifikasi email lu:</p>
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; background:#0f172a; padding:24px; color:#e5e7eb;">
+        <div style="max-width:520px; margin:auto; background:#111827; border:1px solid #1f2937; border-radius:18px; padding:24px;">
+          <h2 style="margin:0 0 10px; color:#ffffff;">Halo ${escapeHtml(nama)} 👋</h2>
+          <p>Makasih udah daftar di <b>NaXaShop</b>.</p>
+          <p>Klik tombol di bawah buat verifikasi email lu:</p>
 
-        <p>
-          <a href="${escapeHtml(link)}"
-             style="display:inline-block;padding:12px 18px;background:#06b6d4;color:#fff;text-decoration:none;border-radius:10px;font-weight:bold;">
-            Verifikasi Email
-          </a>
-        </p>
+          <p style="margin:24px 0;">
+            <a href="${escapeHtml(link)}"
+               style="display:inline-block;padding:12px 18px;background:#06b6d4;color:#fff;text-decoration:none;border-radius:10px;font-weight:bold;">
+              Verifikasi Email
+            </a>
+          </p>
 
-        <p>Kalau tombolnya gak bisa diklik, copy link ini:</p>
-        <p>${escapeHtml(link)}</p>
+          <p>Kalau tombolnya gak bisa diklik, copy link ini:</p>
+          <p style="word-break:break-all; color:#67e8f9;">${escapeHtml(link)}</p>
 
-        <p>Link ini berlaku 1 jam.</p>
+          <p style="font-size:13px;color:#9ca3af;">Link ini berlaku 1 jam.</p>
+        </div>
       </div>
     `,
   });
@@ -105,8 +107,8 @@ export async function kirimEmailVerifikasi({ to, nama, link }) {
 export async function kirimEmailAdmin({ subject, title, message, orderId, detail }) {
   const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_SERVER_USER;
 
-  await sendMailAman({
-    from: getFromEmail(),
+  return sendMailAman({
+    from: `NaXaShop <${getFromEmail()}>`,
     to: adminEmail,
     subject: subject || 'Notifikasi NaXaShop',
     html: `
@@ -144,15 +146,15 @@ export async function kirimEmailTopupSukses({
   orderId,
   namaProduk,
   harga,
-  paymentType
+  paymentType,
 }) {
-  if (!to) return;
+  if (!to) return null;
 
   const baseUrl = getBaseUrl();
   const linkCekOrder = `${baseUrl}/lacak?order_id=${encodeURIComponent(orderId)}`;
 
-  await sendMailAman({
-    from: getFromEmail(),
+  return sendMailAman({
+    from: `NaXaShop <${getFromEmail()}>`,
     to,
     subject: `Top-up Berhasil - ${orderId}`,
     html: `
@@ -186,6 +188,6 @@ export async function kirimEmailTopupSukses({
           </p>
         </div>
       </div>
-    `
+    `,
   });
 }

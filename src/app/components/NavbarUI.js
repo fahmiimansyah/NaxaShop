@@ -6,8 +6,17 @@ import { AnimatePresence, motion } from "framer-motion"
 import Swal from 'sweetalert2'
 import { signOut } from "next-auth/react" // Jurus panggil Satpam buat Logout
 
+const EMAIL_CEO = 'fahmiimansyah28@gmail.com'
+
 export default function NavbarUI({ session }) { // <--- TERIMA DATA DARI SERVER
   const [open, setOpen] = useState(false)
+
+  const namaUser =
+    session?.user?.name ||
+    session?.user?.email?.split('@')?.[0] ||
+    'User'
+
+  const isCEO = session?.user?.email === EMAIL_CEO
 
   const menuItems = [
     { name: "Home", href: "/" },
@@ -26,12 +35,13 @@ export default function NavbarUI({ session }) { // <--- TERIMA DATA DARI SERVER
           <div className="h-16 flex items-center justify-between">
 
             {/* LEFT */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
 
               {/* HAMBURGER */}
               <button
                 onClick={() => setOpen(!open)}
                 className="w-11 h-11 rounded-xl bg-gray-800/80 border border-gray-700 flex flex-col justify-center items-center gap-1.5 hover:border-blue-500 transition-all duration-300 group cursor-pointer"
+                aria-label="Buka menu NaXaShop"
               >
                 <motion.span
                   animate={open ? { rotate: 45, y: 7 } : { rotate: 0, y: 0 }}
@@ -51,7 +61,7 @@ export default function NavbarUI({ session }) { // <--- TERIMA DATA DARI SERVER
 
               {/* LOGO */}
               <Link href="/">
-                <h1 className="text-2xl font-black tracking-tight">
+                <h1 className="text-xl sm:text-2xl font-black tracking-tight">
                   <span className="text-blue-500">NaXa</span>
                   <span className="text-white">Shop</span>
                 </h1>
@@ -59,16 +69,16 @@ export default function NavbarUI({ session }) { // <--- TERIMA DATA DARI SERVER
             </div>
 
             {/* RIGHT (BAGIAN VIP) */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               {session ? (
                 // JIKA UDAH LOGIN
                 <>
-                  <span className="text-cyan-400 font-bold hidden md:block text-sm mr-2">
-                    Halo, {session.user.name}!
+                  <span className="text-cyan-400 font-bold hidden md:block text-sm mr-2 max-w-[220px] truncate">
+                    Halo, {namaUser}!
                   </span>
 
                   {/* 🔥 TOMBOL RAHASIA CEO (CUMA MUNCUL KALO EMAILNYA COCOK) 🔥 */}
-                  {session?.user?.email === 'fahmiimansyah28@gmail.com' && (
+                  {isCEO && (
                     <Link href="/admin" className="hidden sm:flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition-all mr-1 border border-blue-400 shadow-[0_0_10px_rgba(37,99,235,0.4)]">
                       Ruang CEO 💼
                     </Link>
@@ -94,7 +104,7 @@ export default function NavbarUI({ session }) { // <--- TERIMA DATA DARI SERVER
                         }
                       })
                     }} 
-                    className="bg-red-500/10 border border-red-500/50 hover:bg-red-500 text-red-500 hover:text-white text-sm font-semibold px-4 h-10 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(239,68,68,0.5)]"
+                    className="bg-red-500/10 border border-red-500/50 hover:bg-red-500 text-red-500 hover:text-white text-xs sm:text-sm font-semibold px-3 sm:px-4 h-10 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(239,68,68,0.5)]"
                   >
                     Logout
                   </button>
@@ -110,6 +120,26 @@ export default function NavbarUI({ session }) { // <--- TERIMA DATA DARI SERVER
               )}
             </div>
           </div>
+
+          {/* SAPAAN KHUSUS USER DI HP */}
+          {session && (
+            <Link
+              href="/akun/riwayat"
+              className="md:hidden mb-3 flex items-center justify-between gap-3 rounded-2xl border border-blue-500/30 bg-blue-500/10 px-4 py-3 shadow-[0_0_22px_rgba(59,130,246,0.12)]"
+            >
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-200/70">
+                  Akun NaXaShop
+                </p>
+                <p className="mt-0.5 truncate text-sm font-black text-white">
+                  Halo, <span className="text-cyan-300">{namaUser}</span> 👋
+                </p>
+              </div>
+              <span className="shrink-0 rounded-xl bg-white/10 px-3 py-1.5 text-[11px] font-bold text-blue-100 border border-white/10">
+                Riwayat
+              </span>
+            </Link>
+          )}
         </div>
       </nav>
 
@@ -140,6 +170,7 @@ export default function NavbarUI({ session }) { // <--- TERIMA DATA DARI SERVER
                 <button
                   onClick={() => setOpen(false)}
                   className="w-10 h-10 rounded-xl bg-gray-800 hover:bg-gray-700 transition-all duration-300 text-white text-xl"
+                  aria-label="Tutup menu NaXaShop"
                 >
                   ✕
                 </button>
@@ -151,11 +182,12 @@ export default function NavbarUI({ session }) { // <--- TERIMA DATA DARI SERVER
                   animate={{ opacity: 1, y: 0 }}
                   className="mb-8 p-4 bg-gray-800/50 rounded-2xl border border-cyan-500/30 flex flex-col gap-1"
                 >
-                  <p className="text-xs text-gray-400 font-medium">Halo </p>
-                  <p className="text-xl font-bold text-cyan-400 truncate">{session.user.name}</p>
+                  <p className="text-xs text-gray-400 font-medium">Selamat datang,</p>
+                  <p className="text-xl font-bold text-cyan-400 truncate">{namaUser}</p>
+                  <p className="text-xs text-gray-500">Top up jadi lebih gampang dari akun lu.</p>
                   
                   {/* 🔥 TOMBOL RAHASIA CEO DI DALAM SIDEBAR HP 🔥 */}
-                  {session?.user?.email === 'fahmiimansyah28@gmail.com' && (
+                  {isCEO && (
                     <Link href="/admin" onClick={() => setOpen(false)} className="mt-3 text-center py-2 bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white text-xs font-bold rounded-lg transition-all border border-blue-500/50">
                       Masuk Ruang CEO 💼
                     </Link>
@@ -187,16 +219,6 @@ export default function NavbarUI({ session }) { // <--- TERIMA DATA DARI SERVER
                 ))}
               </div>
 
-              {/* <div className="absolute bottom-6 left-6 right-6">
-                <div className="bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-500/20 rounded-2xl p-4 backdrop-blur-xl">
-                  <p className="text-white font-semibold">
-                    Next Evolution Edition 🔥
-                  </p>
-                  <p className="text-gray-400 text-sm mt-1">
-                    Top Up Game Modern UI
-                  </p>
-                </div>
-              </div> */}
             </motion.div>
           </>
         )}

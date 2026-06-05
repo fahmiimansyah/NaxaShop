@@ -6,6 +6,21 @@ import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import Swal from 'sweetalert2';
 
+async function ambilJsonAman(respon) {
+  const text = await respon.text();
+
+  if (!text) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    console.error('Response register bukan JSON:', text);
+    return null;
+  }
+}
+
 export default function HalamanRegister() {
   const router = useRouter();
 
@@ -29,34 +44,38 @@ export default function HalamanRegister() {
         body: JSON.stringify({ nama, email, password }),
       });
 
-      const data = await respon.json();
+      const data = await ambilJsonAman(respon);
+      const pesan = data?.pesan || 'Ada response aneh dari server bre.';
 
-      if (respon.ok) {
-        Swal.fire({
-          title: 'MANTAP BRE! ',
-          text: data.pesan || 'Akun berhasil dibikin!',
-          icon: 'success',
+      if (respon.ok && data?.sukses) {
+        await Swal.fire({
+          title: data.emailWarning ? 'AKUN AMAN, EMAIL NGADAT ⚠️' : 'MANTAP BRE! ',
+          text: pesan,
+          icon: data.emailWarning ? 'warning' : 'success',
           background: '#1f2937',
           color: '#fff',
           confirmButtonColor: '#06b6d4',
-        }).then(() => {
-          router.push('/login');
         });
 
         setNama('');
         setEmail('');
         setPassword('');
-      } else {
-        Swal.fire({
-          title: 'YAHHH GAGAL ❌',
-          text: data.pesan,
-          icon: 'error',
-          background: '#1f2937',
-          color: '#fff',
-          confirmButtonColor: '#ef4444',
-        });
+
+        router.push('/login');
+        return;
       }
+
+      Swal.fire({
+        title: 'YAHHH GAGAL ❌',
+        text: pesan,
+        icon: 'error',
+        background: '#1f2937',
+        color: '#fff',
+        confirmButtonColor: '#ef4444',
+      });
     } catch (error) {
+      console.error('Register frontend error:', error);
+
       Swal.fire({
         title: 'SERVER NGADAT! 💥',
         text: 'Waduh, gagal nyambung ke server bre!',
@@ -88,7 +107,7 @@ export default function HalamanRegister() {
             Bikin Akun <span className="text-blue-500">Baru</span>
           </h1>
           <p className="text-gray-400">
-            Join jadi member NaXaShop sekarang 
+            Join jadi member NaXaShop sekarang
           </p>
         </div>
 
