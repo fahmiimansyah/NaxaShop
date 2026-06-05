@@ -1,6 +1,5 @@
-import nodemailer from 'nodemailer';
-
 const EMAIL_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS || 15000);
+const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 
 function formatRupiah(angka) {
   return `Rp ${Number(angka || 0).toLocaleString('id-ID')}`;
@@ -15,8 +14,45 @@ function escapeHtml(value) {
     .replaceAll("'", '&#039;');
 }
 
+function stripHtml(value) {
+  return String(value || '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function ambilEmailMurni(value) {
+  const text = String(value || '').trim();
+  const match = text.match(/<([^>]+)>/);
+  return (match?.[1] || text).trim();
+}
+
 function getFromEmail() {
-  return process.env.EMAIL_FROM || process.env.EMAIL_SERVER_USER;
+  // Contoh value yang bagus di Vercel:
+  // EMAIL_FROM=NaXaShop <noreply@naxashop.id>
+  return process.env.EMAIL_FROM || process.env.RESEND_FROM || '';
+}
+
+function getReplyTo() {
+  return process.env.EMAIL_REPLY_TO || process.env.SUPPORT_EMAIL || '';
+}
+
+function getAdminEmail() {
+  return (
+    process.env.ADMIN_EMAIL ||
+    process.env.EMAIL_ADMIN ||
+    process.env.EMAIL_REPLY_TO ||
+    process.env.SUPPORT_EMAIL ||
+    ambilEmailMurni(getFromEmail())
+  );
 }
 
 function getBaseUrl() {
@@ -24,79 +60,140 @@ function getBaseUrl() {
 }
 
 function emailSiap() {
-  return Boolean(
-    process.env.EMAIL_SERVER_USER &&
-      process.env.EMAIL_SERVER_PASSWORD &&
-      getFromEmail()
-  );
+  return Boolean(process.env.RESEND_API_KEY && getFromEmail());
 }
 
-function bikinTransporter() {
-  const host = process.env.EMAIL_SERVER_HOST || 'smtp.gmail.com';
-  const port = Number(process.env.EMAIL_SERVER_PORT || 465);
+async function bacaJsonAman(response) {
+  const text = await response.text();
 
-  return nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: {
-      user: process.env.EMAIL_SERVER_USER,
-      pass: process.env.EMAIL_SERVER_PASSWORD,
-    },
+  if (!text) return null;
 
-    // Biar kalau Gmail/DNS ngadat, request gak gantung kelamaan
-    connectionTimeout: EMAIL_TIMEOUT_MS,
-    greetingTimeout: EMAIL_TIMEOUT_MS,
-    socketTimeout: EMAIL_TIMEOUT_MS,
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { raw: text };
+  }
+}
 
-    // Kadang membantu TLS Gmail di environment serverless
-    tls: {
-      servername: host,
-    },
-  });
+async function kirimLewatResend(payload, idempotencyKey) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), EMAIL_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(RESEND_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'naxashop/1.0',
+        ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    const data = await bacaJsonAman(response);
+
+    if (!response.ok) {
+      const message =
+        data?.message ||
+        data?.error ||
+        data?.raw ||
+        `Resend error HTTP ${response.status}`;
+
+      const error = new Error(message);
+      error.status = response.status;
+      error.resend = data;
+      throw error;
+    }
+
+    return data;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function sendMailAman(options) {
+  const from = options?.from || getFromEmail();
+  const to = options?.to;
+  const subject = options?.subject;
+  const html = options?.html || '';
+  const text = options?.text || stripHtml(html);
+  const replyTo = options?.replyTo || getReplyTo();
+
   if (!emailSiap()) {
-    console.warn('Email belum dikonfigurasi lengkap. Email tidak dikirim:', {
-      to: options?.to,
-      subject: options?.subject,
+    console.warn('Resend belum dikonfigurasi lengkap. Email tidak dikirim:', {
+      to,
+      subject,
+      butuh: ['RESEND_API_KEY', 'EMAIL_FROM'],
     });
 
     return {
       skipped: true,
-      reason: 'EMAIL_NOT_CONFIGURED',
+      reason: 'RESEND_NOT_CONFIGURED',
     };
   }
 
-  const transporter = bikinTransporter();
-  return transporter.sendMail(options);
+  if (!to || !subject || !html) {
+    console.warn('Payload email tidak lengkap. Email tidak dikirim:', {
+      to,
+      subject,
+      adaHtml: Boolean(html),
+    });
+
+    return {
+      skipped: true,
+      reason: 'EMAIL_PAYLOAD_INCOMPLETE',
+    };
+  }
+
+  const payload = {
+    from,
+    to,
+    subject,
+    html,
+    text,
+    ...(replyTo ? { reply_to: replyTo } : {}),
+  };
+
+  return kirimLewatResend(payload, options?.idempotencyKey);
 }
 
 // EMAIL VERIFIKASI REGISTER
 export async function kirimEmailVerifikasi({ to, nama, link }) {
+  const namaAman = escapeHtml(nama || 'Kak');
+  const linkAman = escapeHtml(link);
+
   return sendMailAman({
-    from: `NaXaShop <${getFromEmail()}>`,
     to,
-    subject: 'Verifikasi Email NaXaShop',
+    subject: 'Verifikasi akun NaXaShop kamu',
+    idempotencyKey: `verify-${to}-${Date.now()}`.slice(0, 240),
     html: `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; background:#0f172a; padding:24px; color:#e5e7eb;">
-        <div style="max-width:520px; margin:auto; background:#111827; border:1px solid #1f2937; border-radius:18px; padding:24px;">
-          <h2 style="margin:0 0 10px; color:#ffffff;">Halo ${escapeHtml(nama)} 👋</h2>
-          <p>Makasih udah daftar di <b>NaXaShop</b>.</p>
-          <p>Klik tombol di bawah buat verifikasi email lu:</p>
+      <div style="margin:0;padding:0;background:#f8fafc;font-family:Arial,Helvetica,sans-serif;color:#0f172a;line-height:1.6;">
+        <div style="max-width:560px;margin:0 auto;padding:28px 16px;">
+          <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:18px;padding:26px;">
+            <h1 style="margin:0 0 10px;font-size:22px;color:#0f172a;">Halo ${namaAman},</h1>
 
-          <p style="margin:24px 0;">
-            <a href="${escapeHtml(link)}"
-               style="display:inline-block;padding:12px 18px;background:#06b6d4;color:#fff;text-decoration:none;border-radius:10px;font-weight:bold;">
-              Verifikasi Email
-            </a>
+            <p style="margin:0 0 14px;">Terima kasih sudah mendaftar di <b>NaXaShop</b>.</p>
+            <p style="margin:0 0 22px;">Klik tombol di bawah ini untuk memverifikasi akun kamu.</p>
+
+            <p style="margin:0 0 24px;">
+              <a href="${linkAman}"
+                 style="display:inline-block;background:#0284c7;color:#ffffff;text-decoration:none;font-weight:bold;border-radius:12px;padding:12px 18px;">
+                Verifikasi Akun
+              </a>
+            </p>
+
+            <p style="margin:0 0 8px;font-size:14px;color:#475569;">Kalau tombol tidak bisa dibuka, salin link ini ke browser:</p>
+            <p style="margin:0 0 18px;font-size:13px;word-break:break-all;color:#0369a1;">${linkAman}</p>
+
+            <p style="margin:0 0 16px;font-size:14px;color:#475569;">Link ini berlaku 1 jam.</p>
+            <p style="margin:0;font-size:13px;color:#64748b;">Kalau kamu tidak merasa mendaftar, abaikan email ini.</p>
+          </div>
+
+          <p style="text-align:center;font-size:12px;color:#94a3b8;margin:18px 0 0;">
+            Email otomatis dari NaXaShop.
           </p>
-
-          <p>Kalau tombolnya gak bisa diklik, copy link ini:</p>
-          <p style="word-break:break-all; color:#67e8f9;">${escapeHtml(link)}</p>
-
-          <p style="font-size:13px;color:#9ca3af;">Link ini berlaku 1 jam.</p>
         </div>
       </div>
     `,
@@ -105,14 +202,21 @@ export async function kirimEmailVerifikasi({ to, nama, link }) {
 
 // EMAIL KE ADMIN KALAU ADA ORDER BERMASALAH
 export async function kirimEmailAdmin({ subject, title, message, orderId, detail }) {
-  const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_SERVER_USER;
+  const adminEmail = getAdminEmail();
+
+  if (!adminEmail) {
+    console.warn('ADMIN_EMAIL belum diset. Email admin tidak dikirim.', {
+      subject,
+      orderId,
+    });
+    return { skipped: true, reason: 'ADMIN_EMAIL_NOT_CONFIGURED' };
+  }
 
   return sendMailAman({
-    from: `NaXaShop <${getFromEmail()}>`,
     to: adminEmail,
     subject: subject || 'Notifikasi NaXaShop',
     html: `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <div style="font-family:Arial,Helvetica,sans-serif;line-height:1.6;color:#0f172a;">
         <h2>${escapeHtml(title || 'Notifikasi NaXaShop')}</h2>
 
         <p>${escapeHtml(message || '-')}</p>
@@ -127,12 +231,12 @@ export async function kirimEmailAdmin({ subject, title, message, orderId, detail
           detail
             ? `
               <p><b>Detail:</b></p>
-              <pre style="background:#111827;color:#e5e7eb;padding:12px;border-radius:10px;white-space:pre-wrap;">${escapeHtml(detail)}</pre>
+              <pre style="background:#0f172a;color:#e5e7eb;padding:12px;border-radius:10px;white-space:pre-wrap;">${escapeHtml(detail)}</pre>
             `
             : ''
         }
 
-        <p style="font-size:12px;color:#666;">
+        <p style="font-size:12px;color:#64748b;">
           Email otomatis dari NaXaShop Admin System.
         </p>
       </div>
@@ -151,40 +255,54 @@ export async function kirimEmailTopupSukses({
   if (!to) return null;
 
   const baseUrl = getBaseUrl();
-  const linkCekOrder = `${baseUrl}/lacak?order_id=${encodeURIComponent(orderId)}`;
+  const linkCekOrder = baseUrl
+    ? `${baseUrl.replace(/\/$/, '')}/lacak?order_id=${encodeURIComponent(orderId)}`
+    : '';
 
   return sendMailAman({
-    from: `NaXaShop <${getFromEmail()}>`,
     to,
-    subject: `Top-up Berhasil - ${orderId}`,
+    subject: `Top-up berhasil - ${orderId}`,
+    idempotencyKey: `topup-${orderId}`.slice(0, 240),
     html: `
-      <div style="font-family:Arial,sans-serif;line-height:1.6;background:#0f172a;padding:24px;color:#e5e7eb;">
-        <div style="max-width:520px;margin:auto;background:#111827;border:1px solid #1f2937;border-radius:18px;padding:24px;">
-          <h2 style="margin:0 0 8px;color:#ffffff;">Top-up Berhasil ✅</h2>
+      <div style="margin:0;padding:0;background:#f8fafc;font-family:Arial,Helvetica,sans-serif;color:#0f172a;line-height:1.6;">
+        <div style="max-width:560px;margin:0 auto;padding:28px 16px;">
+          <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:18px;padding:26px;">
+            <h1 style="margin:0 0 10px;font-size:22px;color:#0f172a;">Top-up berhasil</h1>
 
-          <p style="display:inline-block;background:#083344;color:#67e8f9;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:bold;">
-            SUKSES
-          </p>
+            <p style="display:inline-block;margin:0 0 16px;background:#dcfce7;color:#166534;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:bold;">
+              SUKSES
+            </p>
 
-          <p>Mantap! Top-up kamu sudah berhasil diproses.</p>
-          <p>Silakan cek item, diamond, saldo, atau benefit di akun game kamu.</p>
+            <p style="margin:0 0 14px;">Mantap, pesanan kamu sudah berhasil diproses.</p>
+            <p style="margin:0 0 18px;color:#475569;">Silakan cek item, diamond, saldo, atau benefit di akun game kamu.</p>
 
-          <div style="background:#020617;border:1px solid #1f2937;border-radius:14px;padding:16px;margin:18px 0;">
-            <p style="margin:0 0 8px;"><b>Order ID:</b><br/><code>${escapeHtml(orderId)}</code></p>
-            <p style="margin:0 0 8px;"><b>Produk:</b><br/>${escapeHtml(namaProduk || '-')}</p>
-            <p style="margin:0 0 8px;"><b>Total:</b><br/>${formatRupiah(harga)}</p>
-            <p style="margin:0;"><b>Metode:</b><br/>${escapeHtml(paymentType || '-')}</p>
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:16px;margin:18px 0;">
+              <p style="margin:0 0 8px;"><b>Order ID:</b><br/><code>${escapeHtml(orderId)}</code></p>
+              <p style="margin:0 0 8px;"><b>Produk:</b><br/>${escapeHtml(namaProduk || '-')}</p>
+              <p style="margin:0 0 8px;"><b>Total:</b><br/>${formatRupiah(harga)}</p>
+              <p style="margin:0;"><b>Metode:</b><br/>${escapeHtml(paymentType || '-')}</p>
+            </div>
+
+            ${
+              linkCekOrder
+                ? `
+                  <p style="margin:0 0 18px;">
+                    <a href="${escapeHtml(linkCekOrder)}"
+                       style="display:inline-block;background:#0284c7;color:#ffffff;text-decoration:none;font-weight:bold;border-radius:12px;padding:12px 18px;">
+                      Cek Status Order
+                    </a>
+                  </p>
+                `
+                : ''
+            }
+
+            <p style="margin:0;font-size:13px;color:#64748b;">
+              Simpan Order ID ini sampai transaksi benar-benar selesai.
+            </p>
           </div>
 
-          <p>
-            <a href="${escapeHtml(linkCekOrder)}"
-               style="display:inline-block;padding:12px 18px;background:#06b6d4;color:#fff;text-decoration:none;border-radius:12px;font-weight:bold;">
-              Cek Status Order
-            </a>
-          </p>
-
-          <p style="font-size:12px;color:#9ca3af;margin-top:20px;">
-            Simpan Order ID ini sampai transaksi benar-benar selesai.
+          <p style="text-align:center;font-size:12px;color:#94a3b8;margin:18px 0 0;">
+            Email otomatis dari NaXaShop.
           </p>
         </div>
       </div>
