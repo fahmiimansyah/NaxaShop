@@ -73,14 +73,27 @@ export default function NavbarUI({ session }) { // <--- TERIMA DATA DARI SERVER
               {session ? (
                 // JIKA UDAH LOGIN
                 <>
-                  <span className="text-cyan-400 font-bold hidden md:block text-sm mr-2 max-w-[220px] truncate">
-                    Halo, {namaUser}!
-                  </span>
+                  <Link
+  href="/akun/riwayat"
+  className="hidden md:flex max-w-[220px] items-center gap-2 truncate rounded-xl border border-cyan-400/25 bg-cyan-400/10 px-3 py-2 text-sm font-bold text-cyan-300 transition hover:bg-cyan-400/15"
+>
+  <span className="shrink-0">👋</span>
+  <span className="truncate">Halo, {namaUser}</span>
+</Link>
+
+<Link
+  href="/akun/riwayat"
+  aria-label="Buka riwayat transaksi"
+  className="md:hidden flex max-w-[88px] items-center gap-1.5 truncate rounded-xl border border-cyan-400/25 bg-cyan-400/10 px-2.5 h-10 text-xs font-black text-cyan-300 transition hover:bg-cyan-400/15"
+>
+  <span className="shrink-0">👋</span>
+  <span className="truncate">{namaUser}</span>
+</Link>
 
                   {/* 🔥 TOMBOL RAHASIA CEO (CUMA MUNCUL KALO EMAILNYA COCOK) 🔥 */}
                   {isCEO && (
                     <Link href="/admin" className="hidden sm:flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition-all mr-1 border border-blue-400 shadow-[0_0_10px_rgba(37,99,235,0.4)]">
-                      Ruang CEO 💼
+                      Ruang Rahasia
                     </Link>
                   )}
 
@@ -121,25 +134,7 @@ export default function NavbarUI({ session }) { // <--- TERIMA DATA DARI SERVER
             </div>
           </div>
 
-          {/* SAPAAN KHUSUS USER DI HP */}
-          {session && (
-            <Link
-              href="/akun/riwayat"
-              className="md:hidden mb-3 flex items-center justify-between gap-3 rounded-2xl border border-blue-500/30 bg-blue-500/10 px-4 py-3 shadow-[0_0_22px_rgba(59,130,246,0.12)]"
-            >
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-200/70">
-                  Akun NaXaShop
-                </p>
-                <p className="mt-0.5 truncate text-sm font-black text-white">
-                  Halo, <span className="text-cyan-300">{namaUser}</span> 👋
-                </p>
-              </div>
-              <span className="shrink-0 rounded-xl bg-white/10 px-3 py-1.5 text-[11px] font-bold text-blue-100 border border-white/10">
-                Riwayat
-              </span>
-            </Link>
-          )}
+
         </div>
       </nav>
 
@@ -182,14 +177,14 @@ export default function NavbarUI({ session }) { // <--- TERIMA DATA DARI SERVER
                   animate={{ opacity: 1, y: 0 }}
                   className="mb-8 p-4 bg-gray-800/50 rounded-2xl border border-cyan-500/30 flex flex-col gap-1"
                 >
-                  <p className="text-xs text-gray-400 font-medium">Selamat datang,</p>
+                  <p className="text-xs text-gray-400 font-medium">Haloo,</p>
                   <p className="text-xl font-bold text-cyan-400 truncate">{namaUser}</p>
-                  <p className="text-xs text-gray-500">Top up jadi lebih gampang dari akun lu.</p>
+                  <p className="text-xs text-gray-500">Gunakan uang kamu sebaik mungkin yaa!!</p>
                   
                   {/* 🔥 TOMBOL RAHASIA CEO DI DALAM SIDEBAR HP 🔥 */}
                   {isCEO && (
                     <Link href="/admin" onClick={() => setOpen(false)} className="mt-3 text-center py-2 bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white text-xs font-bold rounded-lg transition-all border border-blue-500/50">
-                      Masuk Ruang CEO 💼
+                      Masuk Ruang Rahasia
                     </Link>
                   )}
                 </motion.div>
