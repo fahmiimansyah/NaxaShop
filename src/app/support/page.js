@@ -80,7 +80,7 @@ const faqItems = [
 export default function SupportPage() {
   const adminWhatsapp = process.env.NEXT_PUBLIC_ADMIN_WHATSAPP || "";
   const supportEmail =
-    process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "support@naxashop.com";
+    process.env.NEXT_PUBLIC_SUPPORT_EMAIL;
 
   const whatsappLink = adminWhatsapp
     ? `https://wa.me/${adminWhatsapp}?text=${encodeURIComponent(

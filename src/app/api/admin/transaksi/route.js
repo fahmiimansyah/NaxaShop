@@ -299,3 +299,70 @@ export async function PATCH(request) {
     );
   }
 }
+export async function DELETE(request) {
+  const adminValid = await cekAdmin();
+
+  if (!adminValid) {
+    return NextResponse.json(
+      { sukses: false, pesan: 'Akses ditolak bre! Lu bukan admin.' },
+      { status: 403 }
+    );
+  }
+
+  try {
+    let body = {};
+
+    try {
+      body = await request.json();
+    } catch {
+      body = {};
+    }
+
+    const { searchParams } = new URL(request.url);
+    const orderId = bersihinText(body.order_id || searchParams.get('order_id'));
+
+    if (!orderId) {
+      return NextResponse.json(
+        { sukses: false, pesan: 'Order ID wajib dikirim bre!' },
+        { status: 400 }
+      );
+    }
+
+    const [cekTrx] = await db.query(
+      `SELECT id, order_id, status_bayar, status_topup
+       FROM transaksi
+       WHERE order_id = ?
+       LIMIT 1`,
+      [orderId]
+    );
+
+    if (cekTrx.length === 0) {
+      return NextResponse.json(
+        { sukses: false, pesan: 'Transaksi gak ketemu bre!' },
+        { status: 404 }
+      );
+    }
+
+    await db.query(
+      `DELETE FROM transaksi
+       WHERE order_id = ?
+       LIMIT 1`,
+      [orderId]
+    );
+
+    return NextResponse.json({
+      sukses: true,
+      pesan: 'Riwayat transaksi berhasil dihapus bre!',
+      data: {
+        order_id: orderId,
+      },
+    });
+  } catch (error) {
+    console.error('Gagal hapus transaksi admin:', error);
+
+    return NextResponse.json(
+      { sukses: false, pesan: 'Dapur hapus transaksi meledak bre!' },
+      { status: 500 }
+    );
+  }
+}

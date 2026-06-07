@@ -12,7 +12,7 @@ export async function GET() {
       return NextResponse.json(
         {
           sukses: false,
-          pesan: 'Login dulu buat lihat riwayat transaksi.'
+          pesan: 'Login dulu buat lihat riwayat transaksi.',
         },
         { status: 401 }
       );
@@ -42,8 +42,11 @@ export async function GET() {
        FROM transaksi t
        LEFT JOIN games g ON t.game_id = g.id
        LEFT JOIN produk p ON t.produk_id = p.id
-       WHERE t.user_email = ?
-          OR t.customer_email = ?
+       WHERE (
+          LOWER(TRIM(COALESCE(t.user_email, ''))) = ?
+          OR LOWER(TRIM(COALESCE(t.customer_email, ''))) = ?
+       )
+       AND t.status_bayar = 'sukses'
        ORDER BY t.created_at DESC
        LIMIT 50`,
       [emailLogin, emailLogin]
@@ -51,7 +54,7 @@ export async function GET() {
 
     return NextResponse.json({
       sukses: true,
-      data: riwayat
+      data: riwayat,
     });
   } catch (error) {
     console.error('GET /api/akun/riwayat error:', error);
@@ -59,7 +62,7 @@ export async function GET() {
     return NextResponse.json(
       {
         sukses: false,
-        pesan: 'Gagal ambil riwayat transaksi.'
+        pesan: 'Gagal ambil riwayat transaksi.',
       },
       { status: 500 }
     );

@@ -4,6 +4,12 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/route';
 import db from '../../lib/db';
 import { rateLimit } from '../../lib/rate-limit';
+import {
+  ensureVoucherSchema,
+  normalizeKodeVoucher,
+  validateVoucherForCheckout,
+  tambahPemakaianVoucher
+} from '../../lib/voucher';
 
 const METODE_BAYAR_VALID = [
   'qris',
@@ -159,13 +165,22 @@ async function updateTransaksiGagal(orderId, catatan) {
   }
 }
 
-function bikinItemDetails({ namaProduk, hargaProduk, biayaAdmin }) {
+function bikinItemDetails({ namaProduk, hargaProduk, biayaAdmin, diskonVoucher = 0, kodeVoucher = '' }) {
+  const hargaProdukAsli = Number(hargaProduk || 0);
+  const diskon = Number(diskonVoucher || 0);
+  const hargaProdukSetelahDiskon = diskon > 0
+    ? Math.max(1000, hargaProdukAsli - diskon)
+    : hargaProdukAsli;
+  const namaItem = kodeVoucher
+    ? `${namaProduk || 'Produk NaXaShop'} (Voucher ${kodeVoucher})`
+    : namaProduk || 'Produk NaXaShop';
+
   const items = [
     {
       id: 'produk',
-      price: hargaProduk,
+      price: hargaProdukSetelahDiskon,
       quantity: 1,
-      name: namaProduk?.slice(0, 50) || 'Produk NaXaShop'
+      name: namaItem.slice(0, 50)
     }
   ];
 
@@ -191,7 +206,9 @@ function bikinPayloadMidtrans({
   customerEmail,
   customerWhatsapp,
   namaProduk,
-  finishUrl
+  finishUrl,
+  diskonVoucher = 0,
+  kodeVoucher = ''
 }) {
   const payload = {
     transaction_details: {
@@ -207,7 +224,9 @@ function bikinPayloadMidtrans({
     item_details: bikinItemDetails({
       namaProduk,
       hargaProduk,
-      biayaAdmin
+      biayaAdmin,
+      diskonVoucher,
+      kodeVoucher
     })
   };
 
@@ -298,7 +317,9 @@ function bikinResponsePembayaran({
   biayaAdmin,
   hargaTotal,
   namaProduk,
-  dataMidtrans
+  dataMidtrans,
+  diskonVoucher = 0,
+  kodeVoucher = ''
 }) {
   const labelMetode = LABEL_METODE_BAYAR[metodeBayar] || metodeBayar;
 
@@ -310,6 +331,8 @@ function bikinResponsePembayaran({
     harga: hargaTotal,
     harga_produk: hargaProduk,
     biaya_admin: biayaAdmin,
+    diskon_voucher: diskonVoucher,
+    kode_voucher: kodeVoucher || '',
     harga_total: hargaTotal,
     nama_produk: namaProduk
   };
@@ -457,6 +480,7 @@ export async function POST(request) {
     const idPlayer = bersihinText(pesanan.id_player);
     const zonePlayer = bersihinText(pesanan.zone_player);
     const metodeBayar = bersihinText(pesanan.metode_bayar);
+    const kodeVoucher = normalizeKodeVoucher(pesanan.kode_voucher || pesanan.voucher || '');
 
     const customerWhatsapp = bersihinWhatsapp(pesanan.customer_whatsapp);
     const customerEmail = bersihinText(pesanan.customer_email).toLowerCase();
@@ -628,7 +652,41 @@ export async function POST(request) {
     }
 
     const biayaAdmin = getBiayaAdmin(metodeBayar);
-    const hargaTotal = hargaProduk + biayaAdmin;
+
+    let voucherCheckout = { voucher: null, kode_voucher: '', diskon: 0 };
+
+    if (kodeVoucher) {
+      voucherCheckout = await validateVoucherForCheckout(db, {
+        kodeVoucher,
+        hargaProduk,
+        biayaAdmin
+      });
+
+      if (!voucherCheckout.sukses) {
+        return NextResponse.json(
+          {
+            sukses: false,
+            pesan: voucherCheckout.pesan || 'Voucher tidak bisa dipakai bre!'
+          },
+          { status: 400 }
+        );
+      }
+    } else {
+      await ensureVoucherSchema(db);
+    }
+
+    const diskonVoucher = Number(voucherCheckout.diskon || 0);
+    const hargaTotal = hargaProduk + biayaAdmin - diskonVoucher;
+
+    if (hargaTotal < 1000) {
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan: 'Total pembayaran setelah voucher terlalu kecil bre!'
+        },
+        { status: 400 }
+      );
+    }
 
     const butuhZoneId = Number(produk.zone_id) === 1;
     const butuhServer =
@@ -676,6 +734,9 @@ export async function POST(request) {
          harga,
          harga_produk,
          biaya_admin,
+         diskon_voucher,
+         voucher_id,
+         kode_voucher,
          harga_total,
          harga_modal,
          payment_type,
@@ -685,7 +746,7 @@ export async function POST(request) {
          customer_email,
          user_email
        )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         orderId,
         produk.game_id,
@@ -698,6 +759,9 @@ export async function POST(request) {
         hargaTotal,
         hargaProduk,
         biayaAdmin,
+        diskonVoucher,
+        voucherCheckout.voucher?.id || null,
+        voucherCheckout.kode_voucher || null,
         hargaTotal,
         hargaModal,
         metodeBayar,
@@ -725,7 +789,9 @@ export async function POST(request) {
       customerEmail: emailUntukPayment,
       customerWhatsapp,
       namaProduk: produk.nama_produk,
-      finishUrl
+      finishUrl,
+      diskonVoucher,
+      kodeVoucher: voucherCheckout.kode_voucher || ''
     });
 
     const response = await fetch(`${midtransBaseUrl}/v2/charge`, {
@@ -785,7 +851,9 @@ export async function POST(request) {
       biayaAdmin,
       hargaTotal,
       namaProduk: produk.nama_produk,
-      dataMidtrans: data
+      dataMidtrans: data,
+      diskonVoucher,
+      kodeVoucher: voucherCheckout.kode_voucher || ''
     });
 
     if (!responsePunyaInstruksiBayar(responseBayar)) {
@@ -802,6 +870,10 @@ export async function POST(request) {
         },
         { status: 500 }
       );
+    }
+
+    if (voucherCheckout.voucher?.id && diskonVoucher > 0) {
+      await tambahPemakaianVoucher(db, voucherCheckout.voucher.id);
     }
 
     return NextResponse.json(responseBayar);

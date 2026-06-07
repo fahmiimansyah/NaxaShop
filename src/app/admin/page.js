@@ -1,9 +1,280 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Swal from 'sweetalert2';
+import AdminVoucherPanel from '../components/AdminVoucherPanel';
+
+function angkaDashboard(value) {
+  return Number(value || 0);
+}
+
+function formatCompactDashboard(value) {
+  const angka = Number(value || 0);
+
+  if (angka >= 1000000) {
+    return `Rp ${(angka / 1000000).toLocaleString('id-ID', { maximumFractionDigits: 1 })}jt`;
+  }
+
+  if (angka >= 1000) {
+    return `Rp ${(angka / 1000).toLocaleString('id-ID', { maximumFractionDigits: 0 })}rb`;
+  }
+
+  return `Rp ${angka.toLocaleString('id-ID')}`;
+}
+
+function labelMetodeBayarDashboard(value) {
+  const metode = String(value || '').toLowerCase();
+
+  const map = {
+    qris: 'QRIS',
+    gopay: 'GoPay',
+    shopeepay: 'ShopeePay',
+    dana: 'DANA',
+    bca_va: 'BCA VA',
+    bni_va: 'BNI VA',
+    bri_va: 'BRI VA',
+    cimb_va: 'CIMB VA',
+    permata_va: 'Permata VA',
+    mandiri_bill: 'Mandiri Bill',
+    alfamart: 'Alfamart',
+    indomaret: 'Indomaret'
+  };
+
+  return map[metode] || value || 'Unknown';
+}
+
+function EmptyChartState({ text = 'Belum ada data real yang bisa digambar.' }) {
+  return (
+    <div className="flex min-h-[190px] items-center justify-center rounded-2xl border border-dashed border-white/10 bg-slate-950/50 text-center text-sm font-bold text-gray-500">
+      {text}
+    </div>
+  );
+}
+
+function RevenueLineChart({ data = [] }) {
+  const chartData = Array.isArray(data) ? data : [];
+  const width = 720;
+  const height = 220;
+  const paddingX = 28;
+  const paddingY = 28;
+  const values = chartData.map((item) => angkaDashboard(item.omset));
+  const profitValues = chartData.map((item) => angkaDashboard(item.profit));
+  const maxValue = Math.max(...values, ...profitValues, 1);
+  const usableWidth = width - paddingX * 2;
+  const usableHeight = height - paddingY * 2;
+
+  const pointFor = (value, index) => {
+    const x = paddingX + (chartData.length <= 1 ? 0 : (index / (chartData.length - 1)) * usableWidth);
+    const y = height - paddingY - (angkaDashboard(value) / maxValue) * usableHeight;
+    return { x, y };
+  };
+
+  const omsetPoints = chartData.map((item, index) => pointFor(item.omset, index));
+  const profitPoints = chartData.map((item, index) => pointFor(item.profit, index));
+  const omsetPolyline = omsetPoints.map((point) => `${point.x},${point.y}`).join(' ');
+  const profitPolyline = profitPoints.map((point) => `${point.x},${point.y}`).join(' ');
+  const areaPath = omsetPoints.length
+    ? `M ${omsetPoints[0].x} ${height - paddingY} L ${omsetPoints.map((point) => `${point.x} ${point.y}`).join(' L ')} L ${omsetPoints.at(-1).x} ${height - paddingY} Z`
+    : '';
+
+  if (chartData.length === 0 || values.every((value) => value === 0)) {
+    return <EmptyChartState />;
+  }
+
+  return (
+    <div>
+      <div className="mb-4 flex flex-wrap items-center gap-3 text-xs font-black text-gray-400">
+        <span className="inline-flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-cyan-400" /> Omset
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" /> Profit
+        </span>
+        <span className="ml-auto text-gray-500">14 hari terakhir</span>
+      </div>
+
+      <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-3">
+        <svg viewBox={`0 0 ${width} ${height}`} className="h-[230px] w-full overflow-visible">
+          {[0.25, 0.5, 0.75, 1].map((line) => {
+            const y = height - paddingY - line * usableHeight;
+            return (
+              <g key={line}>
+                <line x1={paddingX} y1={y} x2={width - paddingX} y2={y} stroke="rgba(148,163,184,0.13)" strokeWidth="1" />
+                <text x={0} y={y + 4} fill="rgba(148,163,184,0.55)" fontSize="11" fontWeight="700">
+                  {formatCompactDashboard(maxValue * line)}
+                </text>
+              </g>
+            );
+          })}
+
+          {areaPath && <path d={areaPath} fill="rgba(34,211,238,0.08)" />}
+
+          <polyline points={omsetPolyline} fill="none" stroke="rgb(34,211,238)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+          <polyline points={profitPolyline} fill="none" stroke="rgb(52,211,153)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+
+          {omsetPoints.map((point, index) => (
+            <circle key={`omset-${chartData[index]?.tanggal || index}`} cx={point.x} cy={point.y} r="4.5" fill="rgb(34,211,238)" stroke="rgb(15,23,42)" strokeWidth="3" />
+          ))}
+
+          {chartData.map((item, index) => {
+            if (index % 3 !== 0 && index !== chartData.length - 1) return null;
+            const point = pointFor(0, index);
+            return (
+              <text key={item.tanggal} x={point.x} y={height - 4} textAnchor="middle" fill="rgba(148,163,184,0.65)" fontSize="11" fontWeight="800">
+                {item.label}
+              </text>
+            );
+          })}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function OrderBarChart({ data = [] }) {
+  const chartData = Array.isArray(data) ? data : [];
+  const maxOrder = Math.max(...chartData.map((item) => angkaDashboard(item.orderSukses)), 1);
+
+  if (chartData.length === 0 || chartData.every((item) => angkaDashboard(item.orderSukses) === 0)) {
+    return <EmptyChartState text="Belum ada order sukses di 14 hari terakhir." />;
+  }
+
+  return (
+    <div className="flex h-[260px] items-end gap-2 rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+      {chartData.map((item) => {
+        const order = angkaDashboard(item.orderSukses);
+        const tinggi = Math.max((order / maxOrder) * 100, order > 0 ? 9 : 2);
+
+        return (
+          <div key={item.tanggal} className="group flex min-w-0 flex-1 flex-col items-center gap-2">
+            <div className="relative flex h-[190px] w-full items-end justify-center">
+              <div
+                className="w-full max-w-[24px] rounded-t-xl bg-gradient-to-t from-blue-600 to-cyan-400 shadow-lg shadow-cyan-950/30 transition group-hover:scale-105"
+                style={{ height: `${tinggi}%` }}
+              />
+              <div className="pointer-events-none absolute bottom-full mb-2 hidden rounded-xl border border-white/10 bg-slate-900 px-2 py-1 text-[10px] font-black text-white shadow-xl group-hover:block">
+                {order} order
+              </div>
+            </div>
+            <span className="text-[10px] font-black text-gray-500 [writing-mode:vertical-rl] sm:[writing-mode:initial]">
+              {item.label}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function CompactRankList({ title, subtitle, data = [], type = 'game' }) {
+  const list = Array.isArray(data) ? data : [];
+  const maxOrder = Math.max(...list.map((item) => angkaDashboard(item.totalOrder)), 1);
+
+  return (
+    <div className="rounded-3xl border border-gray-800 bg-gray-900 p-5 shadow-xl">
+      <div className="mb-4">
+        <h3 className="text-lg font-black text-white">{title}</h3>
+        <p className="text-xs font-semibold text-gray-500">{subtitle}</p>
+      </div>
+
+      {list.length === 0 ? (
+        <EmptyChartState text="Belum ada data terlaris." />
+      ) : (
+        <div className="space-y-3">
+          {list.map((item, index) => {
+            const persen = Math.max((angkaDashboard(item.totalOrder) / maxOrder) * 100, 8);
+            return (
+              <div key={`${type}-${item.nama}-${index}`} className="rounded-2xl border border-white/10 bg-slate-950/45 p-3">
+                <div className="mb-2 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-black text-white">#{index + 1} {item.nama}</p>
+                    {item.game && <p className="truncate text-[11px] font-bold text-cyan-300">{item.game}</p>}
+                    <p className="text-[11px] font-bold text-gray-500">{formatCompactDashboard(item.omset)}</p>
+                  </div>
+                  <span className="shrink-0 rounded-xl bg-blue-500/10 px-2.5 py-1 text-xs font-black text-blue-300">
+                    {item.totalOrder}x
+                  </span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-white/5">
+                  <div className="h-full rounded-full bg-gradient-to-r from-blue-600 to-cyan-400" style={{ width: `${persen}%` }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PaymentMethodList({ data = [] }) {
+  const list = Array.isArray(data) ? data : [];
+  const maxOrder = Math.max(...list.map((item) => angkaDashboard(item.totalOrder)), 1);
+
+  return (
+    <div className="rounded-3xl border border-gray-800 bg-gray-900 p-5 shadow-xl">
+      <div className="mb-4">
+        <h3 className="text-lg font-black text-white">Metode Bayar Favorit</h3>
+        <p className="text-xs font-semibold text-gray-500">Metode yang paling sering dipakai customer.</p>
+      </div>
+
+      {list.length === 0 ? (
+        <EmptyChartState text="Belum ada metode bayar sukses." />
+      ) : (
+        <div className="space-y-3">
+          {list.map((item) => {
+            const persen = Math.max((angkaDashboard(item.totalOrder) / maxOrder) * 100, 8);
+            return (
+              <div key={item.metode}>
+                <div className="mb-1 flex items-center justify-between gap-3 text-xs font-black">
+                  <span className="text-slate-200">{labelMetodeBayarDashboard(item.metode)}</span>
+                  <span className="text-gray-500">{item.totalOrder}x • {formatCompactDashboard(item.omset)}</span>
+                </div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-white/5">
+                  <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-400" style={{ width: `${persen}%` }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatusSnapshot({ stats }) {
+  const statusBayar = stats?.statusBayar || {};
+  const statusTopup = stats?.statusTopup || {};
+
+  const items = [
+    { label: 'Bayar Sukses', value: statusBayar.sukses || 0, className: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20' },
+    { label: 'Bayar Pending', value: statusBayar.pending || 0, className: 'text-yellow-300 bg-yellow-500/10 border-yellow-500/20' },
+    { label: 'Bayar Gagal', value: statusBayar.gagal || 0, className: 'text-red-300 bg-red-500/10 border-red-500/20' },
+    { label: 'Topup Proses', value: statusTopup.proses || 0, className: 'text-purple-300 bg-purple-500/10 border-purple-500/20' },
+    { label: 'Topup Sukses', value: statusTopup.sukses || 0, className: 'text-blue-300 bg-blue-500/10 border-blue-500/20' },
+    { label: 'Topup Gagal', value: statusTopup.gagal || 0, className: 'text-orange-300 bg-orange-500/10 border-orange-500/20' }
+  ];
+
+  return (
+    <div className="rounded-3xl border border-gray-800 bg-gray-900 p-5 shadow-xl">
+      <div className="mb-4">
+        <h3 className="text-lg font-black text-white">Status Snapshot</h3>
+        <p className="text-xs font-semibold text-gray-500">Pantauan cepat pembayaran dan top-up.</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {items.map((item) => (
+          <div key={item.label} className={`rounded-2xl border p-3 ${item.className}`}>
+            <p className="text-[11px] font-black uppercase tracking-wide opacity-80">{item.label}</p>
+            <p className="mt-1 text-2xl font-black">{item.value}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function DashboardAdmin() {
   const { data: session, status } = useSession();
@@ -69,6 +340,9 @@ const [loadingPromo, setLoadingPromo] = useState(false);
 const [loadingPromoForm, setLoadingPromoForm] = useState(false);
 const [modeEditPromo, setModeEditPromo] = useState(false);
 const [promoEditId, setPromoEditId] = useState(null);
+const [daftarMetodeBayarAdmin, setDaftarMetodeBayarAdmin] = useState([]);
+const [loadingMetodeBayarAdmin, setLoadingMetodeBayarAdmin] = useState(false);
+const [loadingAksiMetodeBayar, setLoadingAksiMetodeBayar] = useState(null);
 
 const [formPromo, setFormPromo] = useState({
   badge: '',
@@ -118,9 +392,23 @@ const [filterRequestGame, setFilterRequestGame] = useState({
     filterProdukGame === 'all'
       ? 'Semua Game'
       : cariNamaGame(filterProdukGame);
+  const metodeBayarAdminByGrup = daftarMetodeBayarAdmin.reduce((hasil, item) => {
+    const grup = item.grup || 'Lainnya';
+
+    if (!hasil[grup]) hasil[grup] = [];
+    hasil[grup].push(item);
+
+    return hasil;
+  }, {});
+
   const formatRupiah = (angka) => {
   return `Rp ${Number(angka || 0).toLocaleString('id-ID')}`;
   };
+
+  const trenHarianDashboard = useMemo(() => stats?.trenHarian || [], [stats?.trenHarian]);
+  const metodeBayarDashboard = useMemo(() => stats?.metodeBayar || [], [stats?.metodeBayar]);
+  const gameTerlarisDashboard = useMemo(() => stats?.gameTerlaris || [], [stats?.gameTerlaris]);
+  const produkTerlarisDashboard = useMemo(() => stats?.produkTerlaris || [], [stats?.produkTerlaris]);
   const biayaAdminMap = {
   qris: 0,
   gopay: 0,
@@ -194,6 +482,22 @@ const getLabelBiayaAdmin = (metode) => {
     if (status === 'coming_soon') return 'COMING SOON';
     if (status === 'nonaktif') return 'NONAKTIF';
     return 'UNKNOWN';
+  };
+
+  const labelStatusMetodeBayarAdmin = (status) => {
+    if (status === 'aktif') return 'Aktif';
+    if (status === 'maintenance') return 'Maintenance';
+    if (status === 'coming_soon') return 'Coming Soon';
+    if (status === 'nonaktif') return 'Nonaktif';
+    return 'Unknown';
+  };
+
+  const warnaStatusMetodeBayarAdmin = (status) => {
+    if (status === 'aktif') return 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20';
+    if (status === 'maintenance') return 'bg-yellow-500/10 text-yellow-300 border-yellow-500/20';
+    if (status === 'coming_soon') return 'bg-sky-500/10 text-sky-300 border-sky-500/20';
+    if (status === 'nonaktif') return 'bg-red-500/10 text-red-300 border-red-500/20';
+    return 'bg-gray-800 text-gray-400 border-gray-700';
   };
 
   const normalisasiProvider = (value) => {
@@ -660,6 +964,22 @@ const handleGantiHalamanTransaksi = (pageBaru) => {
   ambilTransaksi(filterBaru);
 };
 
+const handleDownloadCSVTransaksi = () => {
+  const params = new URLSearchParams();
+
+  if (filterTransaksi.search) params.set('search', filterTransaksi.search);
+  if (filterTransaksi.status_bayar && filterTransaksi.status_bayar !== 'all') {
+    params.set('status_bayar', filterTransaksi.status_bayar);
+  }
+  if (filterTransaksi.status_topup && filterTransaksi.status_topup !== 'all') {
+    params.set('status_topup', filterTransaksi.status_topup);
+  }
+
+  params.set('limit', '5000');
+
+  window.open(`/api/admin/transaksi/export?${params.toString()}`, '_blank', 'noopener,noreferrer');
+};
+
 const handleDetailTransaksi = (trx) => {
   const providerLabel = labelProvider(trx.provider);
   const kodeProvider = kodeProviderEfektif(trx);
@@ -816,6 +1136,71 @@ const handleUpdateTransaksi = async (trx, payload, teksKonfirmasi) => {
       icon: 'error',
       background: '#1f2937',
       color: '#fff'
+    });
+  } finally {
+    setLoadingAksiTransaksi(null);
+  }
+};
+
+const handleHapusTransaksi = async (trx) => {
+  const konfirmasi = await Swal.fire({
+    title: 'Hapus transaksi ini?',
+    html: `
+      <div style="text-align:left">
+        <b>${escapeHtml(trx.order_id)}</b><br/>
+        <small>
+          Data transaksi ini bakal dihapus dari database.
+          Kalau ini transaksi real, pastiin dulu lu emang mau bersihin riwayatnya.
+        </small>
+      </div>
+    `,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Iya, hapus!',
+    cancelButtonText: 'Batal',
+    background: '#1f2937',
+    color: '#fff',
+    confirmButtonColor: '#ef4444',
+    cancelButtonColor: '#374151',
+  });
+
+  if (!konfirmasi.isConfirmed) return;
+
+  setLoadingAksiTransaksi(`${trx.order_id}-delete`);
+
+  try {
+    const respon = await fetch('/api/admin/transaksi', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        order_id: trx.order_id,
+      }),
+    });
+
+    const hasil = await respon.json();
+
+    if (!respon.ok || !hasil.sukses) {
+      throw new Error(hasil.pesan || 'Gagal hapus transaksi.');
+    }
+
+    Swal.fire({
+      title: 'Berhasil dihapus ✅',
+      text: hasil.pesan,
+      icon: 'success',
+      background: '#1f2937',
+      color: '#fff',
+    });
+
+    ambilDataSultan();
+    ambilTransaksi();
+    ambilAlerts();
+  } catch (error) {
+    Swal.fire({
+      title: 'Gagal hapus ❌',
+      text: error.message || 'Gagal hapus transaksi bre.',
+      icon: 'error',
+      background: '#1f2937',
+      color: '#fff',
     });
   } finally {
     setLoadingAksiTransaksi(null);
@@ -1074,12 +1459,136 @@ const ambilRequestGame = async (customFilter = filterRequestGame) => {
     setLoadingRequestGame(false);
   }
 };
+
+const ambilMetodeBayarAdmin = async () => {
+  setLoadingMetodeBayarAdmin(true);
+
+  try {
+    const respon = await fetch('/api/admin/metode-bayar', { cache: 'no-store' });
+    const hasil = await respon.json();
+
+    if (hasil.sukses) {
+      setDaftarMetodeBayarAdmin(hasil.data || []);
+    } else {
+      Swal.fire({
+        title: 'Gagal ambil metode bayar',
+        text: hasil.pesan || 'Gagal ambil setting metode bayar bre.',
+        icon: 'error',
+        background: '#1f2937',
+        color: '#fff'
+      });
+    }
+  } catch (error) {
+    Swal.fire({
+      title: 'ERROR SERVER!',
+      text: 'Gagal ambil setting metode bayar bre',
+      icon: 'error',
+      background: '#1f2937',
+      color: '#fff'
+    });
+  } finally {
+    setLoadingMetodeBayarAdmin(false);
+  }
+};
+
+const handleSimpanMetodeBayarAdmin = async (e, item) => {
+  e.preventDefault();
+
+  const formData = new FormData(e.currentTarget);
+  const payload = {
+    kode: item.value,
+    status_metode: String(formData.get('status_metode') || 'aktif'),
+    biaya_admin: Number(formData.get('biaya_admin') || 0),
+    minimal_transaksi: Number(formData.get('minimal_transaksi') || 0),
+    urutan: Number(formData.get('urutan') || item.sort_order || 0),
+    deskripsi: String(formData.get('deskripsi') || item.desc || ''),
+    rekomendasi: Number(formData.get('rekomendasi') || 0)
+  };
+
+  setLoadingAksiMetodeBayar(item.value);
+
+  try {
+    const respon = await fetch('/api/admin/metode-bayar', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const hasil = await respon.json();
+
+    if (!respon.ok || !hasil.sukses) {
+      throw new Error(hasil.pesan || 'Gagal simpan metode bayar.');
+    }
+
+    Swal.fire({
+      title: 'Tersimpan ✅',
+      text: hasil.pesan || 'Setting metode bayar berhasil disimpan.',
+      icon: 'success',
+      timer: 1200,
+      showConfirmButton: false,
+      background: '#1f2937',
+      color: '#fff'
+    });
+
+    ambilMetodeBayarAdmin();
+  } catch (error) {
+    Swal.fire({
+      title: 'Gagal simpan ❌',
+      text: error.message || 'Gagal simpan setting metode bayar bre.',
+      icon: 'error',
+      background: '#1f2937',
+      color: '#fff'
+    });
+  } finally {
+    setLoadingAksiMetodeBayar(null);
+  }
+};
+
+const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
+  setLoadingAksiMetodeBayar(item.value);
+
+  try {
+    const respon = await fetch('/api/admin/metode-bayar', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        kode: item.value,
+        status_metode: statusBaru,
+        biaya_admin: item.biaya,
+        minimal_transaksi: item.minimal,
+        urutan: item.sort_order,
+        deskripsi: item.desc,
+        rekomendasi: item.rekomendasi ? 1 : 0
+      })
+    });
+
+    const hasil = await respon.json();
+
+    if (!respon.ok || !hasil.sukses) {
+      throw new Error(hasil.pesan || 'Gagal update status metode bayar.');
+    }
+
+    ambilMetodeBayarAdmin();
+  } catch (error) {
+    Swal.fire({
+      title: 'Gagal update ❌',
+      text: error.message || 'Gagal update status metode bayar bre.',
+      icon: 'error',
+      background: '#1f2937',
+      color: '#fff'
+    });
+  } finally {
+    setLoadingAksiMetodeBayar(null);
+  }
+};
+
   useEffect(() => {
     if (session?.user?.email === EMAIL_CEO) {
       ambilDataSultan();
       ambilTransaksi();
       ambilAlerts();
       ambilPromo();
+      ambilMetodeBayarAdmin();
       ambilRequestGame();
     }
   }, [session]);
@@ -1786,6 +2295,31 @@ const handleHapusRequestGame = async (item) => {
   🎞️ Kelola Promo
 </button>
 
+
+<button
+  onClick={() => setTabAktif('metode-bayar')}
+  className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+    tabAktif === 'metode-bayar'
+      ? 'bg-indigo-600 text-white shadow-md'
+      : 'text-gray-400 hover:text-white'
+  }`}
+>
+  💳 Metode Bayar
+</button>
+
+
+
+<button
+  onClick={() => setTabAktif('voucher')}
+  className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+    tabAktif === 'voucher'
+      ? 'bg-pink-600 text-white shadow-md'
+      : 'text-gray-400 hover:text-white'
+  }`}
+>
+  🎟️ Voucher
+</button>
+
 <button
   onClick={() => setTabAktif('request-game')}
   className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
@@ -1804,140 +2338,262 @@ const handleHapusRequestGame = async (item) => {
           </div>
         </div>
 
-        {/* TAB STATISTIK */}
-        {tabAktif === 'statistik' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
-              
-              <div className="bg-gradient-to-br from-gray-900 to-slate-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
-  <div className="absolute top-4 right-4 text-3xl opacity-20">💰</div>
-  <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Total Omset</p>
-  <h3 className="text-2xl font-black text-green-400">
-    {formatRupiah(stats?.totalOmset ?? stats?.totalCuan)}
-  </h3>
-</div>
+{/* TAB STATISTIK */}
+{tabAktif === 'statistik' && (
+  <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
 
-<div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
-  <div className="absolute top-4 right-4 text-3xl opacity-20">📦</div>
-  <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Total Modal</p>
-  <h3 className="text-2xl font-black text-orange-400">
-    {formatRupiah(stats?.totalModal)}
-  </h3>
-</div>
-
-<div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
-  <div className="absolute top-4 right-4 text-3xl opacity-20">💸</div>
-  <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Profit</p>
-  <h3 className="text-2xl font-black text-emerald-400">
-    {formatRupiah(stats?.totalProfit)}
-  </h3>
-</div>
-
-<div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
-  <div className="absolute top-4 right-4 text-3xl opacity-20">🚀</div>
-  <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Topup Sukses</p>
-  <h3 className="text-2xl font-black text-blue-400">{stats?.suksesTopup || 0}</h3>
-</div>
-
-              <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
-                <div className="absolute top-4 right-4 text-3xl opacity-20">⏳</div>
-                <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Pending Bayar</p>
-                <h3 className="text-2xl font-black text-yellow-400">{stats?.pendingBayar || 0}</h3>
-              </div>
-
-              <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
-                <div className="absolute top-4 right-4 text-3xl opacity-20">👥</div>
-                <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Total User</p>
-                <h3 className="text-2xl font-black text-purple-400">{stats?.totalUser || 0}</h3>
-              </div>
-
-              <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
-                <div className="absolute top-4 right-4 text-3xl opacity-20">✅</div>
-                <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Verified</p>
-                <h3 className="text-2xl font-black text-emerald-400">{stats?.userVerified || 0}</h3>
-              </div>
-
-              <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
-                <div className="absolute top-4 right-4 text-3xl opacity-20">🟢</div>
-                <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Login 15 Menit</p>
-                <h3 className="text-2xl font-black text-lime-400">{stats?.userAktif15Menit || 0}</h3>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-              <div className="bg-gray-900 p-5 rounded-3xl border border-gray-800">
-                <p className="text-xs text-gray-500 font-bold uppercase">User Google</p>
-                <h3 className="text-3xl font-black text-white mt-1">{stats?.userGoogle || 0}</h3>
-              </div>
-
-              <div className="bg-gray-900 p-5 rounded-3xl border border-gray-800">
-                <p className="text-xs text-gray-500 font-bold uppercase">User Manual</p>
-                <h3 className="text-3xl font-black text-white mt-1">{stats?.userManual || 0}</h3>
-              </div>
-
-              <div className="bg-gray-900 p-5 rounded-3xl border border-gray-800">
-                <p className="text-xs text-gray-500 font-bold uppercase">Login 24 Jam</p>
-                <h3 className="text-3xl font-black text-white mt-1">{stats?.userAktif24Jam || 0}</h3>
-              </div>
-            </div>
-
-            <div className="bg-gray-900 rounded-3xl border border-gray-800 shadow-xl overflow-hidden">
-              <div className="p-6 border-b border-gray-800">
-                <h2 className="text-xl font-bold">5 Transaksi Terakhir 🛒</h2>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-gray-950 text-gray-400 text-xs uppercase tracking-wider font-bold">
-                      <th className="p-4">Order ID</th>
-                      <th className="p-4">Target Player</th>
-                      <th className="p-4">Nominal / Produk</th>
-                      <th className="p-4">Bayar</th>
-                      <th className="p-4">Top Up</th>
-                    </tr>
-                  </thead>
-
-                  <tbody className="divide-y divide-gray-800 text-sm">
-                    {stats?.orderanTerbaru?.map((trx) => (
-                      <tr key={trx.id} className="hover:bg-gray-800/40">
-                        <td className="p-4 font-mono font-bold text-gray-300">{trx.order_id}</td>
-                        <td className="p-4 font-bold text-white">
-                          {trx.id_player}
-                          <span className="text-xs text-gray-500 block">{trx.zone_player || '-'}</span>
-                        </td>
-                        <td className="p-4 font-bold text-gray-300">
-                          Rp {trx.harga?.toLocaleString('id-ID')}
-                          <span className="text-[10px] text-blue-400 block">{trx.kode_produk}</span>
-                        </td>
-                        <td className="p-4">
-                          <span className={`px-2 py-1 rounded-md text-[10px] font-bold ${
-                            trx.status_bayar === 'sukses'
-                              ? 'bg-green-500/10 text-green-400'
-                              : 'bg-yellow-500/10 text-yellow-400'
-                          }`}>
-                            {trx.status_bayar}
-                          </span>
-                        </td>
-                        <td className="p-4">
-                          <span className={`px-2 py-1 rounded-md text-[10px] font-bold ${
-                            trx.status_topup === 'sukses'
-                              ? 'bg-blue-500/10 text-blue-400'
-                              : trx.status_topup === 'proses'
-                                ? 'bg-purple-500/10 text-purple-400'
-                                : 'bg-gray-800 text-gray-500'
-                          }`}>
-                            {trx.status_topup}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+    {/* GRAFIK PALING ATAS */}
+    <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 mb-8">
+      <div className="xl:col-span-3 rounded-3xl border border-gray-800 bg-gray-900 p-5 shadow-xl">
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+          <div>
+            <h2 className="text-xl font-black text-white">Grafik Omset & Profit 📈</h2>
+            <p className="text-xs font-semibold text-gray-500">
+              Pantau naik-turun uang masuk dari order sukses.
+            </p>
           </div>
-        )}        
+
+          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-right">
+            <p className="text-[10px] font-black uppercase tracking-wide text-emerald-300/80">
+              Bulan Ini
+            </p>
+            <p className="text-sm font-black text-emerald-300">
+              {formatRupiah(stats?.profitBulanIni)}
+            </p>
+          </div>
+        </div>
+
+        <RevenueLineChart data={trenHarianDashboard} />
+      </div>
+
+      <div className="xl:col-span-2 rounded-3xl border border-gray-800 bg-gray-900 p-5 shadow-xl">
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+          <div>
+            <h2 className="text-xl font-black text-white">Order Harian 🚀</h2>
+            <p className="text-xs font-semibold text-gray-500">
+              Jumlah top-up sukses per hari.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-right">
+            <p className="text-[10px] font-black uppercase tracking-wide text-cyan-300/80">
+              Hari Ini
+            </p>
+            <p className="text-sm font-black text-cyan-300">
+              {stats?.orderHariIni || 0} order
+            </p>
+          </div>
+        </div>
+
+        <OrderBarChart data={trenHarianDashboard} />
+      </div>
+    </div>
+
+    {/* KARTU STATISTIK */}
+    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
+      <div className="bg-gradient-to-br from-gray-900 to-slate-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
+        <div className="absolute top-4 right-4 text-3xl opacity-20">💰</div>
+        <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">
+          Total Omset
+        </p>
+        <h3 className="text-2xl font-black text-green-400">
+          {formatRupiah(stats?.totalOmset ?? stats?.totalCuan)}
+        </h3>
+      </div>
+
+      <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
+        <div className="absolute top-4 right-4 text-3xl opacity-20">📦</div>
+        <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">
+          Total Modal
+        </p>
+        <h3 className="text-2xl font-black text-orange-400">
+          {formatRupiah(stats?.totalModal)}
+        </h3>
+      </div>
+
+      <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
+        <div className="absolute top-4 right-4 text-3xl opacity-20">💸</div>
+        <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">
+          Profit
+        </p>
+        <h3 className="text-2xl font-black text-emerald-400">
+          {formatRupiah(stats?.totalProfit)}
+        </h3>
+      </div>
+
+      <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
+        <div className="absolute top-4 right-4 text-3xl opacity-20">🚀</div>
+        <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">
+          Topup Sukses
+        </p>
+        <h3 className="text-2xl font-black text-blue-400">
+          {stats?.suksesTopup || 0}
+        </h3>
+      </div>
+
+      <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
+        <div className="absolute top-4 right-4 text-3xl opacity-20">⏳</div>
+        <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">
+          Pending Bayar
+        </p>
+        <h3 className="text-2xl font-black text-yellow-400">
+          {stats?.pendingBayar || 0}
+        </h3>
+      </div>
+
+      <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
+        <div className="absolute top-4 right-4 text-3xl opacity-20">👥</div>
+        <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">
+          Total User
+        </p>
+        <h3 className="text-2xl font-black text-purple-400">
+          {stats?.totalUser || 0}
+        </h3>
+      </div>
+
+      <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
+        <div className="absolute top-4 right-4 text-3xl opacity-20">✅</div>
+        <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">
+          Verified
+        </p>
+        <h3 className="text-2xl font-black text-emerald-400">
+          {stats?.userVerified || 0}
+        </h3>
+      </div>
+
+      <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
+        <div className="absolute top-4 right-4 text-3xl opacity-20">🟢</div>
+        <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">
+          Login 15 Menit
+        </p>
+        <h3 className="text-2xl font-black text-lime-400">
+          {stats?.userAktif15Menit || 0}
+        </h3>
+      </div>
+    </div>
+
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      <PaymentMethodList data={metodeBayarDashboard} />
+
+      <CompactRankList
+        title="Game Terlaris"
+        subtitle="Game paling sering dibeli customer."
+        data={gameTerlarisDashboard}
+        type="game"
+      />
+
+      <CompactRankList
+        title="Produk Terlaris"
+        subtitle="Nominal yang paling laku."
+        data={produkTerlarisDashboard}
+        type="produk"
+      />
+    </div>
+
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+      <StatusSnapshot stats={stats} />
+
+      <div className="bg-gray-900 p-5 rounded-3xl border border-gray-800">
+        <p className="text-xs text-gray-500 font-bold uppercase">User Google</p>
+        <h3 className="text-3xl font-black text-white mt-1">
+          {stats?.userGoogle || 0}
+        </h3>
+      </div>
+
+      <div className="bg-gray-900 p-5 rounded-3xl border border-gray-800">
+        <p className="text-xs text-gray-500 font-bold uppercase">User Manual</p>
+        <h3 className="text-3xl font-black text-white mt-1">
+          {stats?.userManual || 0}
+        </h3>
+      </div>
+
+      <div className="bg-gray-900 p-5 rounded-3xl border border-gray-800">
+        <p className="text-xs text-gray-500 font-bold uppercase">Login 24 Jam</p>
+        <h3 className="text-3xl font-black text-white mt-1">
+          {stats?.userAktif24Jam || 0}
+        </h3>
+      </div>
+    </div>
+
+    <div className="bg-gray-900 rounded-3xl border border-gray-800 shadow-xl overflow-hidden">
+      <div className="p-6 border-b border-gray-800">
+        <h2 className="text-xl font-bold">5 Transaksi Terakhir 🛒</h2>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-gray-950 text-gray-400 text-xs uppercase tracking-wider font-bold">
+              <th className="p-4">Order ID</th>
+              <th className="p-4">Target Player</th>
+              <th className="p-4">Nominal / Produk</th>
+              <th className="p-4">Bayar</th>
+              <th className="p-4">Top Up</th>
+            </tr>
+          </thead>
+
+          <tbody className="divide-y divide-gray-800 text-sm">
+            {stats?.orderanTerbaru?.map((trx) => (
+              <tr key={trx.id} className="hover:bg-gray-800/40">
+                <td className="p-4 font-mono font-bold text-gray-300">
+                  {trx.order_id}
+                </td>
+
+                <td className="p-4 font-bold text-white">
+                  {trx.id_player}
+                  <span className="text-xs text-gray-500 block">
+                    {trx.zone_player || '-'}
+                  </span>
+                </td>
+
+                <td className="p-4 font-bold text-gray-300">
+                  Rp {Number(trx.harga || 0).toLocaleString('id-ID')}
+                  <span className="text-[10px] text-blue-400 block">
+                    {trx.kode_produk}
+                  </span>
+                </td>
+
+                <td className="p-4">
+                  <span
+                    className={`px-2 py-1 rounded-md text-[10px] font-bold ${
+                      trx.status_bayar === 'sukses'
+                        ? 'bg-green-500/10 text-green-400'
+                        : 'bg-yellow-500/10 text-yellow-400'
+                    }`}
+                  >
+                    {trx.status_bayar}
+                  </span>
+                </td>
+
+                <td className="p-4">
+                  <span
+                    className={`px-2 py-1 rounded-md text-[10px] font-bold ${
+                      trx.status_topup === 'sukses'
+                        ? 'bg-blue-500/10 text-blue-400'
+                        : trx.status_topup === 'proses'
+                          ? 'bg-purple-500/10 text-purple-400'
+                          : 'bg-gray-800 text-gray-500'
+                    }`}
+                  >
+                    {trx.status_topup}
+                  </span>
+                </td>
+              </tr>
+            ))}
+
+            {(!stats?.orderanTerbaru || stats.orderanTerbaru.length === 0) && (
+              <tr>
+                <td colSpan={5} className="p-6 text-center text-sm font-bold text-gray-500">
+                  Belum ada transaksi terbaru.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+)}    
 
         {/* TAB TRANSAKSI */}
         {tabAktif === 'transaksi' && (
@@ -2276,13 +2932,23 @@ const handleHapusRequestGame = async (item) => {
                   </p>
                 </div>
 
-                <button
-                  onClick={() => ambilTransaksi()}
-                  disabled={loadingTransaksi}
-                  className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-white text-xs font-black disabled:opacity-50"
-                >
-                  {loadingTransaksi ? 'Refresh...' : '🔄 Refresh'}
-                </button>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={handleDownloadCSVTransaksi}
+                    className="px-4 py-2 rounded-xl bg-emerald-600/15 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/25 text-xs font-black transition-all"
+                  >
+                    ⬇️ Download CSV
+                  </button>
+
+                  <button
+                    onClick={() => ambilTransaksi()}
+                    disabled={loadingTransaksi}
+                    className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-white text-xs font-black disabled:opacity-50"
+                  >
+                    {loadingTransaksi ? 'Refresh...' : '🔄 Refresh'}
+                  </button>
+                </div>
               </div>
 
               {loadingTransaksi ? (
@@ -2468,6 +3134,15 @@ const handleHapusRequestGame = async (item) => {
                 className="px-3 py-2 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-black hover:bg-blue-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 ❌ Gagal
+              </button>
+              <button
+                onClick={() => handleHapusTransaksi(trx)}
+                disabled={loadingAksiTransaksi === `${trx.order_id}-delete`}
+                className="col-span-2 px-3 py-2 rounded-xl bg-red-600/10 text-red-300 border border-red-500/30 text-xs font-black hover:bg-red-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {loadingAksiTransaksi === `${trx.order_id}-delete`
+                  ? 'Hapus...'
+                  : '🗑️ Hapus Riwayat'}
               </button>
             </div>
           </div>
@@ -3406,6 +4081,205 @@ const handleHapusRequestGame = async (item) => {
 )}
 
         {/* TAB REQUEST gAME */}
+        {tabAktif === 'metode-bayar' && (
+          <div className="space-y-6">
+            <div className="rounded-3xl border border-indigo-500/20 bg-gradient-to-br from-indigo-500/10 via-slate-900 to-slate-950 p-6 shadow-xl">
+              <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.24em] text-indigo-300/80">
+                    Payment Control
+                  </p>
+                  <h2 className="mt-2 text-2xl font-black text-white">💳 Setting Metode Bayar</h2>
+                  <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
+                    Atur metode pembayaran tanpa deploy ulang. Status aktif bakal muncul dan bisa dipakai user,
+                    sedangkan maintenance/coming soon/nonaktif otomatis dikunci di kasir dan backend checkout.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={ambilMetodeBayarAdmin}
+                  disabled={loadingMetodeBayarAdmin}
+                  className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-black text-slate-200 transition hover:bg-white/10 disabled:opacity-50"
+                >
+                  {loadingMetodeBayarAdmin ? 'Refresh...' : '🔄 Refresh'}
+                </button>
+              </div>
+            </div>
+
+            {loadingMetodeBayarAdmin && daftarMetodeBayarAdmin.length === 0 ? (
+              <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-8 text-center font-bold text-slate-400">
+                Ngambil setting metode bayar...
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {Object.entries(metodeBayarAdminByGrup).map(([grup, items]) => (
+                  <div key={grup} className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="h-px flex-1 bg-slate-800" />
+                      <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-400">
+                        {grup}
+                      </p>
+                      <div className="h-px flex-1 bg-slate-800" />
+                    </div>
+
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      {items.map((item) => {
+                        const sedangLoading = loadingAksiMetodeBayar === item.value;
+
+                        return (
+                          <form
+                            key={item.value}
+                            onSubmit={(e) => handleSimpanMetodeBayarAdmin(e, item)}
+                            className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5 shadow-lg shadow-black/20"
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex items-start gap-3">
+                                <div className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-700 bg-white">
+                                  {item.logo ? (
+                                    <img
+                                      src={item.logo}
+                                      alt={item.label}
+                                      className="max-h-8 max-w-[52px] object-contain"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                        e.currentTarget.nextElementSibling.style.display = 'block';
+                                      }}
+                                    />
+                                  ) : null}
+                                  <span className="hidden text-xs font-black text-slate-900">
+                                    {item.fallback}
+                                  </span>
+                                </div>
+
+                                <div>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <h3 className="text-lg font-black text-white">{item.label}</h3>
+                                    <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black ${warnaStatusMetodeBayarAdmin(item.status_metode)}`}>
+                                      {labelStatusMetodeBayarAdmin(item.status_metode)}
+                                    </span>
+                                  </div>
+                                  <p className="mt-1 font-mono text-xs font-bold text-slate-500">{item.value}</p>
+                                </div>
+                              </div>
+
+                              <div className="flex shrink-0 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleStatusCepatMetodeBayar(item, 'aktif')}
+                                  disabled={sedangLoading || item.status_metode === 'aktif'}
+                                  className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs font-black text-emerald-300 transition hover:bg-emerald-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                  Aktif
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStatusCepatMetodeBayar(item, 'maintenance')}
+                                  disabled={sedangLoading || item.status_metode === 'maintenance'}
+                                  className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 px-3 py-2 text-xs font-black text-yellow-300 transition hover:bg-yellow-500 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                  MT
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="mt-4 grid gap-3 md:grid-cols-2">
+                              <label className="space-y-1">
+                                <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">Status</span>
+                                <select
+                                  name="status_metode"
+                                  defaultValue={item.status_metode}
+                                  className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm font-bold text-white outline-none focus:border-indigo-400"
+                                >
+                                  <option value="aktif">Aktif</option>
+                                  <option value="maintenance">Maintenance</option>
+                                  <option value="coming_soon">Coming Soon</option>
+                                  <option value="nonaktif">Nonaktif</option>
+                                </select>
+                              </label>
+
+                              <label className="space-y-1">
+                                <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">Rekomendasi</span>
+                                <select
+                                  name="rekomendasi"
+                                  defaultValue={item.rekomendasi ? 1 : 0}
+                                  className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm font-bold text-white outline-none focus:border-indigo-400"
+                                >
+                                  <option value="0">Biasa</option>
+                                  <option value="1">Rekomendasi</option>
+                                </select>
+                              </label>
+
+                              <label className="space-y-1">
+                                <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">Fee Admin</span>
+                                <input
+                                  name="biaya_admin"
+                                  type="number"
+                                  min="0"
+                                  defaultValue={item.biaya}
+                                  className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm font-bold text-white outline-none focus:border-indigo-400"
+                                />
+                              </label>
+
+                              <label className="space-y-1">
+                                <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">Minimal Transaksi</span>
+                                <input
+                                  name="minimal_transaksi"
+                                  type="number"
+                                  min="0"
+                                  defaultValue={item.minimal}
+                                  className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm font-bold text-white outline-none focus:border-indigo-400"
+                                />
+                              </label>
+
+                              <label className="space-y-1 md:col-span-2">
+                                <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">Deskripsi di Kasir</span>
+                                <input
+                                  name="deskripsi"
+                                  defaultValue={item.desc}
+                                  maxLength={255}
+                                  className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm font-bold text-white outline-none focus:border-indigo-400"
+                                />
+                              </label>
+
+                              <label className="space-y-1">
+                                <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">Urutan</span>
+                                <input
+                                  name="urutan"
+                                  type="number"
+                                  min="0"
+                                  defaultValue={item.sort_order}
+                                  className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm font-bold text-white outline-none focus:border-indigo-400"
+                                />
+                              </label>
+
+                              <div className="flex items-end">
+                                <button
+                                  type="submit"
+                                  disabled={sedangLoading}
+                                  className="w-full rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-indigo-950/30 transition hover:-translate-y-0.5 hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  {sedangLoading ? 'Nyimpen...' : '💾 Simpan'}
+                                </button>
+                              </div>
+                            </div>
+                          </form>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+
+
+        {tabAktif === 'voucher' && (
+          <AdminVoucherPanel formatRupiah={formatRupiah} />
+        )}
+
         {tabAktif === 'request-game' && (
   <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
     <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-5">

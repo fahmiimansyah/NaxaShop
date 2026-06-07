@@ -41,13 +41,13 @@ export const metadata = {
   openGraph: {
     title: 'NaXaShop - Top Up Game Termurah & Otomatis',
     description: 'Beli Diamond MLBB, Oneiric Shard HSR, Primogems GI instant hitungan detik gratis biaya admin!',
-    url: 'https://naxashop.com', // Ganti pake domain asli lu nanti bre
+    url: 'https://naxashop.id', // Ganti pake domain asli lu nanti bre
     siteName: 'NaXaShop',
     locale: 'id_ID',
     type: 'website',
     images: [
       {
-        url: 'https://naxashop.com/banner-seo.jpg', // Taruh gambar banner keren di folder public lu
+        url: 'https://naxashop.id/banner-seo.jpg', // Taruh gambar banner keren di folder public lu
         width: 1200,
         height: 630,
         alt: 'NaXaShop - Platform Top Up Game Tercepat',
@@ -60,7 +60,7 @@ export const metadata = {
     card: 'summary_large_image',
     title: 'NaXaShop - Top Up Game Otomatis',
     description: 'Gak usah nunggu admin, transfer langsung masuk 24 jam non-stop!',
-    images: ['https://naxashop.com/banner-seo.jpg'],
+    images: ['https://naxashop.id/banner-seo.jpg'],
   },
 };
 

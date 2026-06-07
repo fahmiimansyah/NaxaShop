@@ -57,7 +57,7 @@ export async function GET() {
        FROM transaksi t
        LEFT JOIN games g ON t.game_id = g.id
        LEFT JOIN produk p ON t.produk_id = p.id
-       WHERE t.status_bayar IN ('success', 'pending')
+       WHERE t.status_bayar IN ('sukses', 'pending')
        ORDER BY t.created_at DESC
        LIMIT 8`
     );

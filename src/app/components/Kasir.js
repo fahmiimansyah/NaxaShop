@@ -14,6 +14,9 @@ export default function FormKasir({ dataGame }) {
   const [isProsesBeli, setIsProsesBeli] = useState(false);
   const [customerWhatsapp, setCustomerWhatsapp] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
+  const [voucherInput, setVoucherInput] = useState('');
+  const [voucherAktif, setVoucherAktif] = useState(null);
+  const [isCekVoucher, setIsCekVoucher] = useState(false);
 
   const butuhZoneId = dataGame.zone_id === 1;
   const butuhServer = dataGame.server_game && dataGame.server_game.trim() !== '';
@@ -123,8 +126,15 @@ export default function FormKasir({ dataGame }) {
     );
   };
 
+  const getDiskonVoucher = (produk = produkDipilih) => {
+    if (!produk || !voucherAktif) return 0;
+    return Number(voucherAktif.diskon || 0);
+  };
+
   const getTotalBayar = (produk = produkDipilih, metode = metodeBayar) => {
-    return Number(produk?.harga || 0) + getBiayaAdmin(metode);
+    const subtotal = Number(produk?.harga || 0) + getBiayaAdmin(metode);
+    const diskon = getDiskonVoucher(produk);
+    return Math.max(0, subtotal - diskon);
   };
 
   const getLabelBiayaAdmin = (metode, produk = produkDipilih) => {
@@ -351,6 +361,88 @@ export default function FormKasir({ dataGame }) {
     });
   };
 
+  const resetVoucher = () => {
+    setVoucherAktif(null);
+  };
+
+  const handleHapusVoucher = () => {
+    setVoucherAktif(null);
+    setVoucherInput('');
+  };
+
+  const handleCekVoucher = async () => {
+    if (!produkDipilih) {
+      Swal.fire({
+        background: '#1f2937',
+        color: '#fff',
+        title: 'Pilih produk dulu bree!',
+        text: 'Voucher baru bisa dicek setelah nominal dipilih.',
+        icon: 'warning',
+        confirmButtonColor: '#06b6d4'
+      });
+      return;
+    }
+
+    const kode = voucherInput.trim().toUpperCase().replace(/\s+/g, '');
+
+    if (!kode) {
+      Swal.fire({
+        background: '#1f2937',
+        color: '#fff',
+        title: 'Kode kosong bree',
+        text: 'Isi kode voucher dulu, misal NAXA10.',
+        icon: 'warning',
+        confirmButtonColor: '#06b6d4'
+      });
+      return;
+    }
+
+    setIsCekVoucher(true);
+
+    try {
+      const respon = await fetch('/api/voucher/cek', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          kode_voucher: kode,
+          produk_id: produkDipilih.id,
+          metode_bayar: metodeBayar
+        })
+      });
+
+      const hasil = await respon.json();
+
+      if (!respon.ok || !hasil.sukses) {
+        throw new Error(hasil.pesan || 'Voucher gak bisa dipakai.');
+      }
+
+      setVoucherInput(hasil.data.kode);
+      setVoucherAktif(hasil.data);
+
+      Swal.fire({
+        background: '#1f2937',
+        color: '#fff',
+        title: 'Voucher kepasang ✅',
+        text: `Diskon ${formatRupiah(hasil.data.diskon)} berhasil diterapkan.`,
+        icon: 'success',
+        confirmButtonColor: '#06b6d4'
+      });
+    } catch (error) {
+      setVoucherAktif(null);
+
+      Swal.fire({
+        background: '#1f2937',
+        color: '#fff',
+        title: 'Voucher gagal ❌',
+        text: error.message || 'Voucher gak bisa dipakai bre.',
+        icon: 'error',
+        confirmButtonColor: '#06b6d4'
+      });
+    } finally {
+      setIsCekVoucher(false);
+    }
+  };
+
   const handleBeli = async () => {
     const alertBase = {
       background: '#1f2937',
@@ -415,6 +507,11 @@ export default function FormKasir({ dataGame }) {
       return;
     }
 
+    if (voucherInput.trim() && !voucherAktif) {
+      tampilWarning('Kode voucher sudah diketik, tapi belum dipakai. Klik tombol Pakai dulu ya bree.', 'Voucher belum diterapkan');
+      return;
+    }
+
     const bikinTagihan = async () => {
       Swal.fire({
         ...alertBase,
@@ -435,7 +532,8 @@ export default function FormKasir({ dataGame }) {
           zone_player: inputZoneId,
           metode_bayar: metodeBayar,
           customer_whatsapp: customerWhatsapp,
-          customer_email: customerEmail
+          customer_email: customerEmail,
+          kode_voucher: voucherAktif?.kode || ''
         })
       });
 
@@ -499,6 +597,7 @@ export default function FormKasir({ dataGame }) {
               <b>ID:</b> ${inputUserId}<br/>
               <b>Server/Zone:</b> ${inputZoneId || '-'}<br/>
               <b>Metode:</b> ${namaMetodeBayar[metodeBayar] || metodeBayar}<br/>
+              ${voucherAktif ? `<b>Voucher:</b> ${voucherAktif.kode} (-${formatRupiah(voucherAktif.diskon)})<br/>` : ''}
               <b>Total:</b> ${formatRupiah(getTotalBayar())}<br/>
               <span style="color:#94a3b8; font-size:12px">
                 ${getLabelBiayaAdmin(metodeBayar)}
@@ -622,6 +721,7 @@ export default function FormKasir({ dataGame }) {
                   }
 
                   setProdukDipilih(item);
+                  resetVoucher();
 
                   if (metodeBayar && isMetodeBayarDisabled(metodeBayar, item)) {
                     setMetodeBayar('');
@@ -928,6 +1028,82 @@ export default function FormKasir({ dataGame }) {
           </p>
         </div>
 
+        {/* 5. VOUCHER PROMO */}
+        <div className="bg-gray-800 p-6 rounded-3xl border border-gray-700 shadow-lg">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-black text-sm">
+              5
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">Voucher Promo</h2>
+              <p className="text-xs text-gray-500 mt-1">
+                Opsional. Pakai kode voucher kalau lagi ada promo NaXaShop.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <input
+              type="text"
+              placeholder="Masukkan kode voucher, contoh: NAXA10"
+              value={voucherInput}
+              onChange={(e) => {
+                setVoucherInput(e.target.value.toUpperCase().replace(/\s+/g, ''));
+                setVoucherAktif(null);
+              }}
+              disabled={isCekVoucher || isProsesBeli}
+              className="w-full bg-gray-900 text-white px-5 py-4 rounded-2xl outline-none focus:ring-2 focus:ring-cyan-500 border border-gray-700 transition-all font-black tracking-wide disabled:opacity-60"
+            />
+
+            {voucherAktif ? (
+              <button
+                type="button"
+                onClick={handleHapusVoucher}
+                className="sm:w-40 rounded-2xl border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm font-black text-red-300 transition hover:bg-red-500/20"
+              >
+                Hapus
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleCekVoucher}
+                disabled={isCekVoucher || isProsesBeli || !produkDipilih}
+                className="sm:w-40 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 px-5 py-4 text-sm font-black text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isCekVoucher ? 'Cek...' : 'Pakai'}
+              </button>
+            )}
+          </div>
+
+          {voucherAktif ? (
+            <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <p className="text-sm font-black text-emerald-300">
+                    🎟️ {voucherAktif.kode} berhasil dipakai
+                  </p>
+                  <p className="mt-1 text-xs font-semibold text-emerald-100/80">
+                    {voucherAktif.nama || 'Voucher NaXaShop'}
+                  </p>
+                </div>
+
+                <div className="text-left sm:text-right">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-emerald-200/70">
+                    Diskon
+                  </p>
+                  <p className="text-lg font-black text-emerald-300">
+                    -{formatRupiah(voucherAktif.diskon)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-3 text-xs text-gray-500">
+              Pilih produk dulu, lalu masukkan voucher kalau punya. Diskon akan dihitung otomatis sebelum bayar.
+            </p>
+          )}
+        </div>
+
         <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl p-4">
           <p className="text-xs text-yellow-100/90 leading-relaxed">
             Pastikan User ID, Zone ID, dan Server sudah benar sebelum lanjut bayar.
@@ -999,6 +1175,15 @@ export default function FormKasir({ dataGame }) {
               </span>
             </div>
 
+            {voucherAktif && (
+              <div className="flex justify-between gap-4 border-b border-dashed border-gray-700 pb-3">
+                <span className="text-gray-400">Voucher</span>
+                <span className="text-emerald-300 font-black text-right">
+                  {voucherAktif.kode} -{formatRupiah(voucherAktif.diskon)}
+                </span>
+              </div>
+            )}
+
             {(customerWhatsapp || customerEmail) && (
               <div className="flex justify-between gap-4 border-b border-dashed border-gray-700 pb-3">
                 <span className="text-gray-400">Kontak</span>
@@ -1024,6 +1209,12 @@ export default function FormKasir({ dataGame }) {
                 {produkDipilih && metodeBayar && getBiayaAdmin(metodeBayar) > 0 && (
                   <p className="mb-1 text-[11px] font-bold text-yellow-300">
                     Admin {formatRupiah(getBiayaAdmin(metodeBayar))}
+                  </p>
+                )}
+
+                {voucherAktif && (
+                  <p className="mb-1 text-[11px] font-black text-emerald-300">
+                    Voucher -{formatRupiah(voucherAktif.diskon)}
                   </p>
                 )}
 
@@ -1091,8 +1282,10 @@ export default function FormKasir({ dataGame }) {
                   {gameComingSoon || isProdukComingSoon(produkDipilih)
                     ? 'Coming Soon • checkout belum dibuka'
                     : metodeBayar
-                      ? `${namaMetodeBayar[metodeBayar]} • ${getLabelBiayaAdmin(metodeBayar)}`
-                      : 'Pilih metode pembayaran buat lihat total final'}
+                      ? `${namaMetodeBayar[metodeBayar]} • ${getLabelBiayaAdmin(metodeBayar)}${voucherAktif ? ` • Voucher -${formatRupiah(voucherAktif.diskon)}` : ''}`
+                      : voucherAktif
+                        ? `Voucher -${formatRupiah(voucherAktif.diskon)}`
+                        : 'Pilih metode pembayaran buat lihat total final'}
                 </p>
               </div>
 
