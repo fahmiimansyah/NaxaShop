@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import db from '../../../lib/db';
 import { kirimEmailAdmin, kirimEmailTopupSukses } from '../../../lib/mailer';
+import { prosesVoucherMakasihOrderPertama } from '../../../lib/voucher';
 
 function bersihinText(value) {
   return String(value || '').trim();
@@ -395,6 +396,10 @@ export async function POST(request) {
             detail: error.message || String(error)
           });
         }
+      }
+
+      if (hasilUpdate.affectedRows > 0) {
+        await prosesVoucherMakasihOrderPertama(db, orderId);
       }
 
       return NextResponse.json({

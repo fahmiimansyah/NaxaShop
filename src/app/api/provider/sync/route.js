@@ -4,6 +4,7 @@ import { authOptions } from '../../auth/[...nextauth]/route';
 import db from '../../../lib/db';
 import { rateLimit } from '../../../lib/rate-limit';
 import { kirimEmailAdmin, kirimEmailTopupSukses } from '../../../lib/mailer';
+import { prosesVoucherMakasihOrderPertama } from '../../../lib/voucher';
 import { transaksiDigiflazz } from '../../../lib/digiflazz';
 import { cekStatusVipReseller, ambilVipResellerTrxIdDariResponse } from '../../../lib/vipreseller';
 import crypto from 'crypto';
@@ -410,6 +411,8 @@ async function syncApiGamesLangsung(orderId) {
   }
 }
 
+    await prosesVoucherMakasihOrderPertama(db, orderId);
+
     return NextResponse.json({
       sukses: true,
       pesan: 'Top-up sukses.',
@@ -689,6 +692,8 @@ export async function POST(request) {
           });
         }
       }
+
+      await prosesVoucherMakasihOrderPertama(db, orderId);
 
       return NextResponse.json({
         sukses: true,

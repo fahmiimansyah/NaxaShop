@@ -4,6 +4,7 @@ import db from '../../../lib/db';
 import { orderVipReseller } from '../../../lib/vipreseller';
 import { rateLimit } from '../../../lib/rate-limit';
 import { kirimEmailAdmin, kirimEmailTopupSukses } from '../../../lib/mailer';
+import { prosesVoucherMakasihOrderPertama } from '../../../lib/voucher';
 import { transaksiDigiflazz } from '../../../lib/digiflazz';
 
 function bersihinText(value) {
@@ -809,6 +810,8 @@ export async function POST(request) {
           });
         }
       }
+
+      await prosesVoucherMakasihOrderPertama(db, orderId);
 
       return NextResponse.json({
         sukses: true,

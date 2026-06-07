@@ -309,3 +309,98 @@ export async function kirimEmailTopupSukses({
     `,
   });
 }
+
+
+// EMAIL REWARD VOUCHER SETELAH ORDER PERTAMA SUKSES
+export async function kirimEmailVoucherOrderPertama({
+  to,
+  orderId,
+  kodeVoucher,
+  tipeDiskon,
+  nilaiDiskon,
+  minimalTransaksi,
+  maksimalDiskon,
+  expiredAt,
+  namaProduk,
+}) {
+  if (!to || !kodeVoucher) return null;
+
+  const baseUrl = getBaseUrl();
+  const linkMulaiTopup = baseUrl
+    ? `${baseUrl.replace(/\/$/, '')}/`
+    : '';
+
+  const tipe = String(tipeDiskon || 'nominal').toLowerCase();
+  const labelDiskon = tipe === 'persen'
+    ? `${Number(nilaiDiskon || 0)}%${Number(maksimalDiskon || 0) > 0 ? ` maksimal ${formatRupiah(maksimalDiskon)}` : ''}`
+    : formatRupiah(nilaiDiskon);
+
+  const expiredText = expiredAt
+    ? new Date(expiredAt).toLocaleString('id-ID', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '-';
+
+  return sendMailAman({
+    to,
+    subject: `Voucher makasih order pertama - ${kodeVoucher}`,
+    idempotencyKey: `first-order-voucher-${orderId}-${kodeVoucher}`.slice(0, 240),
+    html: `
+      <div style="margin:0;padding:0;background:#f8fafc;font-family:Arial,Helvetica,sans-serif;color:#0f172a;line-height:1.6;">
+        <div style="max-width:560px;margin:0 auto;padding:28px 16px;">
+          <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:18px;padding:26px;">
+            <p style="display:inline-block;margin:0 0 16px;background:#dbeafe;color:#1d4ed8;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:bold;">
+              MEMBER REWARD
+            </p>
+
+            <h1 style="margin:0 0 10px;font-size:22px;color:#0f172a;">Makasih udah top-up di NaXaShop 🎉</h1>
+
+            <p style="margin:0 0 14px;">Order pertama kamu sudah berhasil diproses.</p>
+            <p style="margin:0 0 18px;color:#475569;">
+              Biar makin gatel top-up lagi, ini voucher khusus akun kamu buat transaksi berikutnya.
+            </p>
+
+            <div style="background:#0f172a;color:#e0f2fe;border-radius:16px;padding:18px;margin:18px 0;text-align:center;">
+              <p style="margin:0 0 8px;font-size:12px;color:#93c5fd;font-weight:bold;text-transform:uppercase;letter-spacing:.08em;">Kode Voucher</p>
+              <p style="margin:0;font-size:26px;font-weight:900;letter-spacing:.06em;">${escapeHtml(kodeVoucher)}</p>
+            </div>
+
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:16px;margin:18px 0;">
+              <p style="margin:0 0 8px;"><b>Diskon:</b><br/>${escapeHtml(labelDiskon)}</p>
+              <p style="margin:0 0 8px;"><b>Minimal transaksi:</b><br/>${formatRupiah(minimalTransaksi)}</p>
+              <p style="margin:0 0 8px;"><b>Berlaku sampai:</b><br/>${escapeHtml(expiredText)}</p>
+              <p style="margin:0 0 8px;"><b>Khusus akun:</b><br/>${escapeHtml(to)}</p>
+              <p style="margin:0 0 8px;"><b>Order sumber:</b><br/><code>${escapeHtml(orderId || '-')}</code></p>
+              <p style="margin:0;"><b>Produk:</b><br/>${escapeHtml(namaProduk || '-')}</p>
+            </div>
+
+            ${
+              linkMulaiTopup
+                ? `
+                  <p style="margin:0 0 18px;">
+                    <a href="${escapeHtml(linkMulaiTopup)}"
+                       style="display:inline-block;background:#0284c7;color:#ffffff;text-decoration:none;font-weight:bold;border-radius:12px;padding:12px 18px;">
+                      Pakai Voucher Sekarang
+                    </a>
+                  </p>
+                `
+                : ''
+            }
+
+            <p style="margin:0;font-size:13px;color:#64748b;">
+              Voucher ini cuma bisa dipakai 1x dan hanya berlaku saat kamu login dengan akun yang sama.
+            </p>
+          </div>
+
+          <p style="text-align:center;font-size:12px;color:#94a3b8;margin:18px 0 0;">
+            Email otomatis dari NaXaShop.
+          </p>
+        </div>
+      </div>
+    `,
+  });
+}

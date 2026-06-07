@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import db from '../../lib/db';
 import { orderVipReseller } from '../../lib/vipreseller';
 import { kirimEmailAdmin, kirimEmailTopupSukses } from '../../lib/mailer';
+import { prosesVoucherMakasihOrderPertama } from '../../lib/voucher';
 import { transaksiDigiflazz } from '../../lib/digiflazz';
 
 function bersihinText(value) {
@@ -791,6 +792,8 @@ export async function POST(request) {
           });
         }
       }
+
+      await prosesVoucherMakasihOrderPertama(db, orderId);
 
       return NextResponse.json(
         {

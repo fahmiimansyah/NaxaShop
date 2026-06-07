@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { orderVipReseller } from '../../../../lib/vipreseller';
 import db from '../../../../lib/db';
 import { kirimEmailAdmin, kirimEmailTopupSukses } from '../../../../lib/mailer';
+import { prosesVoucherMakasihOrderPertama } from '../../../../lib/voucher';
 import { transaksiDigiflazz } from '../../../../lib/digiflazz';
 
 const EMAIL_CEO = 'fahmiimansyah28@gmail.com';
@@ -589,6 +590,8 @@ export async function POST(request) {
           console.error('Gagal kirim email top-up sukses setelah retry:', error);
         }
       }
+
+      await prosesVoucherMakasihOrderPertama(db, orderId);
 
       return NextResponse.json({
         sukses: true,

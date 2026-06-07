@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../../auth/[...nextauth]/route';
 import db from '../../../lib/db';
 import {
   normalizeKodeVoucher,
@@ -27,6 +29,9 @@ function getBiayaAdmin(metodeBayar) {
 
 export async function POST(request) {
   try {
+    const session = await getServerSession(authOptions);
+    const userEmailLogin = String(session?.user?.email || '').trim().toLowerCase();
+
     const body = await request.json();
     const kodeVoucher = normalizeKodeVoucher(body.kode_voucher || body.kode);
     const produkId = Number(body.produk_id);
@@ -69,7 +74,8 @@ export async function POST(request) {
     const hasil = await validateVoucherForCheckout(db, {
       kodeVoucher,
       hargaProduk,
-      biayaAdmin
+      biayaAdmin,
+      userEmail: userEmailLogin
     });
 
     if (!hasil.sukses) {

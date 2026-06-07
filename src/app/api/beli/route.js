@@ -659,7 +659,8 @@ export async function POST(request) {
       voucherCheckout = await validateVoucherForCheckout(db, {
         kodeVoucher,
         hargaProduk,
-        biayaAdmin
+        biayaAdmin,
+        userEmail: userEmailLogin
       });
 
       if (!voucherCheckout.sukses) {

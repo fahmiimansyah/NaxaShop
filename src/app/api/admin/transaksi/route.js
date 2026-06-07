@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/route';
 import db from '../../../lib/db';
 import { kirimEmailTopupSukses } from '../../../lib/mailer';
+import { prosesVoucherMakasihOrderPertama } from '../../../lib/voucher';
 
 const EMAIL_CEO = 'fahmiimansyah28@gmail.com';
 
@@ -284,6 +285,10 @@ export async function PATCH(request) {
       } catch (error) {
         console.error('Gagal kirim email top-up sukses:', error);
       }
+    }
+
+    if (statusTopup === 'sukses' && trx.status_topup !== 'sukses') {
+      await prosesVoucherMakasihOrderPertama(db, trx.order_id);
     }
 
     return NextResponse.json({

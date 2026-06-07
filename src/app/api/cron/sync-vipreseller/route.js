@@ -5,6 +5,7 @@ import {
   ambilVipResellerTrxIdDariResponse
 } from '../../../lib/vipreseller';
 import { kirimEmailTopupSukses } from '../../../lib/mailer';
+import { prosesVoucherMakasihOrderPertama } from '../../../lib/voucher';
 
 function normalisasiStatus(value) {
   return String(value || '').trim().toLowerCase();
@@ -164,6 +165,8 @@ async function syncSatuTransaksi(trx) {
         console.error('Gagal kirim email sukses dari cron VIPReseller:', error);
       }
     }
+
+    await prosesVoucherMakasihOrderPertama(db, trx.order_id);
 
     return {
       order_id: trx.order_id,
