@@ -11,7 +11,9 @@ function warnaStatus(tone) {
   if (tone === 'pending') {
     return 'border-yellow-500/20 bg-yellow-500/10 text-yellow-300';
   }
-
+  if (tone === 'failed') {
+  return 'border-red-500/20 bg-red-500/10 text-red-300';
+}
   return 'border-blue-500/20 bg-blue-500/10 text-blue-300';
 }
 

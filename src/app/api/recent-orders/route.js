@@ -9,23 +9,45 @@ function maskProduk(value) {
   return String(value || 'Produk Digital').trim();
 }
 
-function labelStatus(statusBayar, statusTopup) {
-  const bayar = String(statusBayar || '').toLowerCase();
-  const topup = String(statusTopup || '').toLowerCase();
+function normalizeStatus(value = '') {
+  const status = String(value || '').trim().toLowerCase();
 
-  if (bayar === 'success' && topup === 'success') {
+  if (['sukses', 'success', 'settlement', 'capture', 'paid', 'berhasil'].includes(status)) {
+    return 'sukses';
+  }
+
+  if (['pending', 'menunggu', 'unpaid'].includes(status)) {
+    return 'pending';
+  }
+
+  if (['proses', 'process', 'processing'].includes(status)) {
+    return 'proses';
+  }
+
+  if (['gagal', 'failed', 'failure', 'deny', 'denied', 'cancel', 'cancelled', 'expire', 'expired'].includes(status)) {
+    return 'gagal';
+  }
+
+  return status || 'pending';
+}
+
+function labelStatus(statusBayar, statusTopup) {
+  const bayar = normalizeStatus(statusBayar);
+  const topup = normalizeStatus(statusTopup);
+
+  if (bayar === 'sukses' && topup === 'sukses') {
     return {
       label: 'Berhasil',
       tone: 'success',
-      icon: '✅'
+      icon: '✅',
     };
   }
 
-  if (bayar === 'success' && ['pending', 'process', 'proses', 'processing'].includes(topup)) {
+  if (bayar === 'sukses' && ['pending', 'proses'].includes(topup)) {
     return {
       label: 'Diproses',
       tone: 'process',
-      icon: '⏳'
+      icon: '⏳',
     };
   }
 
@@ -33,14 +55,22 @@ function labelStatus(statusBayar, statusTopup) {
     return {
       label: 'Menunggu bayar',
       tone: 'pending',
-      icon: '🕒'
+      icon: '🕒',
+    };
+  }
+
+  if (bayar === 'gagal' || topup === 'gagal') {
+    return {
+      label: 'Gagal',
+      tone: 'failed',
+      icon: '❌',
     };
   }
 
   return {
     label: 'Diproses',
     tone: 'process',
-    icon: '⏳'
+    icon: '⏳',
   };
 }
 
@@ -57,7 +87,7 @@ export async function GET() {
        FROM transaksi t
        LEFT JOIN games g ON t.game_id = g.id
        LEFT JOIN produk p ON t.produk_id = p.id
-       WHERE t.status_bayar IN ('sukses', 'pending')
+       WHERE t.status_bayar IN ('sukses', 'success', 'pending')
        ORDER BY t.created_at DESC
        LIMIT 8`
     );
@@ -72,13 +102,13 @@ export async function GET() {
         status_label: status.label,
         status_tone: status.tone,
         icon: status.icon,
-        created_at: order.created_at
+        created_at: order.created_at,
       };
     });
 
     return NextResponse.json({
       sukses: true,
-      data
+      data,
     });
   } catch (error) {
     console.error('GET /api/recent-orders error:', error);
@@ -86,7 +116,7 @@ export async function GET() {
     return NextResponse.json(
       {
         sukses: false,
-        pesan: 'Gagal mengambil pesanan terbaru.'
+        pesan: 'Gagal mengambil pesanan terbaru.',
       },
       { status: 500 }
     );
