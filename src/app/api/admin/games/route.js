@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/route';
 import db from '../../../lib/db';
+import {
+  DEFAULT_GAME_CATEGORY,
+  ensureGameCategoryColumns,
+  normalizeKategoriGame,
+} from '../../../lib/game-categories';
 
 const EMAIL_CEO = 'fahmiimansyah28@gmail.com';
 const STATUS_GAME_VALID = ['aktif', 'nonaktif', 'coming_soon'];
@@ -26,7 +31,10 @@ function normalisasiBadgeTipe(value) {
   return BADGE_TIPE_VALID.includes(tipe) ? tipe : 'none';
 }
 
-function payloadGameDariBody(body) {
+function payloadGameDariBody(body, existingGame = {}) {
+  const adaKategoriDiBody = Object.prototype.hasOwnProperty.call(body, 'kategori_game');
+  const adaSortOrderDiBody = Object.prototype.hasOwnProperty.call(body, 'sort_order');
+
   return {
     nama: bersihinText(body.nama),
     publisher: bersihinText(body.publisher),
@@ -35,6 +43,12 @@ function payloadGameDariBody(body) {
     server_game: bersihinText(body.server_game) || null,
     kode_game: bersihinText(body.kode_game),
     status_game: normalisasiStatusGame(body.status_game),
+    kategori_game: normalizeKategoriGame(
+      adaKategoriDiBody ? body.kategori_game : existingGame.kategori_game || DEFAULT_GAME_CATEGORY
+    ),
+    sort_order: adaSortOrderDiBody && Number.isFinite(Number(body.sort_order))
+      ? Number(body.sort_order)
+      : Number(existingGame.sort_order || 0),
     badge_label: bersihinText(body.badge_label) || null,
     badge_tipe: normalisasiBadgeTipe(body.badge_tipe)
   };
@@ -50,6 +64,7 @@ function validasiPayloadGame(game) {
     game.publisher.length > 100 ||
     game.gambar.length > 255 ||
     game.kode_game.length > 100 ||
+    game.kategori_game.length > 50 ||
     (game.server_game && game.server_game.length > 50) ||
     (game.badge_label && game.badge_label.length > 50) ||
     game.badge_tipe.length > 30
@@ -71,10 +86,12 @@ export async function GET() {
   }
 
   try {
+    await ensureGameCategoryColumns(db);
+
     const [games] = await db.query(
-      `SELECT id, nama, publisher, gambar, zone_id, server_game, kode_game, status_game, badge_label, badge_tipe
+      `SELECT id, nama, publisher, gambar, zone_id, server_game, kode_game, status_game, kategori_game, sort_order, badge_label, badge_tipe
        FROM games
-       ORDER BY id DESC`
+       ORDER BY sort_order ASC, id DESC`
     );
 
     return NextResponse.json({ sukses: true, data: games });
@@ -99,6 +116,8 @@ export async function POST(request) {
   }
 
   try {
+    await ensureGameCategoryColumns(db);
+
     const body = await request.json();
     const game = payloadGameDariBody(body);
     const pesanValidasi = validasiPayloadGame(game);
@@ -124,8 +143,8 @@ export async function POST(request) {
 
     await db.query(
       `INSERT INTO games
-       (nama, publisher, gambar, zone_id, server_game, kode_game, status_game, badge_label, badge_tipe)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (nama, publisher, gambar, zone_id, server_game, kode_game, status_game, kategori_game, sort_order, badge_label, badge_tipe)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         game.nama,
         game.publisher,
@@ -134,6 +153,8 @@ export async function POST(request) {
         game.server_game,
         game.kode_game,
         game.status_game,
+        game.kategori_game,
+        game.sort_order,
         game.badge_label,
         game.badge_tipe
       ]
@@ -174,10 +195,10 @@ export async function PATCH(request) {
   }
 
   try {
+    await ensureGameCategoryColumns(db);
+
     const body = await request.json();
     const id = body.id;
-    const game = payloadGameDariBody(body);
-    const pesanValidasi = validasiPayloadGame(game);
 
     if (!id) {
       return NextResponse.json(
@@ -186,15 +207,8 @@ export async function PATCH(request) {
       );
     }
 
-    if (pesanValidasi) {
-      return NextResponse.json(
-        { sukses: false, pesan: pesanValidasi },
-        { status: 400 }
-      );
-    }
-
     const [cekGame] = await db.query(
-      `SELECT id FROM games WHERE id = ? LIMIT 1`,
+      `SELECT id, kategori_game, sort_order FROM games WHERE id = ? LIMIT 1`,
       [id]
     );
 
@@ -202,6 +216,16 @@ export async function PATCH(request) {
       return NextResponse.json(
         { sukses: false, pesan: 'Game gak ketemu bre!' },
         { status: 404 }
+      );
+    }
+
+    const game = payloadGameDariBody(body, cekGame[0]);
+    const pesanValidasi = validasiPayloadGame(game);
+
+    if (pesanValidasi) {
+      return NextResponse.json(
+        { sukses: false, pesan: pesanValidasi },
+        { status: 400 }
       );
     }
 
@@ -226,6 +250,8 @@ export async function PATCH(request) {
            server_game = ?,
            kode_game = ?,
            status_game = ?,
+           kategori_game = ?,
+           sort_order = ?,
            badge_label = ?,
            badge_tipe = ?
        WHERE id = ?`,
@@ -237,6 +263,8 @@ export async function PATCH(request) {
         game.server_game,
         game.kode_game,
         game.status_game,
+        game.kategori_game,
+        game.sort_order,
         game.badge_label,
         game.badge_tipe,
         id
@@ -268,6 +296,8 @@ export async function DELETE(request) {
   }
 
   try {
+    await ensureGameCategoryColumns(db);
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 

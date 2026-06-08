@@ -5,7 +5,8 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Swal from 'sweetalert2';
 import AdminVoucherPanel from '../components/AdminVoucherPanel';
-
+import AdminMaintenancePanel from '../components/AdminMaintenancePanel';
+import { GAME_CATEGORIES, getGameCategoryMeta } from '../lib/game-categories';
 function angkaDashboard(value) {
   return Number(value || 0);
 }
@@ -316,6 +317,8 @@ export default function DashboardAdmin() {
   server_game: '',
   kode_game: '',
   status_game: 'aktif',
+  kategori_game: 'mobile',
+  sort_order: 0,
   badge_label: '',
   badge_tipe: 'none'
 });
@@ -548,6 +551,10 @@ const kodeProviderEfektif = (item) => {
 
   return `https://wa.me/${trx.customer_whatsapp}?text=${pesan}`;
 };
+const labelKategoriGame = (kategori) => {
+  const meta = getGameCategoryMeta(kategori);
+  return `${meta.emoji} ${meta.label}`;
+};
 
   const resetFormGame = () => {
     setFormGame({
@@ -558,6 +565,8 @@ const kodeProviderEfektif = (item) => {
   server_game: '',
   kode_game: '',
   status_game: 'aktif',
+  kategori_game: 'mobile',
+  sort_order: 0,
   badge_label: '',
   badge_tipe: 'none'
 });
@@ -1760,6 +1769,8 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
         server_game: game.server_game || '',
         kode_game: game.kode_game,
         status_game: statusBaru,
+        kategori_game: game.kategori_game || 'mobile',
+        sort_order: Number(game.sort_order || 0),
           badge_label: game.badge_label || '',
   badge_tipe: game.badge_tipe || 'none'
       })
@@ -1809,6 +1820,8 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
       server_game: game.server_game || '',
       kode_game: game.kode_game || '',
       status_game: game.status_game || 'aktif',
+      kategori_game: game.kategori_game || 'mobile',
+      sort_order: Number(game.sort_order || 0),
       badge_label: game.badge_label || '',
       badge_tipe: game.badge_tipe || 'none'
     });
@@ -2318,6 +2331,18 @@ const handleHapusRequestGame = async (item) => {
   }`}
 >
   🎟️ Voucher
+</button>
+
+
+<button
+  onClick={() => setTabAktif('maintenance')}
+  className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+    tabAktif === 'maintenance'
+      ? 'bg-amber-600 text-white shadow-md'
+      : 'text-gray-400 hover:text-white'
+  }`}
+>
+  🛠️ Maintenance
 </button>
 
 <button
@@ -3354,6 +3379,45 @@ const handleHapusRequestGame = async (item) => {
     </select>
   </div>
 </div>
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  <div>
+    <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">
+      Kategori Etalase
+    </label>
+    <select
+      value={formGame.kategori_game}
+      onChange={(e) => setFormGame({ ...formGame, kategori_game: e.target.value })}
+      className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-purple-500 font-bold"
+    >
+      {GAME_CATEGORIES.map((kategori) => (
+        <option key={kategori.id} value={kategori.id}>
+          {kategori.emoji} {kategori.label}
+        </option>
+      ))}
+    </select>
+    <p className="mt-1 text-[11px] text-gray-500">
+      Ini rak etalase di homepage, beda sama badge kecil di kartu game.
+    </p>
+  </div>
+
+  <div>
+    <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">
+      Urutan Tampil
+    </label>
+    <input
+      type="number"
+      value={formGame.sort_order}
+      onChange={(e) => setFormGame({ ...formGame, sort_order: e.target.value })}
+      placeholder="0"
+      className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-purple-500"
+    />
+    <p className="mt-1 text-[11px] text-gray-500">
+      Angka kecil tampil lebih atas. Contoh ML = 1, FF = 2.
+    </p>
+  </div>
+</div>
+
+
 
                 <button
                   type="submit"
@@ -3411,6 +3475,11 @@ const handleHapusRequestGame = async (item) => {
                           <span className={`text-[10px] font-black px-2 py-1 rounded-md border ${warnaStatusEtalase(game.status_game)}`}>
                             {labelStatusEtalase(game.status_game)}
                           </span>
+
+                          <span className="text-[10px] font-black text-cyan-300 bg-cyan-500/10 px-2 py-1 rounded-md border border-cyan-500/20">
+                            {labelKategoriGame(game.kategori_game)}
+                          </span>
+
                         </div>
 
                         <h4 className="font-black text-white truncate">{game.nama}</h4>
@@ -3419,6 +3488,9 @@ const handleHapusRequestGame = async (item) => {
                         {game.server_game && (
                           <p className="text-[11px] text-gray-500 mt-1">Server: {game.server_game}</p>
                         )}
+                        <p className="text-[11px] text-gray-500 mt-1">
+                          Kategori: {labelKategoriGame(game.kategori_game)} • Urutan: {Number(game.sort_order || 0)}
+                        </p>
                       </div>
                     </div>
 
@@ -4278,6 +4350,11 @@ const handleHapusRequestGame = async (item) => {
 
         {tabAktif === 'voucher' && (
           <AdminVoucherPanel formatRupiah={formatRupiah} />
+        )}
+
+
+        {tabAktif === 'maintenance' && (
+          <AdminMaintenancePanel />
         )}
 
         {tabAktif === 'request-game' && (

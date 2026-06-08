@@ -10,7 +10,7 @@ import {
   validateVoucherForCheckout,
   tambahPemakaianVoucher
 } from '../../lib/voucher';
-
+import { checkCheckoutMaintenance } from '../../lib/maintenance';
 const METODE_BAYAR_VALID = [
   'qris',
   'gopay',
@@ -467,7 +467,20 @@ export async function POST(request) {
         { status: 429 }
       );
     }
+    const maintenance = await checkCheckoutMaintenance();
 
+    if (maintenance.blocked) {
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan:
+            maintenance.pesan ||
+            'Checkout NaXaShop sedang maintenance. Coba lagi nanti ya bre.',
+          maintenance: maintenance.data,
+        },
+        { status: 503 }
+      );
+    }
     const session = await getServerSession(authOptions);
     const userEmailLogin =
       bersihinText(session?.user?.email).toLowerCase() || null;
