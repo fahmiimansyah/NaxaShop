@@ -164,7 +164,7 @@ export default function PromoSlider() {
 
   if (!mounted) {
     return (
-      <section className="mx-auto mt-4 w-full max-w-7xl px-0 sm:mt-6 sm:px-6 lg:px-8">
+      <section className="mx-auto w-full max-w-7xl px-0 sm:mt-6 sm:px-6 lg:px-8">
         <div className="h-[175px] rounded-[1.35rem] border border-blue-900/30 bg-[#082447]/60 sm:h-[215px] lg:h-[230px]" />
       </section>
     );
