@@ -11,7 +11,8 @@ export async function GET() {
          description AS \`desc\`,
          cta_text AS cta,
          cta_href AS href,
-         gradient
+         gradient,
+         image_url AS imageUrl
        FROM promo_slider
        WHERE is_active = 1
        ORDER BY sort_order ASC, id DESC`

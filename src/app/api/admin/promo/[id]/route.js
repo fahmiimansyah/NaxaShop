@@ -50,6 +50,7 @@ export async function PUT(request, { params }) {
     const gradient =
       bersihinText(body.gradient) ||
       'from-blue-600/30 via-cyan-500/20 to-slate-900';
+    const image_url = bersihinText(body.image_url);
 
     const sort_order = Number(body.sort_order || 0);
     const is_active = Number(body.is_active ?? 1) === 1 ? 1 : 0;
@@ -66,7 +67,8 @@ export async function PUT(request, { params }) {
       title.length > 255 ||
       cta_text.length > 100 ||
       cta_href.length > 255 ||
-      gradient.length > 255
+      gradient.length > 255 ||
+      image_url.length > 500
     ) {
       return NextResponse.json(
         { sukses: false, pesan: 'Ada input promo yang kepanjangan bre!' },
@@ -94,6 +96,7 @@ export async function PUT(request, { params }) {
            cta_text = ?,
            cta_href = ?,
            gradient = ?,
+           image_url = ?,
            sort_order = ?,
            is_active = ?
        WHERE id = ?`,
@@ -104,6 +107,7 @@ export async function PUT(request, { params }) {
         cta_text,
         cta_href,
         gradient,
+        image_url || null,
         sort_order,
         is_active,
         promoId

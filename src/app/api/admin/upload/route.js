@@ -67,6 +67,7 @@ export async function POST(request) {
 
     const formData = await request.formData();
     const file = formData.get('gambar');
+    const tujuanUpload = String(formData.get('tujuan') || 'game').toLowerCase();
 
     if (!file) {
       return NextResponse.json(
@@ -94,11 +95,12 @@ export async function POST(request) {
       );
     }
 
-    const maxSize = 2 * 1024 * 1024;
+    const maxSize = tujuanUpload === 'promo' ? 5 * 1024 * 1024 : 2 * 1024 * 1024;
+    const maxSizeLabel = tujuanUpload === 'promo' ? '5MB' : '2MB';
 
     if (file.size > maxSize) {
       return NextResponse.json(
-        { sukses: false, pesan: 'Gambar kegedean bre! Maksimal 2MB.' },
+        { sukses: false, pesan: `Gambar kegedean bre! Maksimal ${maxSizeLabel}.` },
         { status: 400 }
       );
     }
@@ -106,21 +108,32 @@ export async function POST(request) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
+    const isPromo = tujuanUpload === 'promo';
+
     const hasilUpload = await uploadKeCloudinary(buffer, {
-      folder: 'naxashop/games',
+      folder: isPromo ? 'naxashop/promo' : 'naxashop/games',
       resource_type: 'image',
       use_filename: false,
       unique_filename: true,
       overwrite: false,
       transformation: [
-        {
-          width: 600,
-          height: 600,
-          crop: 'fill',
-          gravity: 'auto',
-          quality: 'auto',
-          fetch_format: 'auto'
-        }
+        isPromo
+          ? {
+              width: 1400,
+              height: 580,
+              crop: 'fill',
+              gravity: 'auto',
+              quality: 'auto',
+              fetch_format: 'auto'
+            }
+          : {
+              width: 600,
+              height: 600,
+              crop: 'fill',
+              gravity: 'auto',
+              quality: 'auto',
+              fetch_format: 'auto'
+            }
       ]
     });
 

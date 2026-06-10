@@ -343,6 +343,9 @@ const [loadingPromo, setLoadingPromo] = useState(false);
 const [loadingPromoForm, setLoadingPromoForm] = useState(false);
 const [modeEditPromo, setModeEditPromo] = useState(false);
 const [promoEditId, setPromoEditId] = useState(null);
+const [filePromo, setFilePromo] = useState(null);
+const [previewPromo, setPreviewPromo] = useState('');
+const [promoFileInputKey, setPromoFileInputKey] = useState(Date.now());
 const [daftarMetodeBayarAdmin, setDaftarMetodeBayarAdmin] = useState([]);
 const [loadingMetodeBayarAdmin, setLoadingMetodeBayarAdmin] = useState(false);
 const [loadingAksiMetodeBayar, setLoadingAksiMetodeBayar] = useState(null);
@@ -354,6 +357,7 @@ const [formPromo, setFormPromo] = useState({
   cta_text: 'Mulai Top Up',
   cta_href: '#game-list',
   gradient: 'from-blue-600/30 via-cyan-500/20 to-slate-900',
+  image_url: '',
   sort_order: 0,
   is_active: 1
 });
@@ -611,10 +615,14 @@ const resetFormPromo = () => {
     cta_text: 'Mulai Top Up',
     cta_href: '#game-list',
     gradient: 'from-blue-600/30 via-cyan-500/20 to-slate-900',
+    image_url: '',
     sort_order: 0,
     is_active: 1
   });
 
+  setFilePromo(null);
+  setPreviewPromo('');
+  setPromoFileInputKey(Date.now());
   setModeEditPromo(false);
   setPromoEditId(null);
 };
@@ -655,6 +663,8 @@ const handleSubmitPromo = async (e) => {
   setLoadingPromoForm(true);
 
   try {
+    const imageUrlPromo = await uploadPromoKalauAda();
+
     const respon = await fetch(
       modeEditPromo ? `/api/admin/promo/${promoEditId}` : '/api/admin/promo',
       {
@@ -662,6 +672,7 @@ const handleSubmitPromo = async (e) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formPromo,
+          image_url: imageUrlPromo,
           sort_order: Number(formPromo.sort_order || 0),
           is_active: Number(formPromo.is_active)
         })
@@ -715,9 +726,14 @@ const handleEditPromo = (promo) => {
     cta_text: promo.cta_text || 'Mulai Top Up',
     cta_href: promo.cta_href || '#game-list',
     gradient: promo.gradient || 'from-blue-600/30 via-cyan-500/20 to-slate-900',
+    image_url: promo.image_url || '',
     sort_order: promo.sort_order || 0,
     is_active: Number(promo.is_active) === 1 ? 1 : 0
   });
+
+  setFilePromo(null);
+  setPreviewPromo(promo.image_url || '');
+  setPromoFileInputKey(Date.now());
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
@@ -734,6 +750,7 @@ const handleTogglePromo = async (promo) => {
         cta_text: promo.cta_text,
         cta_href: promo.cta_href,
         gradient: promo.gradient,
+        image_url: promo.image_url || '',
         sort_order: promo.sort_order,
         is_active: Number(promo.is_active) === 1 ? 0 : 1
       })
@@ -815,6 +832,67 @@ const handleHapusPromo = async (promo) => {
     });
   }
 };
+
+const handlePilihPromoGambar = (e) => {
+  const file = e.target.files?.[0];
+
+  if (!file) return;
+
+  if (!file.type.startsWith('image/')) {
+    Swal.fire({
+      title: 'FILE SALAH! ❌',
+      text: 'Yang diupload harus gambar bre!',
+      icon: 'error',
+      background: '#1f2937',
+      color: '#fff'
+    });
+
+    setPromoFileInputKey(Date.now());
+    return;
+  }
+
+  const maxSize = 5 * 1024 * 1024;
+
+  if (file.size > maxSize) {
+    Swal.fire({
+      title: 'GEDE BANGET! ❌',
+      text: 'Ukuran banner maksimal 5MB bre.',
+      icon: 'error',
+      background: '#1f2937',
+      color: '#fff'
+    });
+
+    setPromoFileInputKey(Date.now());
+    return;
+  }
+
+  setFilePromo(file);
+  setPreviewPromo(URL.createObjectURL(file));
+};
+
+const uploadPromoKalauAda = async () => {
+  if (!filePromo) {
+    return formPromo.image_url || '';
+  }
+
+  const formData = new FormData();
+  formData.append('gambar', filePromo);
+  formData.append('tujuan', 'promo');
+
+  const responUpload = await fetch('/api/admin/upload', {
+    method: 'POST',
+    body: formData
+  });
+
+  const hasilUpload = await responUpload.json();
+
+  if (!responUpload.ok || !hasilUpload.sukses) {
+    throw new Error(hasilUpload.pesan || 'Upload banner promo gagal bre!');
+  }
+
+  return hasilUpload.url;
+};
+
 const warnaStatusRequest = (status) => {
   if (status === 'baru') return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
   if (status === 'diproses') return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
@@ -3966,6 +4044,46 @@ const handleHapusRequestGame = async (item) => {
 
         <div>
           <label className="block text-xs font-bold text-gray-400 mb-1 uppercase">
+            Banner Promo / Foto Desain
+          </label>
+
+          <div className="rounded-2xl border border-gray-800 bg-slate-950 p-4">
+            <input
+              key={promoFileInputKey}
+              type="file"
+              accept="image/*"
+              onChange={handlePilihPromoGambar}
+              className="w-full text-sm text-gray-400 file:mr-4 file:rounded-xl file:border-0 file:bg-sky-600 file:px-4 file:py-2 file:font-bold file:text-white hover:file:bg-sky-500"
+            />
+
+            <p className="mt-2 text-[11px] leading-relaxed text-gray-500">
+              Saran ukuran desain: 1200×500 px atau rasio lebar. Maksimal 5MB. Kalau upload banner, teks promo bisa tetap diisi buat SEO/admin tapi tampilan homepage fokus ke gambar.
+            </p>
+
+            <input
+              value={formPromo.image_url}
+              onChange={(e) => {
+                setFormPromo({ ...formPromo, image_url: e.target.value });
+                setPreviewPromo(e.target.value);
+              }}
+              placeholder="Atau tempel URL gambar Cloudinary/manual di sini"
+              className="mt-3 w-full rounded-xl border border-gray-700 bg-gray-950 px-4 py-3 text-white outline-none focus:border-sky-500"
+            />
+
+            {(previewPromo || formPromo.image_url) && (
+              <div className="mt-4 overflow-hidden rounded-2xl border border-gray-800 bg-gray-900">
+                <img
+                  src={previewPromo || formPromo.image_url}
+                  alt="Preview banner promo"
+                  className="h-32 w-full object-cover sm:h-40"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-gray-400 mb-1 uppercase">
             Tema Gradient
           </label>
           <select
@@ -4014,18 +4132,28 @@ const handleHapusRequestGame = async (item) => {
             Preview Mini
           </p>
 
-          <div className={`rounded-2xl bg-gradient-to-br ${formPromo.gradient} p-4`}>
-            <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-[10px] font-black text-cyan-200">
-              {formPromo.badge || 'Badge'}
-            </span>
+          <div className={`overflow-hidden rounded-2xl bg-gradient-to-br ${formPromo.gradient}`}>
+            {(previewPromo || formPromo.image_url) ? (
+              <img
+                src={previewPromo || formPromo.image_url}
+                alt="Preview promo"
+                className="h-32 w-full object-cover"
+              />
+            ) : (
+              <div className="p-4">
+                <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-[10px] font-black text-cyan-200">
+                  {formPromo.badge || 'Badge'}
+                </span>
 
-            <h3 className="mt-3 text-lg font-black">
-              {formPromo.title || 'Judul Promo'}
-            </h3>
+                <h3 className="mt-3 text-lg font-black">
+                  {formPromo.title || 'Judul Promo'}
+                </h3>
 
-            <p className="mt-2 text-xs text-gray-300">
-              {formPromo.description || 'Deskripsi promo akan tampil di sini.'}
-            </p>
+                <p className="mt-2 text-xs text-gray-300">
+                  {formPromo.description || 'Deskripsi promo akan tampil di sini.'}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -4107,6 +4235,16 @@ const handleHapusRequestGame = async (item) => {
                       Urutan {promo.sort_order}
                     </span>
                   </div>
+
+                  {promo.image_url && (
+                    <div className="mb-3 overflow-hidden rounded-2xl border border-gray-800 bg-gray-900">
+                      <img
+                        src={promo.image_url}
+                        alt={promo.title}
+                        className="h-28 w-full object-cover"
+                      />
+                    </div>
+                  )}
 
                   <h3 className="text-lg font-black text-white">
                     {promo.title}
