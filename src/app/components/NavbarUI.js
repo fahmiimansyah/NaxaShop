@@ -10,7 +10,6 @@ import {
   FaBars,
   FaTimes,
   FaHome,
-  FaGamepad,
   FaReceipt,
   FaHeadset,
   FaHistory,
@@ -25,14 +24,10 @@ import GlobalGameSearchModal from "./GlobalGameSearchModal";
 const EMAIL_CEO = "fahmiimansyah28@gmail.com";
 
 const menuItems = [
-  { name: "Home", href: "/", icon: FaHome },
-  { name: "Games", href: "/#game-list", icon: FaGamepad },
+  { name: "Beranda", href: "/", icon: FaHome },
   { name: "Cek Pesanan", href: "/lacak", icon: FaReceipt },
-  { name: "Bantuan", href: "/support", icon: FaHeadset },
-];
-
-const userMenuItems = [
   { name: "Riwayat Transaksi", href: "/akun/riwayat", icon: FaHistory },
+  { name: "Bantuan", href: "/support", icon: FaHeadset },
 ];
 
 function getNamaUser(session) {
@@ -76,7 +71,7 @@ function Logo({ onClick }) {
         </h1>
 
         <p className="mt-0.5 hidden text-[10px] font-bold uppercase tracking-[0.2em] text-blue-100/35 sm:block">
-          Top Up Game
+          Top Up Digital
         </p>
       </div>
     </Link>
@@ -152,7 +147,7 @@ export default function NavbarUI({ session }) {
   const handleLogout = () => {
     Swal.fire({
       title: "Keluar dari akun?",
-      text: "Kamu bisa login lagi kapan saja untuk cek riwayat dan pesanan.",
+      text: "Kamu tetap bisa masuk lagi kapan saja untuk cek riwayat dan pesanan.",
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#2563eb",
@@ -175,12 +170,11 @@ export default function NavbarUI({ session }) {
 
         <nav className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-[64px] items-center justify-between gap-3 sm:h-[68px]">
-            {/* LEFT */}
             <div className="flex min-w-0 items-center gap-3">
               <button
                 type="button"
                 onClick={() => setOpen(true)}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-blue-800/45 bg-blue-950/45 text-blue-50 transition hover:border-blue-400/40 hover:bg-blue-800/55 lg:hidden"
+                className=" cursor-pointer flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-blue-800/45 bg-blue-950/45 text-blue-50 transition hover:border-blue-400/40 hover:bg-blue-800/55 lg:hidden"
                 aria-label="Buka menu NaXaShop"
               >
                 <FaBars />
@@ -189,7 +183,6 @@ export default function NavbarUI({ session }) {
               <Logo />
             </div>
 
-            {/* CENTER DESKTOP */}
             <div className="hidden items-center rounded-3xl border border-blue-800/35 bg-blue-950/35 p-1.5 shadow-inner shadow-blue-950/20 lg:flex">
               {menuItems.map((item) => (
                 <DesktopNavLink
@@ -198,32 +191,21 @@ export default function NavbarUI({ session }) {
                   pathname={pathname}
                 />
               ))}
-
-              <button
-                type="button"
-                onClick={() => setSearchOpen(true)}
-                className="inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-black text-blue-100/75 transition-all duration-300 hover:bg-blue-500/10 hover:text-white"
-              >
-                <FaSearch className="text-xs" />
-                Cari Game
-              </button>
             </div>
 
-            {/* RIGHT */}
             <div className="flex shrink-0 items-center gap-2">
-              {/* Search selalu ada, di kiri login/avatar */}
               <button
                 type="button"
                 onClick={() => setSearchOpen(true)}
-                className="flex h-10 w-10 items-center justify-center rounded-2xl border border-blue-800/45 bg-blue-950/45 text-blue-50 transition hover:border-blue-400/40 hover:bg-blue-800/55 lg:hidden"
+                className=" cursor-pointer flex h-10 items-center justify-center gap-2 rounded-2xl border border-blue-800/45 bg-blue-950/45 px-3 text-xs font-black text-blue-50 transition hover:border-blue-400/40 hover:bg-blue-800/55 sm:px-4"
                 aria-label="Cari game"
               >
                 <FaSearch className="text-sm" />
+                <span className="hidden sm:inline">Cari Game</span>
               </button>
 
               {session ? (
                 <>
-                  {/* Mobile avatar akun */}
                   <Link
                     href="/akun/riwayat"
                     className="flex h-10 min-w-10 items-center justify-center rounded-2xl bg-blue-600 px-3 text-xs font-black text-white shadow-lg shadow-blue-950/25 transition hover:bg-blue-500 md:hidden"
@@ -232,7 +214,6 @@ export default function NavbarUI({ session }) {
                     {inisialUser}
                   </Link>
 
-                  {/* Desktop akun */}
                   <Link
                     href="/akun/riwayat"
                     className="hidden max-w-[240px] items-center gap-3 rounded-3xl border border-blue-500/20 bg-blue-500/10 px-3 py-2 transition hover:border-blue-400/35 hover:bg-blue-500/15 md:flex"
@@ -299,7 +280,7 @@ export default function NavbarUI({ session }) {
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 270 }}
-              className="fixed left-0 top-0 z-[90] h-dvh w-[82%] max-w-[315px] overflow-y-auto border-r border-blue-800/40 bg-[#061426] p-4 text-white shadow-2xl shadow-blue-950/50 lg:hidden"
+              className="fixed left-0 top-0 z-[90] h-dvh w-[82%] max-w-[290px] overflow-y-auto border-r border-blue-800/40 bg-[#061426] p-4 text-white shadow-2xl shadow-blue-950/50 lg:hidden"
             >
               <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.20),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(30,64,175,0.14),transparent_32%)]" />
 
@@ -310,7 +291,7 @@ export default function NavbarUI({ session }) {
                   <button
                     type="button"
                     onClick={closeMenu}
-                    className="flex h-10 w-10 items-center justify-center rounded-2xl border border-blue-800/45 bg-blue-950/45 text-blue-50 transition hover:border-blue-400/40 hover:bg-blue-800/55"
+                    className="cursor-pointer flex h-10 w-10 items-center justify-center rounded-2xl border border-blue-800/45 bg-blue-950/45 text-blue-50 transition hover:border-blue-400/40 hover:bg-blue-800/55"
                     aria-label="Tutup menu NaXaShop"
                   >
                     <FaTimes className="text-sm" />
@@ -335,8 +316,8 @@ export default function NavbarUI({ session }) {
                     </div>
 
                     <p className="mt-2 text-[11px] leading-relaxed text-blue-100/45">
-                      Pantau riwayat, cek pesanan, dan hubungi support lewat akun
-                      kamu.
+                      Cek riwayat, pantau pesanan, dan akses bantuan dari satu
+                      akun.
                     </p>
 
                     <div className="mt-3 grid grid-cols-2 gap-2">
@@ -379,8 +360,8 @@ export default function NavbarUI({ session }) {
                           Masuk ke NaXaShop
                         </p>
                         <p className="mt-1 text-[11px] leading-relaxed text-blue-100/45">
-                          Login untuk cek riwayat dan memantau pesanan lebih
-                          mudah.
+                          Login untuk melihat riwayat dan memantau pesanan dari
+                          akun kamu.
                         </p>
                       </div>
                     </div>
@@ -402,27 +383,6 @@ export default function NavbarUI({ session }) {
                   </p>
 
                   <div className="grid gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        closeMenu();
-                        setTimeout(() => setSearchOpen(true), 120);
-                      }}
-                      className="group flex items-center justify-between rounded-2xl border border-blue-800/40 bg-blue-950/35 px-3.5 py-3.5 text-blue-100 transition-all duration-300 hover:border-blue-400/40 hover:bg-blue-800/45"
-                    >
-                      <span className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/10">
-                          <FaSearch className="text-xs" />
-                        </span>
-
-                        <span className="text-sm font-black">Cari Game</span>
-                      </span>
-
-                      <span className="text-base text-blue-200/40 transition group-hover:text-white">
-                        →
-                      </span>
-                    </button>
-
                     {menuItems.map((item, index) => (
                       <motion.div
                         key={item.name}
@@ -437,24 +397,6 @@ export default function NavbarUI({ session }) {
                         />
                       </motion.div>
                     ))}
-
-                    {session &&
-                      userMenuItems.map((item, index) => (
-                        <motion.div
-                          key={item.name}
-                          initial={{ opacity: 0, x: -18 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{
-                            delay: (menuItems.length + index) * 0.04,
-                          }}
-                        >
-                          <MobileMenuLink
-                            item={item}
-                            pathname={pathname}
-                            onClick={closeMenu}
-                          />
-                        </motion.div>
-                      ))}
                   </div>
                 </div>
 
@@ -474,8 +416,8 @@ export default function NavbarUI({ session }) {
 
                 <div className="mt-6 border-t border-blue-800/35 pt-4">
                   <p className="text-center text-[10px] leading-relaxed text-blue-100/35">
-                    NaXaShop dikelola untuk pengalaman top up yang lebih rapi,
-                    jelas, dan mudah dilacak.
+                    Setiap pesanan tercatat dengan Order ID agar lebih mudah
+                    dipantau kapan pun dibutuhkan.
                   </p>
                 </div>
               </div>

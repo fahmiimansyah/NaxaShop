@@ -1,22 +1,27 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../auth/[...nextauth]/route';
 import db from '../../lib/db';
 
-function maskNamaGame(value) {
-  return String(value || 'Game').trim();
-}
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
-function maskProduk(value) {
-  return String(value || 'Produk Digital').trim();
+function teksAman(value, fallback) {
+  return String(value || fallback).trim();
 }
 
 function normalizeStatus(value = '') {
   const status = String(value || '').trim().toLowerCase();
 
-  if (['sukses', 'success', 'settlement', 'capture', 'paid', 'berhasil'].includes(status)) {
+  if (
+    ['sukses', 'success', 'settlement', 'capture', 'paid', 'berhasil'].includes(
+      status
+    )
+  ) {
     return 'sukses';
   }
 
-  if (['pending', 'menunggu', 'unpaid'].includes(status)) {
+  if (['pending', 'menunggu', 'unpaid', 'waiting'].includes(status)) {
     return 'pending';
   }
 
@@ -24,7 +29,19 @@ function normalizeStatus(value = '') {
     return 'proses';
   }
 
-  if (['gagal', 'failed', 'failure', 'deny', 'denied', 'cancel', 'cancelled', 'expire', 'expired'].includes(status)) {
+  if (
+    [
+      'gagal',
+      'failed',
+      'failure',
+      'deny',
+      'denied',
+      'cancel',
+      'cancelled',
+      'expire',
+      'expired',
+    ].includes(status)
+  ) {
     return 'gagal';
   }
 
@@ -76,6 +93,20 @@ function labelStatus(statusBayar, statusTopup) {
 
 export async function GET() {
   try {
+    const session = await getServerSession(authOptions);
+    const emailLogin = String(session?.user?.email || '').trim().toLowerCase();
+
+    if (!emailLogin) {
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan: 'Login dulu buat lihat pesanan terbaru.',
+          data: [],
+        },
+        { status: 401 }
+      );
+    }
+
     const [orders] = await db.query(
       `SELECT
         t.order_id,
@@ -83,13 +114,18 @@ export async function GET() {
         t.status_topup,
         t.created_at,
         g.nama AS nama_game,
-        p.nama_produk
+        p.nama_produk,
+        p.kode_produk
        FROM transaksi t
        LEFT JOIN games g ON t.game_id = g.id
        LEFT JOIN produk p ON t.produk_id = p.id
-       WHERE t.status_bayar IN ('sukses', 'success', 'pending')
+       WHERE (
+          LOWER(TRIM(COALESCE(t.user_email, ''))) = ?
+          OR LOWER(TRIM(COALESCE(t.customer_email, ''))) = ?
+       )
        ORDER BY t.created_at DESC
-       LIMIT 8`
+       LIMIT 8`,
+      [emailLogin, emailLogin]
     );
 
     const data = orders.map((order) => {
@@ -97,8 +133,11 @@ export async function GET() {
 
       return {
         order_hint: String(order.order_id || '').slice(-6),
-        nama_game: maskNamaGame(order.nama_game),
-        nama_produk: maskProduk(order.nama_produk || order.kode_produk),
+        nama_game: teksAman(order.nama_game, 'Game'),
+        nama_produk: teksAman(
+          order.nama_produk || order.kode_produk,
+          'Produk Digital'
+        ),
         status_label: status.label,
         status_tone: status.tone,
         icon: status.icon,
@@ -117,6 +156,7 @@ export async function GET() {
       {
         sukses: false,
         pesan: 'Gagal mengambil pesanan terbaru.',
+        data: [],
       },
       { status: 500 }
     );

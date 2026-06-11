@@ -5,6 +5,15 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import Swal from 'sweetalert2';
+import {
+  FaEnvelope,
+  FaEye,
+  FaEyeSlash,
+  FaLock,
+  FaShieldAlt,
+  FaUser,
+} from 'react-icons/fa';
+import { FcGoogle } from 'react-icons/fc';
 
 async function ambilJsonAman(respon) {
   const text = await respon.text();
@@ -30,7 +39,6 @@ export default function HalamanRegister() {
 
   const [loading, setLoading] = useState(false);
   const [loadingGoogle, setLoadingGoogle] = useState(false);
-
   const [lihatPassword, setLihatPassword] = useState(false);
 
   const handleDaftar = async (e) => {
@@ -45,16 +53,18 @@ export default function HalamanRegister() {
       });
 
       const data = await ambilJsonAman(respon);
-      const pesan = data?.pesan || 'Ada response aneh dari server bre.';
+      const pesan = data?.pesan || 'Pendaftaran belum bisa diproses.';
 
       if (respon.ok && data?.sukses) {
         await Swal.fire({
-          title: data.emailWarning ? 'AKUN AMAN, EMAIL NGADAT ⚠️' : 'MANTAP BRE! ',
-          text: pesan,
+          title: 'Akun berhasil dibuat',
+          text: data.emailWarning
+            ? 'Akun kamu sudah dibuat, tapi email notifikasi belum berhasil dikirim.'
+            : 'Akun kamu sudah siap digunakan. Silakan masuk untuk melanjutkan.',
           icon: data.emailWarning ? 'warning' : 'success',
-          background: '#1f2937',
+          background: '#0f172a',
           color: '#fff',
-          confirmButtonColor: '#06b6d4',
+          confirmButtonColor: '#2563eb',
         });
 
         setNama('');
@@ -66,10 +76,10 @@ export default function HalamanRegister() {
       }
 
       Swal.fire({
-        title: 'YAHHH GAGAL ❌',
+        title: 'Pendaftaran belum berhasil',
         text: pesan,
         icon: 'error',
-        background: '#1f2937',
+        background: '#0f172a',
         color: '#fff',
         confirmButtonColor: '#ef4444',
       });
@@ -77,10 +87,10 @@ export default function HalamanRegister() {
       console.error('Register frontend error:', error);
 
       Swal.fire({
-        title: 'SERVER NGADAT! 💥',
-        text: 'Waduh, gagal nyambung ke server bre!',
+        title: 'Sistem belum merespons',
+        text: 'Pendaftaran belum bisa diproses. Coba lagi sebentar lagi.',
         icon: 'error',
-        background: '#1f2937',
+        background: '#0f172a',
         color: '#fff',
         confirmButtonColor: '#ef4444',
       });
@@ -90,129 +100,170 @@ export default function HalamanRegister() {
   };
 
   const handleGoogleRegister = async () => {
-    setLoadingGoogle(true);
+    try {
+      setLoadingGoogle(true);
 
-    await signIn('google', {
-      callbackUrl: '/',
-    });
+      await signIn('google', {
+        callbackUrl: '/',
+      });
+    } catch (error) {
+      console.error('Google register error:', error);
+      setLoadingGoogle(false);
+
+      Swal.fire({
+        title: 'Google belum terhubung',
+        text: 'Coba daftar dengan Google beberapa saat lagi.',
+        icon: 'error',
+        background: '#0f172a',
+        color: '#fff',
+        confirmButtonColor: '#ef4444',
+      });
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4 relative overflow-hidden">
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-500/20 rounded-full blur-[100px]"></div>
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#07111f] px-4 py-10">
+      <div className="pointer-events-none absolute -left-28 top-20 h-72 w-72 rounded-full bg-blue-600/20 blur-[110px]" />
+      <div className="pointer-events-none absolute -right-28 bottom-10 h-80 w-80 rounded-full bg-blue-500/15 blur-[120px]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(37,99,235,0.12),transparent_42%)]" />
 
-      <div className="bg-gray-800 border border-gray-700 p-8 rounded-3xl w-full max-w-md relative z-10 shadow-2xl">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-black text-white mb-2">
-            Bikin Akun <span className="text-blue-500">Baru</span>
-          </h1>
-          <p className="text-gray-400">
-            Join jadi member NaXaShop sekarang
-          </p>
-        </div>
+      <section className="relative z-10 w-full max-w-md overflow-hidden rounded-[2rem] border border-blue-500/15 bg-slate-950/85 p-6 shadow-2xl shadow-black/40 backdrop-blur-xl sm:p-8">
+        <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-blue-500/10 blur-3xl" />
 
-        {/* REGISTER MANUAL */}
-        <form onSubmit={handleDaftar} className="space-y-5">
-          <div>
-            <label className="block text-gray-400 text-sm font-semibold mb-2">
-              Nama Panggilan
-            </label>
-            <input
-              type="text"
-              required
-              value={nama}
-              onChange={(e) => setNama(e.target.value)}
-              className="w-full bg-gray-900 text-white px-5 py-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 border border-gray-700 transition-all"
-              placeholder="Nama Panggilan"
-            />
-          </div>
-
-          <div>
-            <label className="block text-gray-400 text-sm font-semibold mb-2">
-              Email Aktif
-            </label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-gray-900 text-white px-5 py-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 border border-gray-700 transition-all"
-              placeholder="emailkamu@gmail.com"
-            />
-          </div>
-
-          <div>
-            <label className="block text-gray-400 text-sm font-semibold mb-2">
-              Password
-            </label>
-
-            <div className="relative">
-              <input
-                type={lihatPassword ? 'text' : 'password'}
-                required
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-gray-900 text-white px-5 py-4 pr-14 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 border border-gray-700 transition-all"
-                placeholder="Bikin password yang kuat bre..."
-              />
-
-              <button
-                type="button"
-                onClick={() => setLihatPassword(!lihatPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition text-xl"
-                aria-label={lihatPassword ? 'Sembunyikan password' : 'Lihat password'}
-              >
-                {lihatPassword ? '🙈' : '👁️'}
-              </button>
+        <div className="relative z-10">
+          <div className="mb-8 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-500/20 bg-blue-500/10 text-xl text-blue-400">
+              <FaUser />
             </div>
+
+            <p className="text-[11px] font-black uppercase tracking-[0.24em] text-blue-400">
+              NaXaShop Account
+            </p>
+
+            <h1 className="mt-2 text-3xl font-black text-white">
+              Buat Akun Baru
+            </h1>
+
+            <p className="mt-2 text-sm leading-relaxed text-slate-400">
+              Daftar untuk menyimpan riwayat pesanan dan memantau transaksi
+              dengan lebih mudah.
+            </p>
+          </div>
+
+          <form onSubmit={handleDaftar} className="space-y-5">
+            <div>
+              <label className="mb-2 block text-sm font-bold text-slate-400">
+                Nama Panggilan
+              </label>
+
+              <div className="relative">
+                <FaUser className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-slate-500" />
+
+                <input
+                  type="text"
+                  required
+                  value={nama}
+                  onChange={(e) => setNama(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-800 bg-slate-900/80 px-5 py-4 pl-11 text-white outline-none transition-all placeholder:text-slate-600 focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20"
+                  placeholder="Nama panggilan kamu"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-bold text-slate-400">
+                Email Aktif
+              </label>
+
+              <div className="relative">
+                <FaEnvelope className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-slate-500" />
+
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-800 bg-slate-900/80 px-5 py-4 pl-11 text-white outline-none transition-all placeholder:text-slate-600 focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20"
+                  placeholder="emailkamu@gmail.com"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-bold text-slate-400">
+                Password
+              </label>
+
+              <div className="relative">
+                <FaLock className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-slate-500" />
+
+                <input
+                  type={lihatPassword ? 'text' : 'password'}
+                  required
+                  minLength={8}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-800 bg-slate-900/80 px-5 py-4 pl-11 pr-14 text-white outline-none transition-all placeholder:text-slate-600 focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20"
+                  placeholder="Minimal 8 karakter"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setLihatPassword((prev) => !prev)}
+                  className="absolute right-4 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-800 hover:text-white"
+                  aria-label={
+                    lihatPassword ? 'Sembunyikan password' : 'Lihat password'
+                  }
+                >
+                  {lihatPassword ? <FaEyeSlash /> : <FaEye />}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className={`w-full rounded-2xl py-4 text-base font-black transition-all duration-300 ${
+                loading
+                  ? 'cursor-not-allowed bg-slate-800 text-slate-500'
+                  : 'bg-blue-600 text-white shadow-[0_0_24px_rgba(37,99,235,0.35)] hover:-translate-y-0.5 hover:bg-blue-500'
+              }`}
+            >
+              {loading ? 'Membuat akun...' : 'Daftar'}
+            </button>
+          </form>
+
+          <div className="my-6 flex items-center gap-4">
+            <div className="h-px flex-1 bg-slate-800" />
+            <span className="text-xs font-black uppercase tracking-[0.18em] text-slate-600">
+              atau
+            </span>
+            <div className="h-px flex-1 bg-slate-800" />
           </div>
 
           <button
-            type="submit"
-            disabled={loading}
-            className={`w-full py-4 rounded-2xl font-bold text-lg mt-4 transition-all duration-300 ${
-              loading
-                ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                : 'bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:shadow-[0_0_30px_rgba(59,130,246,0.6)] hover:-translate-y-1'
-            }`}
+            type="button"
+            onClick={handleGoogleRegister}
+            disabled={loadingGoogle}
+            className="flex w-full items-center justify-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/80 px-5 py-4 text-base font-black text-white transition hover:border-blue-500/40 hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading ? 'Daftarin OTW...' : 'Daftar Sekarang '}
+            <FcGoogle className="text-xl" />
+            {loadingGoogle
+              ? 'Menghubungkan ke Google...'
+              : 'Daftar dengan Google'}
           </button>
-        </form>
 
-        {/* PEMBATAS */}
-        <div className="flex items-center gap-4 my-6">
-          <div className="h-px bg-gray-700 flex-1"></div>
-          <span className="text-gray-500 text-xs font-bold uppercase">
-            atau
-          </span>
-          <div className="h-px bg-gray-700 flex-1"></div>
+          <p className="mt-6 text-center text-sm text-slate-400">
+            Sudah punya akun?{' '}
+            <Link
+              href="/login"
+              className="font-black text-blue-400 transition hover:text-blue-300"
+            >
+              Masuk di sini
+            </Link>
+          </p>
         </div>
-
-        {/* REGISTER GOOGLE DI BAWAH */}
-        <button
-          type="button"
-          onClick={handleGoogleRegister}
-          disabled={loadingGoogle}
-          className="w-full py-4 rounded-2xl font-black text-base bg-white text-gray-900 hover:bg-gray-200 transition-all flex items-center justify-center gap-3 disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          <span className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center font-black text-blue-600">
-            G
-          </span>
-          {loadingGoogle ? 'Ngebuka Google...' : 'Daftar dengan Google'}
-        </button>
-
-        <p className="text-center text-gray-400 mt-6 text-sm">
-          Udah punya akun?{' '}
-          <Link
-            href="/login"
-            className="text-blue-400 hover:text-blue-300 font-bold"
-          >
-            Gas Login
-          </Link>
-        </p>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
