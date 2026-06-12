@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/route';
 import db from '../../../lib/db';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
@@ -12,7 +15,8 @@ export async function GET() {
       return NextResponse.json(
         {
           sukses: false,
-          pesan: 'Login dulu buat lihat riwayat transaksi.',
+          pesan: 'Login dulu untuk melihat riwayat transaksi.',
+          data: [],
         },
         { status: 401 }
       );
@@ -46,9 +50,8 @@ export async function GET() {
           LOWER(TRIM(COALESCE(t.user_email, ''))) = ?
           OR LOWER(TRIM(COALESCE(t.customer_email, ''))) = ?
        )
-       AND t.status_bayar = 'sukses'
        ORDER BY t.created_at DESC
-       LIMIT 50`,
+       LIMIT 100`,
       [emailLogin, emailLogin]
     );
 
@@ -62,7 +65,8 @@ export async function GET() {
     return NextResponse.json(
       {
         sukses: false,
-        pesan: 'Gagal ambil riwayat transaksi.',
+        pesan: 'Gagal mengambil riwayat transaksi.',
+        data: [],
       },
       { status: 500 }
     );

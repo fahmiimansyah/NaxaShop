@@ -10,87 +10,6 @@ function teksAman(value, fallback) {
   return String(value || fallback).trim();
 }
 
-function normalizeStatus(value = '') {
-  const status = String(value || '').trim().toLowerCase();
-
-  if (
-    ['sukses', 'success', 'settlement', 'capture', 'paid', 'berhasil'].includes(
-      status
-    )
-  ) {
-    return 'sukses';
-  }
-
-  if (['pending', 'menunggu', 'unpaid', 'waiting'].includes(status)) {
-    return 'pending';
-  }
-
-  if (['proses', 'process', 'processing'].includes(status)) {
-    return 'proses';
-  }
-
-  if (
-    [
-      'gagal',
-      'failed',
-      'failure',
-      'deny',
-      'denied',
-      'cancel',
-      'cancelled',
-      'expire',
-      'expired',
-    ].includes(status)
-  ) {
-    return 'gagal';
-  }
-
-  return status || 'pending';
-}
-
-function labelStatus(statusBayar, statusTopup) {
-  const bayar = normalizeStatus(statusBayar);
-  const topup = normalizeStatus(statusTopup);
-
-  if (bayar === 'sukses' && topup === 'sukses') {
-    return {
-      label: 'Berhasil',
-      tone: 'success',
-      icon: '✅',
-    };
-  }
-
-  if (bayar === 'sukses' && ['pending', 'proses'].includes(topup)) {
-    return {
-      label: 'Diproses',
-      tone: 'process',
-      icon: '⏳',
-    };
-  }
-
-  if (bayar === 'pending') {
-    return {
-      label: 'Menunggu bayar',
-      tone: 'pending',
-      icon: '🕒',
-    };
-  }
-
-  if (bayar === 'gagal' || topup === 'gagal') {
-    return {
-      label: 'Gagal',
-      tone: 'failed',
-      icon: '❌',
-    };
-  }
-
-  return {
-    label: 'Diproses',
-    tone: 'process',
-    icon: '⏳',
-  };
-}
-
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
@@ -109,11 +28,14 @@ export async function GET() {
 
     const [orders] = await db.query(
       `SELECT
+        t.id,
         t.order_id,
-        t.status_bayar,
-        t.status_topup,
+        t.harga,
+        t.harga_total,
+        t.payment_type,
         t.created_at,
         g.nama AS nama_game,
+        g.gambar AS gambar_game,
         p.nama_produk,
         p.kode_produk
        FROM transaksi t
@@ -123,24 +45,43 @@ export async function GET() {
           LOWER(TRIM(COALESCE(t.user_email, ''))) = ?
           OR LOWER(TRIM(COALESCE(t.customer_email, ''))) = ?
        )
+       AND LOWER(TRIM(COALESCE(t.status_bayar, ''))) IN (
+          'sukses',
+          'success',
+          'settlement',
+          'capture',
+          'paid',
+          'berhasil'
+       )
+       AND LOWER(TRIM(COALESCE(t.status_topup, ''))) IN (
+          'sukses',
+          'success',
+          'done',
+          'completed',
+          'complete',
+          'berhasil'
+       )
        ORDER BY t.created_at DESC
-       LIMIT 8`,
+       LIMIT 4`,
       [emailLogin, emailLogin]
     );
 
     const data = orders.map((order) => {
-      const status = labelStatus(order.status_bayar, order.status_topup);
-
       return {
+        id: order.id,
+        order_id: order.order_id,
         order_hint: String(order.order_id || '').slice(-6),
         nama_game: teksAman(order.nama_game, 'Game'),
+        gambar_game: order.gambar_game || '',
         nama_produk: teksAman(
           order.nama_produk || order.kode_produk,
           'Produk Digital'
         ),
-        status_label: status.label,
-        status_tone: status.tone,
-        icon: status.icon,
+        harga_total: order.harga_total || order.harga || 0,
+        payment_type: order.payment_type || '-',
+        status_label: 'Selesai',
+        status_desc: 'Top-up berhasil diproses.',
+        status_tone: 'success',
         created_at: order.created_at,
       };
     });

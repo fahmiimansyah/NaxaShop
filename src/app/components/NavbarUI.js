@@ -18,6 +18,7 @@ import {
   FaSignOutAlt,
   FaSignInAlt,
   FaSearch,
+  FaChevronRight,
 } from "react-icons/fa";
 import GlobalGameSearchModal from "./GlobalGameSearchModal";
 
@@ -26,7 +27,6 @@ const EMAIL_CEO = "fahmiimansyah28@gmail.com";
 const menuItems = [
   { name: "Beranda", href: "/", icon: FaHome },
   { name: "Cek Pesanan", href: "/lacak", icon: FaReceipt },
-  { name: "Riwayat Transaksi", href: "/akun/riwayat", icon: FaHistory },
   { name: "Bantuan", href: "/support", icon: FaHeadset },
 ];
 
@@ -121,13 +121,37 @@ function MobileMenuLink({ item, pathname, onClick }) {
         <span className="text-sm font-black">{item.name}</span>
       </span>
 
-      <span
-        className={`text-base transition ${
+      <FaChevronRight
+        className={`text-xs transition ${
           aktif ? "text-white" : "text-blue-200/40 group-hover:text-white"
         }`}
-      >
-        →
-      </span>
+      />
+    </Link>
+  );
+}
+
+function DrawerActionLink({
+  href,
+  onClick,
+  children,
+  variant = "primary",
+  icon: Icon,
+}) {
+  const style =
+    variant === "light"
+      ? "bg-white text-blue-950 hover:bg-blue-50"
+      : variant === "soft"
+        ? "border border-blue-400/25 bg-blue-500/10 text-blue-100 hover:border-blue-300/40 hover:bg-blue-500/15"
+        : "bg-blue-600 text-white hover:bg-blue-500";
+
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      className={`flex items-center justify-center gap-2 rounded-2xl px-3 py-2.5 text-xs font-black transition ${style}`}
+    >
+      {Icon && <Icon className="text-xs" />}
+      {children}
     </Link>
   );
 }
@@ -141,13 +165,14 @@ export default function NavbarUI({ session }) {
   const namaUser = useMemo(() => getNamaUser(session), [session]);
   const inisialUser = useMemo(() => getInisialUser(namaUser), [namaUser]);
   const isCEO = session?.user?.email === EMAIL_CEO;
+  const akunAktif = pathname?.startsWith("/akun");
 
   const closeMenu = () => setOpen(false);
 
   const handleLogout = () => {
     Swal.fire({
       title: "Keluar dari akun?",
-      text: "Kamu tetap bisa masuk lagi kapan saja untuk cek riwayat dan pesanan.",
+      text: "Kamu bisa masuk lagi kapan saja untuk melihat riwayat dan pesanan.",
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#2563eb",
@@ -174,7 +199,7 @@ export default function NavbarUI({ session }) {
               <button
                 type="button"
                 onClick={() => setOpen(true)}
-                className=" cursor-pointer flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-blue-800/45 bg-blue-950/45 text-blue-50 transition hover:border-blue-400/40 hover:bg-blue-800/55 lg:hidden"
+                className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-2xl border border-blue-800/45 bg-blue-950/45 text-blue-50 transition hover:border-blue-400/40 hover:bg-blue-800/55 lg:hidden"
                 aria-label="Buka menu NaXaShop"
               >
                 <FaBars />
@@ -197,7 +222,7 @@ export default function NavbarUI({ session }) {
               <button
                 type="button"
                 onClick={() => setSearchOpen(true)}
-                className=" cursor-pointer flex h-10 items-center justify-center gap-2 rounded-2xl border border-blue-800/45 bg-blue-950/45 px-3 text-xs font-black text-blue-50 transition hover:border-blue-400/40 hover:bg-blue-800/55 sm:px-4"
+                className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-blue-800/45 bg-blue-950/45 px-3 text-xs font-black text-blue-50 transition hover:border-blue-400/40 hover:bg-blue-800/55 sm:px-4"
                 aria-label="Cari game"
               >
                 <FaSearch className="text-sm" />
@@ -208,7 +233,11 @@ export default function NavbarUI({ session }) {
                 <>
                   <Link
                     href="/akun/riwayat"
-                    className="flex h-10 min-w-10 items-center justify-center rounded-2xl bg-blue-600 px-3 text-xs font-black text-white shadow-lg shadow-blue-950/25 transition hover:bg-blue-500 md:hidden"
+                    className={`flex h-10 min-w-10 items-center justify-center rounded-2xl px-3 text-xs font-black text-white shadow-lg shadow-blue-950/25 transition md:hidden ${
+                      akunAktif
+                        ? "bg-blue-500"
+                        : "bg-blue-600 hover:bg-blue-500"
+                    }`}
                     aria-label="Buka akun"
                   >
                     {inisialUser}
@@ -216,7 +245,11 @@ export default function NavbarUI({ session }) {
 
                   <Link
                     href="/akun/riwayat"
-                    className="hidden max-w-[240px] items-center gap-3 rounded-3xl border border-blue-500/20 bg-blue-500/10 px-3 py-2 transition hover:border-blue-400/35 hover:bg-blue-500/15 md:flex"
+                    className={`hidden max-w-[240px] items-center gap-3 rounded-3xl border px-3 py-2 transition md:flex ${
+                      akunAktif
+                        ? "border-blue-400/35 bg-blue-500/15"
+                        : "border-blue-500/20 bg-blue-500/10 hover:border-blue-400/35 hover:bg-blue-500/15"
+                    }`}
                   >
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-xs font-black text-white shadow-lg shadow-blue-950/25">
                       {inisialUser}
@@ -245,7 +278,7 @@ export default function NavbarUI({ session }) {
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="hidden rounded-3xl border border-blue-800/40 bg-blue-950/45 px-4 py-2.5 text-xs font-black text-blue-100 transition hover:border-red-400/35 hover:bg-red-500/10 hover:text-red-100 md:inline-flex"
+                    className="hidden cursor-pointer rounded-3xl border border-blue-800/40 bg-blue-950/45 px-4 py-2.5 text-xs font-black text-blue-100 transition hover:border-red-400/35 hover:bg-red-500/10 hover:text-red-100 md:inline-flex"
                   >
                     Logout
                   </button>
@@ -280,7 +313,7 @@ export default function NavbarUI({ session }) {
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 270 }}
-              className="fixed left-0 top-0 z-[90] h-dvh w-[82%] max-w-[290px] overflow-y-auto border-r border-blue-800/40 bg-[#061426] p-4 text-white shadow-2xl shadow-blue-950/50 lg:hidden"
+              className="fixed left-0 top-0 z-[90] h-dvh w-[84%] max-w-[310px] overflow-y-auto border-r border-blue-800/40 bg-[#061426] p-4 text-white shadow-2xl shadow-blue-950/50 lg:hidden"
             >
               <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.20),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(30,64,175,0.14),transparent_32%)]" />
 
@@ -291,7 +324,7 @@ export default function NavbarUI({ session }) {
                   <button
                     type="button"
                     onClick={closeMenu}
-                    className="cursor-pointer flex h-10 w-10 items-center justify-center rounded-2xl border border-blue-800/45 bg-blue-950/45 text-blue-50 transition hover:border-blue-400/40 hover:bg-blue-800/55"
+                    className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-2xl border border-blue-800/45 bg-blue-950/45 text-blue-50 transition hover:border-blue-400/40 hover:bg-blue-800/55"
                     aria-label="Tutup menu NaXaShop"
                   >
                     <FaTimes className="text-sm" />
@@ -299,7 +332,7 @@ export default function NavbarUI({ session }) {
                 </div>
 
                 {session ? (
-                  <div className="mt-5 rounded-[22px] border border-blue-500/20 bg-blue-500/10 p-3.5">
+                  <div className="mt-5 rounded-[24px] border border-blue-500/20 bg-blue-500/10 p-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-sm font-black text-white shadow-lg shadow-blue-950/25">
                         {inisialUser}
@@ -316,40 +349,40 @@ export default function NavbarUI({ session }) {
                     </div>
 
                     <p className="mt-2 text-[11px] leading-relaxed text-blue-100/45">
-                      Cek riwayat, pantau pesanan, dan akses bantuan dari satu
-                      akun.
+                      Pesanan dan riwayat akun kamu tersimpan rapi di NaXaShop.
                     </p>
 
                     <div className="mt-3 grid grid-cols-2 gap-2">
-                      <Link
+                      <DrawerActionLink
                         href="/akun/riwayat"
                         onClick={closeMenu}
-                        className="rounded-2xl bg-white px-3 py-2 text-center text-xs font-black text-blue-950 transition hover:bg-blue-50"
+                        variant="light"
+                        icon={FaHistory}
                       >
                         Riwayat
-                      </Link>
+                      </DrawerActionLink>
 
                       {isCEO ? (
-                        <Link
+                        <DrawerActionLink
                           href="/admin"
                           onClick={closeMenu}
-                          className="rounded-2xl bg-blue-600 px-3 py-2 text-center text-xs font-black text-white transition hover:bg-blue-500"
+                          icon={FaShieldAlt}
                         >
                           Admin
-                        </Link>
+                        </DrawerActionLink>
                       ) : (
-                        <Link
+                        <DrawerActionLink
                           href="/lacak"
                           onClick={closeMenu}
-                          className="rounded-2xl bg-blue-600 px-3 py-2 text-center text-xs font-black text-white transition hover:bg-blue-500"
+                          icon={FaReceipt}
                         >
-                          Cek Order
-                        </Link>
+                          Lacak
+                        </DrawerActionLink>
                       )}
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-5 rounded-[22px] border border-blue-500/20 bg-blue-500/10 p-3.5">
+                  <div className="mt-5 rounded-[24px] border border-blue-500/20 bg-blue-500/10 p-4">
                     <div className="flex items-start gap-3">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-950/25">
                         <FaUserCircle />
@@ -357,7 +390,7 @@ export default function NavbarUI({ session }) {
 
                       <div>
                         <p className="text-sm font-black text-white">
-                          Masuk ke NaXaShop
+                          Masuk ke akun
                         </p>
                         <p className="mt-1 text-[11px] leading-relaxed text-blue-100/45">
                           Login untuk melihat riwayat dan memantau pesanan dari
@@ -366,20 +399,30 @@ export default function NavbarUI({ session }) {
                       </div>
                     </div>
 
-                    <Link
-                      href="/login"
-                      onClick={closeMenu}
-                      className="mt-3 flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-2.5 text-xs font-black text-white transition hover:bg-blue-500"
-                    >
-                      <FaSignInAlt />
-                      Login Sekarang
-                    </Link>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <DrawerActionLink
+                        href="/login"
+                        onClick={closeMenu}
+                        icon={FaSignInAlt}
+                      >
+                        Login
+                      </DrawerActionLink>
+
+                      <DrawerActionLink
+                        href="/akun/riwayat"
+                        onClick={closeMenu}
+                        variant="soft"
+                        icon={FaHistory}
+                      >
+                        Riwayat
+                      </DrawerActionLink>
+                    </div>
                   </div>
                 )}
 
                 <div className="mt-5">
                   <p className="mb-2.5 text-[10px] font-black uppercase tracking-[0.22em] text-blue-100/35">
-                    Menu
+                    Navigasi
                   </p>
 
                   <div className="grid gap-2.5">
@@ -407,7 +450,7 @@ export default function NavbarUI({ session }) {
                       closeMenu();
                       handleLogout();
                     }}
-                    className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-400/25 bg-red-500/10 px-4 py-2.5 text-xs font-black text-red-100 transition hover:border-red-300/40 hover:bg-red-500/15"
+                    className="mt-5 flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-red-400/25 bg-red-500/10 px-4 py-2.5 text-xs font-black text-red-100 transition hover:border-red-300/40 hover:bg-red-500/15"
                   >
                     <FaSignOutAlt />
                     Logout
@@ -416,8 +459,8 @@ export default function NavbarUI({ session }) {
 
                 <div className="mt-6 border-t border-blue-800/35 pt-4">
                   <p className="text-center text-[10px] leading-relaxed text-blue-100/35">
-                    Setiap pesanan tercatat dengan Order ID agar lebih mudah
-                    dipantau kapan pun dibutuhkan.
+                    Setiap pesanan punya Order ID, jadi statusnya bisa dicek
+                    kapan pun dibutuhkan.
                   </p>
                 </div>
               </div>

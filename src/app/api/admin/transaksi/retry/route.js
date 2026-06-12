@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../auth/[...nextauth]/route';
 import crypto from 'crypto';
-import { orderVipReseller } from '../../../../lib/vipreseller';
+import { orderVipReseller, ambilVipResellerTrxIdDariResponse } from '../../../../lib/vipreseller';
 import db from '../../../../lib/db';
 import { kirimEmailAdmin, kirimEmailTopupSukses } from '../../../../lib/mailer';
 import { prosesVoucherMakasihOrderPertama } from '../../../../lib/voucher';
@@ -20,7 +20,12 @@ function bersihinText(value) {
 }
 
 function realTopupAktif() {
-  return process.env.ENABLE_REAL_TOPUP === 'true';
+  const realTopup = process.env.ENABLE_REAL_TOPUP === 'true';
+  const midtransProduction = process.env.MIDTRANS_IS_PRODUCTION === 'true';
+  const allowSandboxRealTopup =
+    process.env.ALLOW_SANDBOX_REAL_TOPUP === 'true';
+
+  return realTopup && (midtransProduction || allowSandboxRealTopup);
 }
 
 function normalisasiProvider(value) {
@@ -29,6 +34,21 @@ function normalisasiProvider(value) {
 
 function normalisasiStatus(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+function statusTopupBolehRetry(status) {
+  const s = normalisasiStatus(status);
+  return ['gagal', 'failed', 'fail', 'error'].includes(s);
+}
+
+function ambilTrxidProviderTersimpan(trx) {
+  const provider = normalisasiProvider(trx?.provider);
+
+  if (provider === 'vipreseller') {
+    return ambilVipResellerTrxIdDariResponse(trx?.apigames_response);
+  }
+
+  return '';
 }
 
 function bikinSignatureApiGames({ merchantId, secretKey, refId }) {
@@ -357,7 +377,7 @@ export async function POST(request) {
 
   if (!adminValid) {
     return NextResponse.json(
-      { sukses: false, pesan: 'Akses ditolak bre! Lu bukan admin.' },
+      { sukses: false, pesan: 'Akses ditolak. Hanya admin yang bisa melakukan retry.' },
       { status: 403 }
     );
   }
@@ -368,7 +388,7 @@ export async function POST(request) {
 
     if (!orderId) {
       return NextResponse.json(
-        { sukses: false, pesan: 'Order ID wajib dikirim bre!' },
+        { sukses: false, pesan: 'Order ID wajib dikirim.' },
         { status: 400 }
       );
     }
@@ -387,7 +407,7 @@ export async function POST(request) {
 
     if (dataTrx.length === 0) {
       return NextResponse.json(
-        { sukses: false, pesan: 'Transaksi gak ketemu bre!' },
+        { sukses: false, pesan: 'Transaksi tidak ditemukan.' },
         { status: 404 }
       );
     }
@@ -397,15 +417,42 @@ export async function POST(request) {
 
     if (trx.status_bayar !== 'sukses') {
       return NextResponse.json(
-        { sukses: false, pesan: 'Pembayaran belum sukses, jangan top-up dulu bre!' },
+        { sukses: false, pesan: 'Pembayaran belum sukses. Top-up belum boleh dikirim.' },
         { status: 400 }
       );
     }
 
     if (trx.status_topup === 'sukses') {
       return NextResponse.json(
-        { sukses: false, pesan: 'Top-up ini udah sukses, jangan ditembak dobel bre!' },
+        { sukses: false, pesan: 'Top-up sudah sukses. Retry ditolak agar tidak terkirim dua kali.' },
         { status: 400 }
+      );
+    }
+
+    const trxidProviderTersimpan = ambilTrxidProviderTersimpan(trx);
+
+    if (trxidProviderTersimpan && !statusTopupBolehRetry(trx.status_topup)) {
+      await db.query(
+        `UPDATE transaksi
+         SET catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nRetry ditolak: order sudah punya TRXID provider ', ?, '. Admin diminta Cek Provider pada ', NOW()),
+             updated_at = NOW()
+         WHERE order_id = ?`,
+        [trxidProviderTersimpan, orderId]
+      );
+
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan:
+            'Order ini sudah pernah dikirim ke provider. Gunakan Cek Provider dulu agar saldo tidak kepotong dua kali.',
+          data: {
+            provider,
+            trxid_provider: trxidProviderTersimpan,
+            status_topup: trx.status_topup || 'proses',
+            aksi_disarankan: 'cek_provider'
+          }
+        },
+        { status: 409 }
       );
     }
 
@@ -413,7 +460,7 @@ export async function POST(request) {
       return NextResponse.json(
         {
           sukses: false,
-          pesan: 'Order ini baru aja diproses bre. Tunggu sebentar sebelum retry lagi.'
+          pesan: 'Order baru saja diproses. Tunggu sebentar atau gunakan Cek Provider sebelum retry lagi.'
         },
         { status: 400 }
       );
@@ -431,7 +478,7 @@ export async function POST(request) {
       return NextResponse.json(
         {
           sukses: false,
-          pesan: `Mode aman aktif bre. ENABLE_REAL_TOPUP=false, ${provider} tidak ditembak.`
+          pesan: `Mode aman aktif. ENABLE_REAL_TOPUP=false, ${provider} tidak ditembak.`
         },
         { status: 400 }
       );
@@ -480,7 +527,7 @@ export async function POST(request) {
       return NextResponse.json(
         {
           sukses: false,
-          pesan: `Koneksi ke ${provider} gagal bre!`,
+          pesan: `Koneksi ke ${provider} gagal.`,
           provider
         },
         { status: 502 }
@@ -550,7 +597,7 @@ export async function POST(request) {
           pesan:
             masalahProvider.jenis === 'konfigurasi_provider'
               ? 'Retry gagal karena konfigurasi provider butuh dicek admin.'
-              : `Retry ke ${hasilProvider.provider || provider} gagal bre!`,
+              : `Retry ke ${hasilProvider.provider || provider} gagal.`,
           data: {
             provider: hasilProvider.provider || provider,
             status_topup: 'gagal',
@@ -634,7 +681,7 @@ export async function POST(request) {
     console.error('Retry top-up error:', error);
 
     return NextResponse.json(
-      { sukses: false, pesan: 'Dapur retry top-up meledak bre!' },
+      { sukses: false, pesan: 'Retry top-up gagal diproses. Coba cek log admin.' },
       { status: 500 }
     );
   }

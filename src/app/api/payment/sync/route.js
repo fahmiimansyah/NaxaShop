@@ -16,7 +16,12 @@ function orderIdValid(orderId) {
 }
 
 function realTopupAktif() {
-  return process.env.ENABLE_REAL_TOPUP === 'true';
+  const realTopup = process.env.ENABLE_REAL_TOPUP === 'true';
+  const midtransProduction = process.env.MIDTRANS_IS_PRODUCTION === 'true';
+  const allowSandboxRealTopup =
+    process.env.ALLOW_SANDBOX_REAL_TOPUP === 'true';
+
+  return realTopup && (midtransProduction || allowSandboxRealTopup);
 }
 
 function pembayaranSukses(statusMidtrans) {

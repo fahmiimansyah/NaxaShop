@@ -1,432 +1,591 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Swal from 'sweetalert2';
+import {
+  FaArrowLeft,
+  FaCheckCircle,
+  FaClock,
+  FaCopy,
+  FaExclamationTriangle,
+  FaHeadset,
+  FaQuestionCircle,
+  FaReceipt,
+  FaSearch,
+  FaTimesCircle,
+} from 'react-icons/fa';
+
 export default function CekOrderPage() {
   const searchParams = useSearchParams();
+
+  const orderIdDariUrl =
+    searchParams.get('order_id') || searchParams.get('id') || '';
+
   const fromPage = searchParams.get('from');
 
-const linkBalik =
-  fromPage === 'payment'
-    ? '/pembayaran'
-    : '/';
+  const linkBalik =
+    fromPage === 'payment' && orderIdDariUrl
+      ? `/pembayaran?order_id=${encodeURIComponent(orderIdDariUrl)}`
+      : fromPage === 'payment'
+        ? '/pembayaran'
+        : '/';
 
-const teksBalik =
-  fromPage === 'payment'
-    ? '← Balik ke Pembayaran'
-    : '← Balik ke Beranda';
+  const teksBalik =
+    fromPage === 'payment' ? 'Kembali ke Pembayaran' : 'Kembali ke Beranda';
+
   const [orderId, setOrderId] = useState('');
   const [dataOrder, setDataOrder] = useState(null);
   const [loading, setLoading] = useState(false);
   const [pesanError, setPesanError] = useState('');
+  const [copied, setCopied] = useState(false);
 
   const API_STATUS = '/api/pesanan';
+  const nomorAdmin = process.env.NEXT_PUBLIC_ADMIN_WHATSAPP;
 
   const formatRupiah = (angka) => {
     return `Rp ${Number(angka || 0).toLocaleString('id-ID')}`;
   };
 
+  const normalisasiStatus = (value = '') => {
+    const status = String(value || '').trim().toLowerCase();
+
+    if (
+      ['sukses', 'success', 'settlement', 'capture', 'paid', 'berhasil'].includes(
+        status
+      )
+    ) {
+      return 'sukses';
+    }
+
+    if (['pending', 'menunggu', 'unpaid', 'waiting'].includes(status)) {
+      return 'pending';
+    }
+
+    if (['proses', 'process', 'processing'].includes(status)) {
+      return 'proses';
+    }
+
+    if (
+      [
+        'gagal',
+        'failed',
+        'failure',
+        'deny',
+        'denied',
+        'cancel',
+        'cancelled',
+        'expire',
+        'expired',
+      ].includes(status)
+    ) {
+      return 'gagal';
+    }
+
+    return status || 'pending';
+  };
+
+  const labelStatus = (status) => {
+    const normal = normalisasiStatus(status);
+
+    if (normal === 'sukses') return 'Sukses';
+    if (normal === 'pending') return 'Pending';
+    if (normal === 'proses') return 'Proses';
+    if (normal === 'gagal') return 'Gagal';
+
+    return normal || '-';
+  };
+
   const statusUtama = (trx) => {
     if (!trx) return null;
 
-    if (trx.status_bayar === 'pending') {
+    const bayar = normalisasiStatus(trx.status_bayar);
+    const topup = normalisasiStatus(trx.status_topup);
+
+    if (bayar === 'pending') {
       return {
-        icon: '⏳',
+        Icon: FaClock,
         title: 'Menunggu Pembayaran',
-        desc: 'Belum kebaca lunas',
-        color: 'text-yellow-400',
-        bg: 'bg-yellow-500/10 border-yellow-500/20'
+        desc: 'Pembayaran belum terkonfirmasi. Selesaikan pembayaran terlebih dahulu, lalu cek lagi statusnya.',
+        color: 'text-yellow-300',
+        badge: 'border-yellow-500/20 bg-yellow-500/10 text-yellow-300',
+        box: 'border-yellow-500/20 bg-yellow-500/10',
       };
     }
 
-    if (trx.status_bayar === 'gagal') {
+    if (bayar === 'gagal') {
       return {
-        icon: '❌',
-        title: 'Pembayaran Gagal',
-        desc: 'Order gagal / expired',
-        color: 'text-red-400',
-        bg: 'bg-red-500/10 border-red-500/20'
+        Icon: FaTimesCircle,
+        title: 'Pembayaran Tidak Berhasil',
+        desc: 'Pembayaran gagal, dibatalkan, atau melewati batas waktu. Silakan buat pesanan baru.',
+        color: 'text-red-300',
+        badge: 'border-red-500/20 bg-red-500/10 text-red-300',
+        box: 'border-red-500/20 bg-red-500/10',
       };
     }
 
-    if (trx.status_bayar === 'sukses' && trx.status_topup === 'pending') {
+    if (bayar === 'sukses' && ['pending', 'proses'].includes(topup)) {
       return {
-        icon: '💰',
-        title: 'Pembayaran Sukses',
-        desc: 'Masuk antrean top-up',
-        color: 'text-green-400',
-        bg: 'bg-green-500/10 border-green-500/20'
+        Icon: FaClock,
+        title: 'Top-up Sedang Diproses',
+        desc: 'Pembayaran sudah berhasil. Pesanan sedang diproses oleh sistem.',
+        color: 'text-blue-300',
+        badge: 'border-blue-500/20 bg-blue-500/10 text-blue-300',
+        box: 'border-blue-500/20 bg-blue-500/10',
       };
     }
 
-    if (trx.status_topup === 'proses') {
+    if (bayar === 'sukses' && topup === 'sukses') {
       return {
-        icon: '🚀',
-        title: 'Top-up Diproses',
-        desc: 'Sedang dikirim provider',
-        color: 'text-purple-400',
-        bg: 'bg-purple-500/10 border-purple-500/20'
-      };
-    }
-
-    if (trx.status_topup === 'sukses') {
-      return {
-        icon: '✅',
+        Icon: FaCheckCircle,
         title: 'Top-up Berhasil',
-        desc: 'Order selesai',
-        color: 'text-cyan-400',
-        bg: 'bg-cyan-500/10 border-cyan-500/20'
+        desc: 'Pesanan sudah selesai diproses. Silakan cek akun game kamu.',
+        color: 'text-green-300',
+        badge: 'border-green-500/20 bg-green-500/10 text-green-300',
+        box: 'border-green-500/20 bg-green-500/10',
       };
     }
 
-    if (trx.status_topup === 'gagal') {
+    if (bayar === 'sukses' && topup === 'gagal') {
       return {
-        icon: '⚠️',
-        title: 'Top-up Bermasalah',
-        desc: 'Hubungi admin',
-        color: 'text-orange-400',
-        bg: 'bg-orange-500/10 border-orange-500/20'
+        Icon: FaExclamationTriangle,
+        title: 'Pesanan Perlu Dicek',
+        desc: 'Pembayaran berhasil, tetapi top-up belum selesai. Simpan Order ID dan hubungi admin.',
+        color: 'text-orange-300',
+        badge: 'border-orange-500/20 bg-orange-500/10 text-orange-300',
+        box: 'border-orange-500/20 bg-orange-500/10',
       };
     }
 
     return {
-      icon: '🧾',
-      title: 'Status Order',
-      desc: 'Data ditemukan',
+      Icon: FaReceipt,
+      title: 'Status Pesanan',
+      desc: 'Data pesanan ditemukan. Silakan cek detail di bawah.',
       color: 'text-gray-300',
-      bg: 'bg-gray-800 border-gray-700'
+      badge: 'border-gray-700 bg-gray-800 text-gray-300',
+      box: 'border-gray-700 bg-gray-800/70',
     };
   };
 
   const badgeBayar = (status) => {
-    if (status === 'sukses') return 'bg-green-500/10 text-green-400 border-green-500/20';
-    if (status === 'pending') return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
-    if (status === 'gagal') return 'bg-red-500/10 text-red-400 border-red-500/20';
-    return 'bg-gray-800 text-gray-400 border-gray-700';
+    const normal = normalisasiStatus(status);
+
+    if (normal === 'sukses') {
+      return 'border-green-500/20 bg-green-500/10 text-green-300';
+    }
+
+    if (normal === 'pending') {
+      return 'border-yellow-500/20 bg-yellow-500/10 text-yellow-300';
+    }
+
+    if (normal === 'gagal') {
+      return 'border-red-500/20 bg-red-500/10 text-red-300';
+    }
+
+    return 'border-gray-700 bg-gray-800 text-gray-400';
   };
 
   const badgeTopup = (status) => {
-    if (status === 'sukses') return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20';
-    if (status === 'proses') return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
-    if (status === 'pending') return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
-    if (status === 'gagal') return 'bg-red-500/10 text-red-400 border-red-500/20';
-    return 'bg-gray-800 text-gray-400 border-gray-700';
+    const normal = normalisasiStatus(status);
+
+    if (normal === 'sukses') {
+      return 'border-green-500/20 bg-green-500/10 text-green-300';
+    }
+
+    if (normal === 'proses') {
+      return 'border-blue-500/20 bg-blue-500/10 text-blue-300';
+    }
+
+    if (normal === 'pending') {
+      return 'border-yellow-500/20 bg-yellow-500/10 text-yellow-300';
+    }
+
+    if (normal === 'gagal') {
+      return 'border-orange-500/20 bg-orange-500/10 text-orange-300';
+    }
+
+    return 'border-gray-700 bg-gray-800 text-gray-400';
   };
+
+  const totalBayar = useMemo(() => {
+    return dataOrder?.harga_total || dataOrder?.harga || dataOrder?.harga_produk || 0;
+  }, [dataOrder]);
+
+  const status = statusUtama(dataOrder);
+  const StatusIcon = status?.Icon || FaReceipt;
+
+  const perluChatAdmin =
+    dataOrder &&
+    (normalisasiStatus(dataOrder.status_bayar) === 'gagal' ||
+      normalisasiStatus(dataOrder.status_topup) === 'gagal');
 
   const copyOrderId = async () => {
     if (!dataOrder?.order_id) return;
 
     await navigator.clipboard.writeText(dataOrder.order_id);
+    setCopied(true);
+
+    setTimeout(() => {
+      setCopied(false);
+    }, 1400);
   };
 
- const cekOrder = async (idOrder) => {
-  const idBersih = String(idOrder || '').trim();
+  const cekOrder = async (idOrder) => {
+    const idBersih = String(idOrder || '').trim();
 
-  if (!idBersih) {
-    setPesanError('Masukin Order ID dulu bre.');
-    setDataOrder(null);
-    return;
-  }
-
-  setLoading(true);
-  setPesanError('');
-  setDataOrder(null);
-
-  try {
-    const respon = await fetch(`${API_STATUS}?id=${encodeURIComponent(idBersih)}`, {
-      cache: 'no-store'
-    });
-
-    const hasil = await respon.json();
-
-    if (!respon.ok || !hasil.sukses) {
-      setPesanError(hasil.pesan || 'Order gak ketemu bre.');
+    if (!idBersih) {
+      setPesanError('Masukkan Order ID terlebih dahulu.');
+      setDataOrder(null);
       return;
     }
 
-    setDataOrder(hasil.data);
-  } catch (error) {
-    setPesanError('Server lagi ngadat bre, coba lagi bentar.');
-  } finally {
-    setLoading(false);
-  }
-};
+    setLoading(true);
+    setPesanError('');
+    setDataOrder(null);
 
-const handleCekOrder = async (e) => {
-  e.preventDefault();
-  cekOrder(orderId);
-};
+    try {
+      const respon = await fetch(`${API_STATUS}?id=${encodeURIComponent(idBersih)}`, {
+        cache: 'no-store',
+      });
+
+      const hasil = await respon.json();
+
+      if (!respon.ok || !hasil.sukses) {
+        setPesanError(
+          hasil.pesan ||
+            'Order ID tidak ditemukan. Pastikan Order ID yang kamu masukkan sudah benar.'
+        );
+        return;
+      }
+
+      setDataOrder(hasil.data);
+    } catch (error) {
+      console.error('Gagal cek order:', error);
+      setPesanError('Sistem belum bisa mengecek pesanan. Coba lagi sebentar lagi.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCekOrder = async (e) => {
+    e.preventDefault();
+    cekOrder(orderId);
+  };
+
+  const bukaCaraCekOrder = () => {
+    Swal.fire({
+      title: 'Cara cek order',
+      width: 560,
+      background: '#0f172a',
+      color: '#ffffff',
+      confirmButtonText: 'Mengerti',
+      confirmButtonColor: '#2563eb',
+      html: `
+        <div style="text-align:left;">
+          <div style="display:grid;gap:10px;">
+            <div style="display:flex;gap:12px;background:#020617;border:1px solid #1f2937;padding:12px;border-radius:16px;">
+              <div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:#2563eb;color:#fff;font-weight:900;font-size:12px;flex:0 0 auto;">1</div>
+              <div>
+                <b style="font-size:13px;color:#fff;">Salin Order ID</b>
+                <p style="margin:4px 0 0;color:#94a3b8;font-size:12px;line-height:1.55;">
+                  Order ID biasanya diawali dengan <b style="color:#93c5fd;">NX-</b>. Kamu bisa menemukannya di halaman pembayaran, struk, atau riwayat transaksi.
+                </p>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:12px;background:#020617;border:1px solid #1f2937;padding:12px;border-radius:16px;">
+              <div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:#2563eb;color:#fff;font-weight:900;font-size:12px;flex:0 0 auto;">2</div>
+              <div>
+                <b style="font-size:13px;color:#fff;">Tempel di kolom cek order</b>
+                <p style="margin:4px 0 0;color:#94a3b8;font-size:12px;line-height:1.55;">
+                  Masukkan Order ID dengan lengkap, lalu tekan tombol <b style="color:#bfdbfe;">Cek Status</b>.
+                </p>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:12px;background:#020617;border:1px solid #1f2937;padding:12px;border-radius:16px;">
+              <div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:#2563eb;color:#fff;font-weight:900;font-size:12px;flex:0 0 auto;">3</div>
+              <div>
+                <b style="font-size:13px;color:#fff;">Lihat status pembayaran dan top-up</b>
+                <p style="margin:4px 0 0;color:#94a3b8;font-size:12px;line-height:1.55;">
+                  Jika pembayaran sudah berhasil, top-up akan masuk ke status diproses atau selesai. Jika perlu bantuan, simpan Order ID lalu hubungi admin.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:12px;background:rgba(234,179,8,0.10);border:1px solid rgba(234,179,8,0.22);padding:12px;border-radius:16px;">
+            <p style="margin:0;color:#fde68a;font-size:12px;line-height:1.6;">
+              Catatan: jangan buat order baru dulu kalau pembayaran sudah berhasil tapi top-up belum masuk. Tunggu beberapa saat atau hubungi admin dengan Order ID yang sama.
+            </p>
+          </div>
+        </div>
+      `,
+    });
+  };
+
   useEffect(() => {
-  const idDariUrl =
-    searchParams.get('order_id') ||
-    searchParams.get('id');
+    if (!orderIdDariUrl) return;
 
-  if (!idDariUrl) return;
+    setOrderId(orderIdDariUrl);
+    cekOrder(orderIdDariUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderIdDariUrl]);
 
-  setOrderId(idDariUrl);
-  cekOrder(idDariUrl);
-}, [searchParams]);
-  const status = statusUtama(dataOrder);
-  const nomorAdmin = process.env.NEXT_PUBLIC_ADMIN_WHATSAPP;
+  const linkChatAdmin = () => {
+    if (!nomorAdmin || !dataOrder) return '#';
 
-const linkChatAdmin = () => {
-  if (!nomorAdmin || !dataOrder) return '#';
+    const pesan = encodeURIComponent(
+      `Halo admin NaXaShop, saya butuh bantuan.\n\nOrder ID: ${dataOrder.order_id}\nProduk: ${dataOrder.nama_produk || dataOrder.kode_produk || '-'}\nID Player: ${dataOrder.id_player || '-'}\nZone/Server: ${dataOrder.zone_player || '-'}\nStatus Bayar: ${dataOrder.status_bayar || '-'}\nStatus Top-up: ${dataOrder.status_topup || '-'}`
+    );
 
-  const pesan = encodeURIComponent(
-    `Halo admin NaXaShop, saya butuh bantuan.\n\nOrder ID: ${dataOrder.order_id}\nProduk: ${dataOrder.nama_produk || dataOrder.kode_produk}\nID Player: ${dataOrder.id_player}\nZone/Server: ${dataOrder.zone_player || '-'}\nStatus Bayar: ${dataOrder.status_bayar}\nStatus Top-up: ${dataOrder.status_topup}`
-  );
+    return `https://wa.me/${nomorAdmin}?text=${pesan}`;
+  };
 
-  return `https://wa.me/${nomorAdmin}?text=${pesan}`;
-};
-
-const bukaTutorialLacak = () => {
-  Swal.fire({
-    title: 'Cara Cek Order',
-    width: 620,
-    background: '#111827',
-    color: '#fff',
-    confirmButtonText: 'Paham bree 🔥',
-    confirmButtonColor: '#06b6d4',
-    html: `
-      <div style="text-align:left;">
-        <div style="display:grid; gap:10px;">
-          <div style="display:flex; gap:12px; background:#020617; border:1px solid #1f2937; padding:12px; border-radius:14px;">
-            <span style="flex:0 0 auto; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:999px; background:#06b6d4; color:white; font-weight:900; font-size:12px;">1</span>
-            <div>
-              <b style="color:white; font-size:13px;">Salin Order ID</b>
-              <p style="margin:4px 0 0; color:#94a3b8; font-size:12px; line-height:1.5;">
-                Order ID biasanya formatnya seperti <code style="color:#67e8f9;">NX-xxxxxxxxxxxxx</code>. Bisa dilihat di halaman pembayaran atau struk.
-              </p>
-            </div>
-          </div>
-
-          <div style="display:flex; gap:12px; background:#020617; border:1px solid #1f2937; padding:12px; border-radius:14px;">
-            <span style="flex:0 0 auto; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:999px; background:#3b82f6; color:white; font-weight:900; font-size:12px;">2</span>
-            <div>
-              <b style="color:white; font-size:13px;">Tempel ke kolom cek order</b>
-              <p style="margin:4px 0 0; color:#94a3b8; font-size:12px; line-height:1.5;">
-                Masukkan Order ID ke kolom yang tersedia, lalu klik tombol <b>Cek</b>.
-              </p>
-            </div>
-          </div>
-
-          <div style="display:flex; gap:12px; background:#020617; border:1px solid #1f2937; padding:12px; border-radius:14px;">
-            <span style="flex:0 0 auto; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:999px; background:#22c55e; color:white; font-weight:900; font-size:12px;">3</span>
-            <div>
-              <b style="color:white; font-size:13px;">Lihat status transaksi</b>
-              <p style="margin:4px 0 0; color:#94a3b8; font-size:12px; line-height:1.5;">
-                Kalau pembayaran sudah sukses, status top-up akan berubah menjadi diproses atau berhasil. Kalau bermasalah, klik tombol Chat Admin.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div style="margin-top:14px; background:rgba(234,179,8,0.10); border:1px solid rgba(234,179,8,0.22); padding:12px; border-radius:14px;">
-          <p style="margin:0; color:#fde68a; font-size:12px; line-height:1.6;">
-            Tips: simpan Order ID sampai top-up berhasil. Jangan bikin order baru dulu kalau pembayaran sudah sukses tapi top-up belum masuk.
-          </p>
-        </div>
-      </div>
-    `
-  });
-};
   return (
-    <main className="min-h-screen bg-slate-950 text-white px-4 py-6 flex items-center justify-center">
-      <div className="w-full max-w-xl">
-        <div className="mb-4">
-          <Link href={linkBalik} className="text-xs text-cyan-400 hover:text-cyan-300 font-black">
+    <main className="min-h-[100dvh] bg-slate-950 px-4 py-4 text-white sm:py-6">
+      <div className="mx-auto flex min-h-[calc(100dvh-32px)] w-full max-w-2xl flex-col justify-center">
+        <div className="mb-3">
+          <Link
+            href={linkBalik}
+            className="inline-flex items-center gap-2 text-xs font-black text-blue-400 transition hover:text-blue-300"
+          >
+            <FaArrowLeft className="text-[10px]" />
             {teksBalik}
           </Link>
         </div>
 
-        <section className="bg-gray-900 border border-gray-800 rounded-[2rem] shadow-2xl overflow-hidden relative">
-          <div className="absolute -top-24 -right-24 w-64 h-64 bg-cyan-500/10 blur-[90px] rounded-full"></div>
-          <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-blue-500/10 blur-[90px] rounded-full"></div>
+        <section className="relative overflow-hidden rounded-[2rem] border border-gray-800 bg-gray-900 shadow-2xl shadow-black/30">
+          <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-blue-500/10 blur-[90px]" />
+          <div className="pointer-events-none absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-blue-600/10 blur-[90px]" />
 
-          <div className="relative z-10 p-5 sm:p-6">
-            <div className="text-center mb-5">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-2xl mb-3">
-                🧾
+          <div className="relative z-10 p-4 sm:p-5">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl border border-blue-500/20 bg-blue-500/10 text-base text-blue-300">
+                  <FaReceipt />
+                </div>
+
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-blue-400">
+                  Lacak Pesanan
+                </p>
+
+                <h1 className="mt-2 text-2xl font-black text-white sm:text-3xl">
+                  Cek status order
+                </h1>
+
+                <p className="mt-2 max-w-xl text-xs leading-relaxed text-gray-400 sm:text-sm">
+                  Masukkan Order ID untuk melihat status pembayaran dan top-up.
+                  Order ID biasanya diawali dengan{' '}
+                  <span className="font-black text-blue-300">NX-</span>.
+                </p>
               </div>
-              <h1 className="text-2xl font-black">
-                Cek <span className="text-cyan-400">Order</span>
-              </h1>
-              <p className="text-gray-500 text-xs mt-1">
-  Masukin resi transaksi lu.
-</p>
-
-<button
-  type="button"
-  onClick={bukaTutorialLacak}
-  className="mt-3 inline-flex items-center gap-2 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-2 text-xs font-black text-cyan-300 transition-all hover:border-cyan-400 hover:bg-cyan-500/20"
->
-  ❔ Cara cek order
-</button>
-            </div>
-
-            <form onSubmit={handleCekOrder} className="flex flex-col sm:flex-row gap-3">
-              <input
-                type="text"
-                value={orderId}
-                onChange={(e) => setOrderId(e.target.value)}
-                placeholder="NX-xxxxxxxxxxxxx"
-                className="flex-1 bg-slate-950 border border-gray-700 rounded-2xl px-4 py-3 text-sm text-white outline-none focus:border-cyan-500 font-mono"
-              />
 
               <button
-                type="submit"
-                disabled={loading}
-                className="px-5 py-3 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-black text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                type="button"
+                onClick={bukaCaraCekOrder}
+                className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-2xl border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-xs font-black text-blue-200 transition hover:border-blue-400/40 hover:bg-blue-500/15 hover:text-white"
               >
-                {loading ? 'Cek...' : 'Cek 🔍'}
+                <FaQuestionCircle className="text-xs" />
+                <span className="hidden sm:inline">Cara cek</span>
               </button>
+            </div>
+
+            <form
+              onSubmit={handleCekOrder}
+              className="rounded-3xl border border-gray-800 bg-slate-950/70 p-3 sm:p-4"
+            >
+              <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.18em] text-gray-500">
+                Order ID
+              </label>
+
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <input
+                  type="text"
+                  value={orderId}
+                  onChange={(e) => setOrderId(e.target.value)}
+                  placeholder="Contoh: NX-1781171911775-6FAD3EC3"
+                  className="flex-1 rounded-2xl border border-gray-700 bg-slate-950 px-4 py-3 font-mono text-xs text-white outline-none transition placeholder:text-gray-600 focus:border-blue-500 sm:text-sm"
+                />
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-xs font-black text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
+                >
+                  <FaSearch className="text-xs" />
+                  {loading ? 'Mengecek...' : 'Cek Status'}
+                </button>
+              </div>
+
+              {pesanError && (
+                <div className="mt-3 rounded-2xl border border-red-500/20 bg-red-500/10 p-3 text-xs font-bold leading-relaxed text-red-300">
+                  {pesanError}
+                </div>
+              )}
+
+              {!dataOrder && !pesanError && (
+                <p className="mt-3 text-[11px] leading-relaxed text-gray-500">
+                  Order ID bisa kamu salin dari halaman pembayaran, struk, atau
+                  halaman riwayat transaksi.
+                </p>
+              )}
             </form>
 
-            {!dataOrder && !pesanError && (
-  <div className="mt-4 grid grid-cols-3 gap-2">
-    <div className="rounded-2xl border border-gray-800 bg-slate-950/70 p-3 text-center">
-      <p className="text-lg">📋</p>
-      <p className="mt-1 text-[10px] font-black text-gray-400">
-        Salin Order ID
-      </p>
-    </div>
-
-    <div className="rounded-2xl border border-gray-800 bg-slate-950/70 p-3 text-center">
-      <p className="text-lg">🔍</p>
-      <p className="mt-1 text-[10px] font-black text-gray-400">
-        Klik Cek
-      </p>
-    </div>
-
-    <div className="rounded-2xl border border-gray-800 bg-slate-950/70 p-3 text-center">
-      <p className="text-lg">🧾</p>
-      <p className="mt-1 text-[10px] font-black text-gray-400">
-        Lihat Status
-      </p>
-    </div>
-  </div>
-)}
-
-            {pesanError && (
-              <div className="mt-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-2xl p-3 text-xs font-bold">
-                {pesanError}
-              </div>
-            )}
-
             {dataOrder && status && (
-              <div className="mt-5 bg-slate-950 border border-gray-800 rounded-[1.5rem] overflow-hidden">
-                {/* HEADER STRUK */}
-                <div className={`p-4 border-b ${status.bg}`}>
-                  <div className="flex items-center gap-3">
-                    <div className="text-3xl">{status.icon}</div>
+              <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-gray-800 bg-slate-950">
+                <div className={`border-b p-4 ${status.box}`}>
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950/70 text-xl ${status.color}`}
+                    >
+                      <StatusIcon />
+                    </div>
+
                     <div className="min-w-0">
-                      <h2 className={`text-lg font-black ${status.color}`}>
+                      <h2 className={`text-base font-black ${status.color}`}>
                         {status.title}
                       </h2>
-                      <p className="text-xs text-gray-400">{status.desc}</p>
+
+                      <p className="mt-1 text-xs leading-relaxed text-gray-400">
+                        {status.desc}
+                      </p>
                     </div>
                   </div>
                 </div>
 
-                {/* BODY STRUK */}
-                <div className="p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-4 border-b border-dashed border-gray-700 pb-3">
+                <div className="space-y-3 p-4">
+                  <div className="flex items-start justify-between gap-3 border-b border-dashed border-gray-800 pb-3">
                     <div className="min-w-0">
-                      <p className="text-[10px] text-gray-500 font-black uppercase tracking-wider">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-gray-500">
                         Order ID
                       </p>
-                      <p className="font-mono text-xs text-cyan-400 font-black break-all">
+
+                      <p className="mt-1 break-all font-mono text-xs font-black text-blue-400">
                         {dataOrder.order_id}
                       </p>
+
+                      {copied && (
+                        <p className="mt-1 text-[11px] font-bold text-blue-300">
+                          Order ID tersalin.
+                        </p>
+                      )}
                     </div>
 
                     <button
                       type="button"
                       onClick={copyOrderId}
-                      className="shrink-0 text-[10px] px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 font-black"
+                      className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-xl bg-gray-800 px-3 py-2 text-[10px] font-black text-gray-300 transition hover:bg-gray-700"
                     >
-                      Copy
+                      <FaCopy />
+                      Salin
                     </button>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <p className="text-[10px] text-gray-500 font-black uppercase tracking-wider">
+                    <div className="col-span-2">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-gray-500">
                         Produk
                       </p>
-                      <p className="font-bold text-white truncate">
-                        {dataOrder.nama_produk || 'Produk Top Up'}
+
+                      <p className="mt-1 line-clamp-2 font-black text-white">
+                        {dataOrder.nama_produk ||
+                          dataOrder.kode_produk ||
+                          'Produk Top Up'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-wider text-gray-500">
+                        Total
+                      </p>
+
+                      <p className="mt-1 font-black text-green-400">
+                        {formatRupiah(totalBayar)}
                       </p>
                     </div>
 
                     <div className="text-right">
-                      <p className="text-[10px] text-gray-500 font-black uppercase tracking-wider">
-                        Total
+                      <p className="text-[10px] font-black uppercase tracking-wider text-gray-500">
+                        Metode
                       </p>
-                      <p className="font-black text-green-400">
-                        {formatRupiah(dataOrder.harga)}
-                      </p>
-                      <p className="text-[11px] text-gray-500">
+
+                      <p className="mt-1 truncate font-bold text-gray-300">
                         {dataOrder.payment_type || '-'}
                       </p>
                     </div>
 
                     <div>
-                      <p className="text-[10px] text-gray-500 font-black uppercase tracking-wider">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-gray-500">
                         ID Player
                       </p>
-                      <p className="font-bold text-white truncate">
-                        {dataOrder.id_player}
+
+                      <p className="mt-1 break-all font-bold text-white">
+                        {dataOrder.id_player || '-'}
                       </p>
                     </div>
 
                     <div className="text-right">
-                      <p className="text-[10px] text-gray-500 font-black uppercase tracking-wider">
-                        Zone/Server
+                      <p className="text-[10px] font-black uppercase tracking-wider text-gray-500">
+                        Zone / Server
                       </p>
-                      <p className="font-bold text-white truncate">
+
+                      <p className="mt-1 break-all font-bold text-white">
                         {dataOrder.zone_player || '-'}
                       </p>
                     </div>
                   </div>
 
-                  <div className="border-t border-dashed border-gray-700 pt-3 flex flex-wrap gap-2">
-                    <span className={`px-3 py-2 rounded-xl border text-[11px] font-black ${badgeBayar(dataOrder.status_bayar)}`}>
-                      Bayar: {dataOrder.status_bayar}
-                    </span>
+                  <div className="border-t border-dashed border-gray-800 pt-3">
+                    <div className="flex flex-wrap gap-2">
+                      <span
+                        className={`rounded-xl border px-3 py-2 text-[11px] font-black ${badgeBayar(
+                          dataOrder.status_bayar
+                        )}`}
+                      >
+                        Bayar: {labelStatus(dataOrder.status_bayar)}
+                      </span>
 
-                    <span className={`px-3 py-2 rounded-xl border text-[11px] font-black ${badgeTopup(dataOrder.status_topup)}`}>
-                      Top-up: {dataOrder.status_topup}
-                    </span>
+                      <span
+                        className={`rounded-xl border px-3 py-2 text-[11px] font-black ${badgeTopup(
+                          dataOrder.status_topup
+                        )}`}
+                      >
+                        Top-up: {labelStatus(dataOrder.status_topup)}
+                      </span>
+                    </div>
                   </div>
 
-                  {dataOrder.status_topup === 'gagal' && (
-                    <div className="bg-orange-500/10 border border-orange-500/20 text-orange-300 rounded-2xl p-3 text-xs font-semibold">
-                      Simpan Order ID ini lalu hubungi admin. Jangan bikin order baru dulu kalau pembayaran sudah sukses.
+                  {normalisasiStatus(dataOrder.status_topup) === 'gagal' && (
+                    <div className="rounded-2xl border border-orange-500/20 bg-orange-500/10 p-3 text-xs font-semibold leading-relaxed text-orange-200">
+                      Simpan Order ID ini lalu hubungi admin. Jangan buat order baru
+                      dulu kalau pembayaran sudah berhasil.
                     </div>
                   )}
+
+                  {perluChatAdmin && nomorAdmin && (
+                    <a
+                      href={linkChatAdmin()}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-green-600 px-4 py-3 text-sm font-black text-white transition hover:bg-green-500"
+                    >
+                      <FaHeadset />
+                      Chat Admin
+                    </a>
+                  )}
                 </div>
-                  {nomorAdmin && dataOrder.status_topup !== 'sukses' && (
-                  <a
-                    href={linkChatAdmin()}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block w-full text-center py-3 rounded-2xl bg-green-500 hover:bg-green-400 text-white text-sm font-black transition-all"
-                  >
-                    💬 Chat Admin
-                  </a>
-                )}
-                {/* FOOTER STRUK */}
-                <div className="bg-gray-900/80 px-4 py-3 border-t border-gray-800 flex items-center justify-between gap-3">
-                  <p className="text-[10px] text-gray-500 font-bold">
-                    NaXaShop Receipt
-                  </p>
-                  <p className="text-[10px] text-gray-600 font-mono">
-                    Thank you 🎮
-                  </p>
-                </div>
+              </div>
+            )}
+
+            {!dataOrder && (
+              <div className="mt-4 rounded-2xl border border-blue-500/15 bg-blue-500/5 p-3">
+                <p className="text-[11px] leading-relaxed text-blue-100/55">
+                  Tips: simpan Order ID sampai pesanan selesai. Kalau pembayaran
+                  sudah berhasil tapi top-up belum masuk, tunggu beberapa saat
+                  atau hubungi admin dengan Order ID yang sama.
+                </p>
               </div>
             )}
           </div>

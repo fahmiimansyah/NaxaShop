@@ -19,14 +19,21 @@ function normalisasiStatus(value) {
 function statusProviderSukses(status) {
   const s = normalisasiStatus(status);
 
-  return [
-    'sukses',
-    'success',
-    'berhasil',
-    'done',
-    'completed',
-    'complete'
-  ].includes(s);
+  return (
+    [
+      'sukses',
+      'success',
+      'berhasil',
+      'done',
+      'completed',
+      'complete'
+    ].includes(s) ||
+    s.includes('success') ||
+    s.includes('sukses') ||
+    s.includes('berhasil') ||
+    s.includes('completed') ||
+    s.includes('complete')
+  );
 }
 
 function statusProviderGagal(status) {
@@ -67,6 +74,24 @@ function bacaJsonAman(value) {
     return JSON.parse(value);
   } catch {
     return null;
+  }
+}
+
+function parsePayloadCallback(rawBody, contentType = '') {
+  if (!rawBody) return {};
+
+  if (contentType.includes('application/json')) {
+    return JSON.parse(rawBody);
+  }
+
+  if (contentType.includes('application/x-www-form-urlencoded')) {
+    return Object.fromEntries(new URLSearchParams(rawBody));
+  }
+
+  try {
+    return JSON.parse(rawBody);
+  } catch {
+    return Object.fromEntries(new URLSearchParams(rawBody));
   }
 }
 
@@ -277,14 +302,17 @@ export async function POST(request) {
     let payload;
 
     try {
-      payload = rawBody ? JSON.parse(rawBody) : {};
+      payload = parsePayloadCallback(
+        rawBody,
+        request.headers.get('content-type') || ''
+      );
     } catch (error) {
-      console.error('Payload callback VIPReseller bukan JSON:', rawBody);
+      console.error('Payload callback VIPReseller tidak bisa dibaca:', rawBody);
 
       return NextResponse.json(
         {
           sukses: false,
-          pesan: 'Payload callback VIPReseller bukan JSON.'
+          pesan: 'Payload callback VIPReseller tidak bisa dibaca.'
         },
         { status: 400 }
       );
@@ -306,7 +334,7 @@ export async function POST(request) {
 
     if (!orderId && !trxid) {
       await kirimNotifAman({
-        subject: '🚨 Callback VIPReseller Tanpa Order ID / TRXID',
+        subject: '⚠️ Callback VIPReseller Tanpa Order ID / TRXID',
         title: 'Callback VIPReseller Tidak Bisa Dicocokkan',
         message:
           'VIPReseller mengirim callback, tapi tidak ada order_id/ref_id/trxid yang bisa dipakai untuk mencari transaksi.',
@@ -329,7 +357,7 @@ export async function POST(request) {
 
     if (orderId && !orderIdValid(orderId)) {
       await kirimNotifAman({
-        subject: `🚨 Callback VIPReseller Order ID Aneh - ${orderId}`,
+        subject: `⚠️ Callback VIPReseller Order ID Tidak Dikenali - ${orderId}`,
         title: 'Format Order ID Callback VIPReseller Tidak Valid',
         message:
           'VIPReseller mengirim callback dengan order_id/ref_id yang bukan format order NaXaShop.',
@@ -358,29 +386,36 @@ export async function POST(request) {
     });
 
     if (!trx) {
+      const detailCallbackTidakCocok = {
+        orderId,
+        trxid,
+        statusRaw,
+        statusNormal,
+        userAgent,
+        payload
+      };
+
+      if (statusProviderMasihProses(statusRaw)) {
+        console.log('Callback VIPReseller belum cocok, status masih proses:', detailCallbackTidakCocok);
+
+        return NextResponse.json({
+          sukses: true,
+          pesan: 'Callback diterima. Status provider masih proses dan transaksi belum cocok.'
+        });
+      }
+
       await kirimNotifAman({
-        subject: `🚨 Callback VIPReseller Transaksi Tidak Ditemukan`,
-        title: 'Callback VIPReseller Masuk Tapi Transaksi Tidak Ada',
+        subject: `⚠️ Callback VIPReseller Belum Cocok`,
+        title: 'Callback VIPReseller Belum Cocok dengan Transaksi',
         message:
-          'VIPReseller mengirim callback valid, tapi transaksi tidak ditemukan di database.',
+          'NaXaShop menerima callback valid dari VIPReseller, tetapi TRXID atau Order ID belum cocok dengan transaksi di database. Ini bisa terjadi dari callback tester, transaksi lama, atau callback di luar NaXaShop.',
         orderId: orderId || '-',
-        detail: JSON.stringify(
-          {
-            orderId,
-            trxid,
-            statusRaw,
-            statusNormal,
-            userAgent,
-            payload
-          },
-          null,
-          2
-        )
+        detail: JSON.stringify(detailCallbackTidakCocok, null, 2)
       });
 
       return NextResponse.json({
         sukses: true,
-        pesan: 'Callback diterima, tapi transaksi tidak ditemukan.'
+        pesan: 'Callback diterima, tapi transaksi belum cocok.'
       });
     }
 

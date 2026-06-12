@@ -60,9 +60,6 @@ function GameCard({ game }) {
         </div>
 
         <div className="p-3">
-          <div className="mb-2 inline-flex max-w-full rounded-full border border-blue-800/40 bg-blue-950/45 px-2 py-1 text-[9px] font-black text-blue-100/70">
-            <span className="truncate">{metaKategori.label}</span>
-          </div>
 
           <h3 className="truncate text-sm font-semibold text-white md:text-base">
             {game.nama || 'Game Tanpa Nama'}

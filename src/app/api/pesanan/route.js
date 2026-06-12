@@ -26,7 +26,7 @@ if (!limit.allowed) {
   return NextResponse.json(
     {
       sukses: false,
-      pesan: `Terlalu sering cek order bre. Coba lagi ${limit.retryAfter} detik lagi.`
+      pesan: `Terlalu sering cek order. Coba lagi ${limit.retryAfter} detik lagi.`
     },
     { status: 429 }
   );
@@ -38,7 +38,7 @@ if (!limit.allowed) {
       return NextResponse.json(
         {
           sukses: false,
-          pesan: 'Masukin resi dulu bre!'
+          pesan: 'Masukkan Order ID terlebih dahulu.'
         },
         { status: 400 }
       );
@@ -48,7 +48,7 @@ if (!limit.allowed) {
       return NextResponse.json(
         {
           sukses: false,
-          pesan: 'Format resi gak valid bre!'
+          pesan: 'Format Order ID tidak valid.'
         },
         { status: 400 }
       );
@@ -77,7 +77,7 @@ if (!limit.allowed) {
       return NextResponse.json(
         {
           sukses: false,
-          pesan: 'Resi gaib! Gak ketemu di sistem kita bre.'
+          pesan: 'Order ID tidak ditemukan. Pastikan Order ID yang dimasukkan sudah benar.'
         },
         { status: 404 }
       );
@@ -108,12 +108,12 @@ if (!limit.allowed) {
   }
 );
   } catch (error) {
-    console.error('Dapur Lacak meledak:', error);
+    console.error('GET /api/pesanan error:', error);
 
     return NextResponse.json(
       {
         sukses: false,
-        pesan: 'Waduh, dapur lagi ngadat bre!'
+        pesan: 'Sistem belum bisa mengecek pesanan. Coba lagi sebentar lagi.'
       },
       { status: 500 }
     );

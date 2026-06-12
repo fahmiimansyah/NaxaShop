@@ -550,8 +550,30 @@ export default function FormKasir({ dataGame }) {
       }
 
       Swal.close();
-      sessionStorage.setItem('dataTagihan', JSON.stringify(dataSistem));
-      router.push('/pembayaran');
+
+const dataTagihanFinal = {
+  ...dataSistem,
+  status_bayar: dataSistem.status_bayar || 'pending',
+  status_topup: dataSistem.status_topup || 'pending',
+  created_at: dataSistem.created_at || new Date().toISOString(),
+};
+
+const orderIdTagihan = dataTagihanFinal?.order_id;
+const keyTagihan = orderIdTagihan
+  ? `dataTagihan:${orderIdTagihan}`
+  : 'dataTagihan';
+
+sessionStorage.setItem('dataTagihan', JSON.stringify(dataTagihanFinal));
+localStorage.setItem('dataTagihan', JSON.stringify(dataTagihanFinal));
+
+if (orderIdTagihan) {
+  sessionStorage.setItem(keyTagihan, JSON.stringify(dataTagihanFinal));
+  localStorage.setItem(keyTagihan, JSON.stringify(dataTagihanFinal));
+
+  router.push(`/pembayaran?order_id=${encodeURIComponent(orderIdTagihan)}`);
+} else {
+  router.push('/pembayaran');
+}
     };
 
     setIsProsesBeli(true);
