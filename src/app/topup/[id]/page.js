@@ -64,11 +64,11 @@ export default async function HalamanTopUp({ params }) {
         <main className="flex min-h-[70vh] items-center justify-center px-4">
           <div className="rounded-3xl border border-red-500/20 bg-red-500/10 px-8 py-6 text-center shadow-2xl">
             <h1 className="text-2xl font-black md:text-3xl">
-              Gamenya ga ada bre! 😭
+              Game tidak ditemukan
             </h1>
 
             <p className="mt-2 text-sm text-red-200">
-              Coba cek lagi URL atau ID gamenya.
+              Coba kembali ke beranda atau pilih game lain yang tersedia.
             </p>
           </div>
         </main>
@@ -91,7 +91,7 @@ export default async function HalamanTopUp({ params }) {
         {/* HERO GAME COMPACT */}
         <section className="relative overflow-hidden rounded-[1.5rem] border border-white/10 bg-gradient-to-br from-slate-900 via-slate-900 to-blue-950 p-4 shadow-xl md:p-5">
           <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-blue-500/20 blur-3xl" />
-          <div className="absolute -bottom-16 -left-16 h-44 w-44 rounded-full bg-cyan-500/10 blur-3xl" />
+          <div className="absolute -bottom-16 -left-16 h-44 w-44 rounded-full bg-blue-500/10 blur-3xl" />
 
           <div className="relative z-10 flex items-center gap-4">
             <div className="shrink-0">
@@ -125,7 +125,7 @@ export default async function HalamanTopUp({ params }) {
 
               <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-400 sm:text-sm">
                 {gameComingSoon
-                  ? 'Etalase produk game ini masih dalam persiapan, juga checkout belum dibuka. Pantau terus update-nya yaa.'
+                  ? 'Game ini sedang disiapkan. Etalase sudah bisa dilihat, tapi checkout belum dibuka dulu.'
                   : 'Pilih nominal, isi data akun, lalu checkout. Pastikan ID benar sebelum bayar.'}
               </p>
             </div>
@@ -144,7 +144,7 @@ export default async function HalamanTopUp({ params }) {
                 </h2>
 
                 <p className="mt-1 text-xs leading-relaxed text-yellow-100/80 sm:text-sm">
-                  Game ini tampil dulu sebagai teaser. Checkout belum dibuka sampai admin mengaktifkannya.
+                  Game ini tampil dulu sebagai teaser. Checkout akan dibuka setelah produk siap diproses dengan aman.
                 </p>
               </div>
             </div>
@@ -157,50 +157,23 @@ export default async function HalamanTopUp({ params }) {
             <FormKasir dataGame={dataGame} />
           </div>
         </section>
-        {/* INFO KECIL: CATATAN DULU, CARA TOP UP COLLAPSE */}
-        <section className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[380px_minmax(0,1fr)]">
+        {/* SEO & HELP SECTION - URUTANNYA DISESUAIKAN DENGAN FORM KASIR */}
+        <section className="mt-5 space-y-4">
+          <div className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-slate-900/75 shadow-xl">
+            <div className="border-b border-white/10 bg-gradient-to-r from-blue-500/10 via-slate-900/40 to-transparent p-5 md:p-6">
+              <p className="text-[10px] font-black uppercase tracking-wider text-blue-300">
+                Panduan Checkout
+              </p>
 
+              <h2 className="mt-2 text-xl font-black text-white md:text-2xl">
+                Cara Top Up {dataGame.nama} di NaXaShop
+              </h2>
+            </div>
 
-          {/* CARA TOP UP COLLAPSE */}
-          <details className="group rounded-[1.5rem] border border-white/10 bg-slate-900/80 p-4 shadow-xl">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-wider text-cyan-400">
-                  Panduan Singkat
-                </p>
-
-                <h2 className="mt-1 text-base font-black text-white">
-                  Cara Top Up
-                </h2>
-
-                <p className="mt-1 text-xs text-slate-500">
-                  Klik kalau butuh panduan.
-                </p>
-              </div>
-
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-cyan-500/20 bg-cyan-500/10 text-cyan-300 transition-transform duration-300 group-open:rotate-180">
-                ⌄
-              </div>
-            </summary>
-
-            <div className="mt-4 grid grid-cols-1 gap-3 border-t border-white/10 pt-4 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4 md:p-5">
               <div className="rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4">
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500 text-xs font-black text-white">
                   1
-                </span>
-
-                <h3 className="mt-3 text-sm font-black text-white">
-                  Isi Data Akun
-                </h3>
-
-                <p className="mt-1 text-xs leading-relaxed text-slate-400">
-                  Masukkan User ID, Zone ID, atau Server sesuai game.
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4">
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-cyan-500 text-xs font-black text-white">
-                  2
                 </span>
 
                 <h3 className="mt-3 text-sm font-black text-white">
@@ -208,13 +181,41 @@ export default async function HalamanTopUp({ params }) {
                 </h3>
 
                 <p className="mt-1 text-xs leading-relaxed text-slate-400">
-                  Pilih produk top up yang mau dibeli.
+                  Tentukan produk atau nominal top up yang ingin kamu beli.
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white">
+              <div className="rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500 text-xs font-black text-white">
+                  2
+                </span>
+
+                <h3 className="mt-3 text-sm font-black text-white">
+                  Isi Data Akun
+                </h3>
+
+                <p className="mt-1 text-xs leading-relaxed text-slate-400">
+                  Masukkan User ID, Zone ID, atau server sesuai kebutuhan game.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500 text-xs font-black text-white">
                   3
+                </span>
+
+                <h3 className="mt-3 text-sm font-black text-white">
+                  Pilih Pembayaran
+                </h3>
+
+                <p className="mt-1 text-xs leading-relaxed text-slate-400">
+                  Pilih metode pembayaran yang tersedia dan cek total akhirnya.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500 text-xs font-black text-white">
+                  4
                 </span>
 
                 <h3 className="mt-3 text-sm font-black text-white">
@@ -222,13 +223,77 @@ export default async function HalamanTopUp({ params }) {
                 </h3>
 
                 <p className="mt-1 text-xs leading-relaxed text-slate-400">
-                  Bayar pesanan, lalu pantau status sampai selesai.
+                  Selesaikan pembayaran, lalu pantau status sampai pesanan selesai.
                 </p>
               </div>
             </div>
-          </details>
-        </section>
+          </div>
 
+          {!gameComingSoon && (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
+              <div className="rounded-[1.5rem] border border-white/10 bg-slate-900/70 p-5 shadow-xl md:p-6">
+                <p className="text-[10px] font-black uppercase tracking-wider text-blue-300">
+                  FAQ Ringkas
+                </p>
+
+                <h2 className="mt-2 text-lg font-black text-white">
+                  Pertanyaan seputar top up {dataGame.nama}
+                </h2>
+
+                <div className="mt-5 space-y-4">
+                  <div>
+                    <h3 className="text-sm font-black text-white">
+                      Berapa lama proses top up?
+                    </h3>
+
+                    <p className="mt-1 text-xs leading-relaxed text-slate-400">
+                      Pesanan diproses setelah pembayaran berhasil. Waktu proses
+                      bisa berbeda tergantung produk dan kondisi provider.
+                    </p>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-black text-white">
+                      Apa yang harus dicek sebelum bayar?
+                    </h3>
+
+                    <p className="mt-1 text-xs leading-relaxed text-slate-400">
+                      Cek kembali nominal, User ID, Zone ID atau server, metode
+                      pembayaran, dan total tagihan sebelum checkout.
+                    </p>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-black text-white">
+                      Bagaimana kalau pesanan perlu dicek?
+                    </h3>
+
+                    <p className="mt-1 text-xs leading-relaxed text-slate-400">
+                      Simpan Order ID dari halaman pembayaran, lalu hubungi support
+                      NaXaShop supaya transaksi bisa dicek lebih cepat.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-[1.5rem] border border-blue-500/20 bg-blue-500/10 p-5 shadow-xl md:p-6">
+                <p className="text-[10px] font-black uppercase tracking-wider text-blue-200">
+                  Tips Aman
+                </p>
+
+                <h2 className="mt-2 text-lg font-black text-white">
+                  Simpan halaman pembayaran
+                </h2>
+
+                <p className="mt-4 text-sm leading-relaxed text-blue-50/80">
+                  Setelah transaksi dibuat, jangan buru-buru menutup halaman
+                  pembayaran. Simpan Order ID atau screenshot instruksi pembayaran
+                  untuk jaga-jaga kalau butuh pengecekan.
+                </p>
+              </div>
+            </div>
+          )}
+        </section>
       </main>
     </div>
   );

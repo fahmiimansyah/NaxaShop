@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import {
   FaInstagram,
   FaTiktok,
-  FaWhatsapp,
   FaEnvelope,
   FaReceipt,
   FaHeadset,
@@ -99,8 +98,7 @@ export default function Footer() {
             </Link>
 
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-blue-100/55">
-             NaXaShop membantu player melakukan top up game dengan alur yang ringkas,
-            status pesanan yang jelas, dan bantuan support saat dibutuhkan.
+             NaXaShop bantu kamu top up game dengan alur ringkas, status pesanan yang jelas, dan support yang gak bikin kamu merasa ngomong sama tembok.
             </p>
 
             <div className="mt-5 flex flex-wrap gap-2">
@@ -112,25 +110,13 @@ export default function Footer() {
                 Cek Pesanan
               </Link>
 
-              {whatsappLink ? (
-                <a
-                  href={whatsappLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-2xl border border-blue-400/20 bg-blue-500/10 px-4 py-2.5 text-xs font-black text-blue-100 transition hover:-translate-y-0.5 hover:border-blue-300/40 hover:bg-blue-500/15"
-                >
-                  <FaWhatsapp />
-                  Hubungi Support
-                </a>
-              ) : (
-                <Link
-                  href="/support"
-                  className="inline-flex items-center gap-2 rounded-2xl border border-blue-400/20 bg-blue-500/10 px-4 py-2.5 text-xs font-black text-blue-100 transition hover:-translate-y-0.5 hover:border-blue-300/40 hover:bg-blue-500/15"
-                >
-                  <FaHeadset />
-                  Pusat Bantuan
-                </Link>
-              )}
+              <Link
+                href="/support"
+                className="inline-flex items-center gap-2 rounded-2xl border border-blue-400/20 bg-blue-500/10 px-4 py-2.5 text-xs font-black text-blue-100 transition hover:-translate-y-0.5 hover:border-blue-300/40 hover:bg-blue-500/15"
+              >
+                <FaHeadset />
+                Pusat Bantuan
+              </Link>
             </div>
           </div>
 
@@ -198,17 +184,6 @@ export default function Footer() {
                 </a>
               )}
 
-              {whatsappLink && (
-                <a
-                  href={whatsappLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="WhatsApp NaXaShop"
-                  className="flex h-9 w-9 items-center justify-center rounded-2xl border border-blue-400/20 bg-blue-500/10 text-sm text-blue-100 transition hover:-translate-y-0.5 hover:border-blue-300/40 hover:bg-blue-600"
-                >
-                  <FaWhatsapp />
-                </a>
-              )}
             </div>
           </div>
         </div>
@@ -218,7 +193,7 @@ export default function Footer() {
             <p className="text-xs font-semibold text-blue-100/45">
               © {new Date().getFullYear()}{" "}
               <span className="font-black text-blue-100">NaXaShop.id</span>.
-              Dikelola untuk pengalaman top up yang lebih rapi, aman, dan jelas.
+              Dibuat untuk top up yang rapi, jelas, dan gak banyak drama.
             </p>
 
             <p className="mx-auto max-w-xl text-[10px] leading-relaxed text-blue-100/35 sm:mx-0 sm:max-w-md sm:text-right">

@@ -18,7 +18,7 @@ export default function FormKasir({ dataGame }) {
   const [voucherAktif, setVoucherAktif] = useState(null);
   const [isCekVoucher, setIsCekVoucher] = useState(false);
 
-  const butuhZoneId = dataGame.zone_id === 1;
+  const butuhZoneId = Number(dataGame.zone_id) === 1;
   const butuhServer = dataGame.server_game && dataGame.server_game.trim() !== '';
   const gameComingSoon = dataGame.status_game === 'coming_soon';
 
@@ -208,9 +208,9 @@ export default function FormKasir({ dataGame }) {
     !produkDipilih ||
     gameComingSoon ||
     isProdukComingSoon(produkDipilih) ||
-    !inputUserId ||
-    (butuhZoneId && !inputZoneId) ||
-    (butuhServer && !inputZoneId) ||
+    !inputUserId.trim() ||
+    (butuhZoneId && !inputZoneId.trim()) ||
+    (butuhServer && !inputZoneId.trim()) ||
     !metodeBayar ||
     isMetodeBayarDisabled(metodeBayar) ||
     isProsesBeli;
@@ -317,8 +317,8 @@ export default function FormKasir({ dataGame }) {
       width: 620,
       background: '#111827',
       color: '#fff',
-      confirmButtonText: 'Paham, lanjut isi ID 🔥',
-      confirmButtonColor: '#06b6d4',
+      confirmButtonText: 'Paham, lanjut isi ID',
+      confirmButtonColor: '#3b82f6',
       html: `
         <div style="text-align:left;">
           <div style="display:flex; justify-content:center; margin-bottom:14px;">
@@ -375,10 +375,10 @@ export default function FormKasir({ dataGame }) {
       Swal.fire({
         background: '#1f2937',
         color: '#fff',
-        title: 'Pilih produk dulu bree!',
+        title: 'Pilih produk dulu ya',
         text: 'Voucher baru bisa dicek setelah nominal dipilih.',
         icon: 'warning',
-        confirmButtonColor: '#06b6d4'
+        confirmButtonColor: '#3b82f6'
       });
       return;
     }
@@ -389,10 +389,10 @@ export default function FormKasir({ dataGame }) {
       Swal.fire({
         background: '#1f2937',
         color: '#fff',
-        title: 'Kode kosong bree',
-        text: 'Isi kode voucher dulu, misal NAXA10.',
+        title: 'Kode voucher masih kosong',
+        text: 'Masukkan kode voucher dulu, contoh: NAXA10.',
         icon: 'warning',
-        confirmButtonColor: '#06b6d4'
+        confirmButtonColor: '#3b82f6'
       });
       return;
     }
@@ -425,7 +425,7 @@ export default function FormKasir({ dataGame }) {
         title: 'Voucher kepasang ✅',
         text: `Diskon ${formatRupiah(hasil.data.diskon)} berhasil diterapkan.`,
         icon: 'success',
-        confirmButtonColor: '#06b6d4'
+        confirmButtonColor: '#3b82f6'
       });
     } catch (error) {
       setVoucherAktif(null);
@@ -433,10 +433,10 @@ export default function FormKasir({ dataGame }) {
       Swal.fire({
         background: '#1f2937',
         color: '#fff',
-        title: 'Voucher gagal ❌',
-        text: error.message || 'Voucher gak bisa dipakai bre.',
+        title: 'Voucher belum bisa dipakai',
+        text: error.message || 'Voucher belum bisa dipakai.',
         icon: 'error',
-        confirmButtonColor: '#06b6d4'
+        confirmButtonColor: '#3b82f6'
       });
     } finally {
       setIsCekVoucher(false);
@@ -449,7 +449,7 @@ export default function FormKasir({ dataGame }) {
       color: '#fff'
     };
 
-    const tampilWarning = (text, title = 'Waduh!') => {
+    const tampilWarning = (text, title = 'Sebentar ya') => {
       Swal.fire({
         ...alertBase,
         title,
@@ -459,56 +459,61 @@ export default function FormKasir({ dataGame }) {
       });
     };
 
+    const userIdBersih = inputUserId.trim();
+    const zoneIdBersih = inputZoneId.trim();
+    const whatsappBersih = customerWhatsapp.trim();
+    const emailBersih = customerEmail.trim();
+
     if (!produkDipilih) {
-      tampilWarning('Pilih nominal dulu bree!');
+      tampilWarning('Pilih nominal dulu ya.');
       return;
     }
 
     if (gameComingSoon) {
-      tampilWarning('Game ini masih Coming Soon. Tunggu launching dulu ya bree!', 'Segera Hadir');
+      tampilWarning('Game ini masih segera hadir. Checkout belum dibuka dulu ya.', 'Segera Hadir');
       return;
     }
 
     if (isProdukComingSoon(produkDipilih)) {
-      tampilWarning('Produk ini masih Coming Soon. Belum bisa dibeli dulu ya bree!', 'Segera Hadir');
+      tampilWarning('Produk ini masih segera hadir. Belum bisa dibeli dulu ya.', 'Segera Hadir');
       return;
     }
 
-    if (!inputUserId) {
-      tampilWarning('ID-nya isi dulu!');
+    if (!userIdBersih) {
+      tampilWarning('User ID / UID belum diisi.');
       return;
     }
 
-    if (butuhZoneId && !inputZoneId) {
-      tampilWarning('Zone ID nya isi bree');
+    if (butuhZoneId && !zoneIdBersih) {
+      tampilWarning('Zone ID belum diisi.');
       return;
     }
 
-    if (butuhServer && !inputZoneId) {
-      tampilWarning('Pilih Server lu dulu bre!');
+    if (butuhServer && !zoneIdBersih) {
+      tampilWarning('Pilih server akun dulu ya.');
       return;
     }
 
     if (!metodeBayar) {
-      tampilWarning('Pilih metode pembayaran dulu bre!', 'Eits!');
+      tampilWarning('Pilih metode pembayaran dulu ya.', 'Metode belum dipilih');
       return;
     }
 
     if (isMetodeComingSoon(metodeBayar)) {
-      tampilWarning('Metode pembayaran ini masih Coming Soon bree. Pakai metode lain dulu ya.', 'Segera Hadir');
+      tampilWarning('Metode pembayaran ini masih segera hadir. Pakai metode lain dulu ya.', 'Segera Hadir');
       return;
     }
 
     if (isMetodeTidakMemenuhiMinimal(metodeBayar)) {
       tampilWarning(
-        `Metode ini minimal transaksi ${formatRupiah(getMinimalMetode(metodeBayar))}. Pakai QRIS buat nominal kecil ya bree.`,
+        `Metode ini minimal transaksi ${formatRupiah(getMinimalMetode(metodeBayar))}. Pakai QRIS untuk nominal kecil ya.`,
         'Minimal transaksi belum cukup'
       );
       return;
     }
 
     if (voucherInput.trim() && !voucherAktif) {
-      tampilWarning('Kode voucher sudah diketik, tapi belum dipakai. Klik tombol Pakai dulu ya bree.', 'Voucher belum diterapkan');
+      tampilWarning('Kode voucher sudah diketik, tapi belum diterapkan. Klik Pakai dulu ya.', 'Voucher belum diterapkan');
       return;
     }
 
@@ -516,7 +521,7 @@ export default function FormKasir({ dataGame }) {
       Swal.fire({
         ...alertBase,
         title: 'Menyiapkan Tagihan...',
-        text: 'Bentar bree, lagi nyiapin pembayaran.',
+        text: 'Sebentar, sistem lagi menyiapkan pembayaran.',
         allowOutsideClick: false,
         didOpen: () => Swal.showLoading()
       });
@@ -528,11 +533,11 @@ export default function FormKasir({ dataGame }) {
           game_id: dataGame.id,
           produk_id: produkDipilih.id,
           kode_produk: produkDipilih.kode_produk,
-          id_player: inputUserId,
-          zone_player: inputZoneId,
+          id_player: userIdBersih,
+          zone_player: zoneIdBersih,
           metode_bayar: metodeBayar,
-          customer_whatsapp: customerWhatsapp,
-          customer_email: customerEmail,
+          customer_whatsapp: whatsappBersih,
+          customer_email: emailBersih,
           kode_voucher: voucherAktif?.kode || ''
         })
       });
@@ -542,7 +547,7 @@ export default function FormKasir({ dataGame }) {
       if (!responBeli.ok) {
         Swal.fire({
           ...alertBase,
-          title: 'Gagal bre',
+          title: 'Tagihan belum berhasil dibuat',
           text: dataSistem.pesan || dataSistem.error || 'Gagal bikin tagihan.',
           icon: 'error'
         });
@@ -581,7 +586,7 @@ if (orderIdTagihan) {
     try {
       Swal.fire({
         ...alertBase,
-        title: 'Bentar, cek akun kamu dulu',
+        title: 'Sebentar, cek akun kamu dulu',
         allowOutsideClick: false,
         didOpen: () => Swal.showLoading()
       });
@@ -590,8 +595,8 @@ if (orderIdTagihan) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id_player: inputUserId,
-          server_player: inputZoneId,
+          id_player: userIdBersih,
+          server_player: zoneIdBersih,
           kode_game: dataGame.kode_game || dataGame.server_game
         })
       });
@@ -616,8 +621,8 @@ if (orderIdTagihan) {
             <div style="text-align:left; line-height:1.7">
               <b>Username:</b> ${username}<br/>
               <b>Produk:</b> ${produkDipilih.nama_produk}<br/>
-              <b>ID:</b> ${inputUserId}<br/>
-              <b>Server/Zone:</b> ${inputZoneId || '-'}<br/>
+              <b>ID:</b> ${userIdBersih}<br/>
+              <b>Server/Zone:</b> ${zoneIdBersih || '-'}<br/>
               <b>Metode:</b> ${namaMetodeBayar[metodeBayar] || metodeBayar}<br/>
               ${voucherAktif ? `<b>Voucher:</b> ${voucherAktif.kode} (-${formatRupiah(voucherAktif.diskon)})<br/>` : ''}
               <b>Total:</b> ${formatRupiah(getTotalBayar())}<br/>
@@ -632,7 +637,7 @@ if (orderIdTagihan) {
           showCancelButton: true,
           confirmButtonText: 'OK, Lanjut Bayar',
           cancelButtonText: 'Batal dulu',
-          confirmButtonColor: '#06b6d4',
+          confirmButtonColor: '#3b82f6',
           cancelButtonColor: '#374151'
         });
 
@@ -658,7 +663,7 @@ if (orderIdTagihan) {
           showCancelButton: true,
           confirmButtonText: 'Lanjut top up manual',
           cancelButtonText: 'Batal dulu',
-          confirmButtonColor: '#06b6d4',
+          confirmButtonColor: '#3b82f6',
           cancelButtonColor: '#374151'
         });
 
@@ -681,12 +686,12 @@ if (orderIdTagihan) {
         background: '#1f2937',
         color: '#fff',
         icon: 'warning',
-        title: 'Server cek username lagi sibuk',
-        text: 'Mau lanjut top up manual?',
+        title: 'Cek username lagi padat',
+        text: 'Mau lanjut checkout tanpa cek username otomatis?',
         showCancelButton: true,
         confirmButtonText: 'Lanjut top up manual',
         cancelButtonText: 'Batal dulu',
-        confirmButtonColor: '#06b6d4',
+        confirmButtonColor: '#3b82f6',
         cancelButtonColor: '#374151'
       });
 
@@ -699,7 +704,7 @@ if (orderIdTagihan) {
   };
 
   return (
-    <div className="mt-8 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6 items-start pb-4 xl:pb-0">
+    <div className={`mt-8 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6 items-start ${produkDipilih ? 'pb-44 xl:pb-0' : 'pb-4 xl:pb-0'}`}>
       <div className="space-y-6">
         {/* 1. PILIH NOMINAL */}
         <div className="bg-gray-800 p-6 rounded-3xl border border-gray-700 shadow-lg">
@@ -714,13 +719,13 @@ if (orderIdTagihan) {
             <div className="mb-4 rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4">
               <p className="text-sm font-black text-yellow-300">🕒 Game ini Coming Soon</p>
               <p className="mt-1 text-xs leading-relaxed text-yellow-100/80">
-                Etalase produk masih dalam persiapan atau percobaan, checkout juga belum dibuka sama admin. Pantau terus NaXaShopnya yaaa!
+                Etalase produk sedang disiapkan. Checkout belum dibuka dulu sampai produk siap diproses dengan aman.
               </p>
             </div>
           )}
 
           <div className="grid grid-cols-2 sm:grid-cols-2 2xl:grid-cols-3 gap-3 sm:gap-4">
-            {dataGame.produk.map((item) => {
+            {(dataGame.produk || []).map((item) => {
               const produkComingSoon = isProdukComingSoon(item) || gameComingSoon;
               const produkAktif = produkDipilih?.id === item.id;
 
@@ -734,10 +739,10 @@ if (orderIdTagihan) {
                       color: '#fff',
                       title: 'Coming Soon 🕒',
                       text: gameComingSoon
-                        ? 'Game ini belum dibuka buat checkout.'
-                        : 'Produk ini belum bisa dibeli dulu bree.',
+                        ? 'Game ini belum dibuka untuk checkout.'
+                        : 'Produk ini belum bisa dibeli dulu ya.',
                       icon: 'info',
-                      confirmButtonColor: '#06b6d4'
+                      confirmButtonColor: '#3b82f6'
                     });
                     return;
                   }
@@ -785,7 +790,7 @@ if (orderIdTagihan) {
                     </div>
                   )}
 
-                  <p className="text-sm sm:text-base font-black text-cyan-400">
+                  <p className="text-sm sm:text-base font-black text-blue-400">
                     {formatRupiah(item.harga)}
                   </p>
                 </div>
@@ -808,10 +813,10 @@ if (orderIdTagihan) {
             <button
               type="button"
               onClick={handleBukaPanduan}
-              className="h-10 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-3 text-cyan-300 font-black transition-all hover:bg-cyan-500/20 hover:border-cyan-400 flex items-center gap-2"
+              className="h-10 rounded-2xl border border-blue-500/20 bg-blue-500/10 px-3 text-blue-300 font-black transition-all hover:bg-blue-500/20 hover:border-blue-400 flex items-center gap-2"
               title="Lihat cara isi ID"
             >
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-cyan-500 text-white text-xs">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-white text-xs">
                 ?
               </span>
               <span className="hidden sm:inline text-xs">
@@ -823,7 +828,7 @@ if (orderIdTagihan) {
           <div className="flex flex-col sm:flex-row gap-4">
             <input
               type="text"
-              placeholder="Ketikan User ID Lu..."
+              placeholder="Masukkan User ID / UID"
               value={inputUserId}
               onChange={(e) => setInputUserId(e.target.value)}
               className="w-full bg-gray-900 text-white px-5 py-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 border border-gray-700 transition-all"
@@ -900,9 +905,9 @@ if (orderIdTagihan) {
                               background: '#1f2937',
                               color: '#fff',
                               title: `${item.label} Coming Soon 🕒`,
-                              text: 'Metode pembayaran ini lagi aktivasi. Pakai metode lain dulu ya bree.',
+                              text: 'Metode pembayaran ini sedang aktivasi. Pakai metode lain dulu ya.',
                               icon: 'info',
-                              confirmButtonColor: '#06b6d4'
+                              confirmButtonColor: '#3b82f6'
                             });
                             return;
                           }
@@ -912,14 +917,15 @@ if (orderIdTagihan) {
                               background: '#1f2937',
                               color: '#fff',
                               title: 'Minimal transaksi belum cukup',
-                              text: `${item.label} minimal ${formatRupiah(minimalMetode)}. Pakai QRIS buat nominal kecil ya bree.`,
+                              text: `${item.label} minimal ${formatRupiah(minimalMetode)}. Pakai QRIS untuk nominal kecil ya.`,
                               icon: 'warning',
-                              confirmButtonColor: '#06b6d4'
+                              confirmButtonColor: '#3b82f6'
                             });
                             return;
                           }
 
                           setMetodeBayar(item.value);
+                          if (voucherAktif) resetVoucher();
                         }}
                         className={`relative overflow-hidden p-4 rounded-2xl border-2 text-left transition-all ${
                           metodeDisabled
@@ -971,7 +977,7 @@ if (orderIdTagihan) {
                               </div>
 
                               {aktif && (
-                                <span className="shrink-0 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2 py-1 text-[10px] font-black text-cyan-300">
+                                <span className="shrink-0 rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-1 text-[10px] font-black text-blue-300">
                                   Dipilih
                                 </span>
                               )}
@@ -1022,19 +1028,12 @@ if (orderIdTagihan) {
             <div>
               <h2 className="text-xl font-bold text-white">Kontak Pembeli</h2>
               <p className="text-xs text-gray-500 mt-1">
-                Opsional, buat bantuan kalau order perlu dicek.
+                Opsional
               </p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input
-              type="text"
-              placeholder="WhatsApp, contoh: 62812xxxx"
-              value={customerWhatsapp}
-              onChange={(e) => setCustomerWhatsapp(e.target.value)}
-              className="w-full bg-gray-900 text-white px-5 py-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 border border-gray-700 transition-all"
-            />
 
             <input
               type="email"
@@ -1046,7 +1045,7 @@ if (orderIdTagihan) {
           </div>
 
           <p className="text-xs text-gray-400 mt-3">
-            Kontak dipakai kalau order butuh pengecekan admin. Bukan buat spam.
+            Isi kontak jika ingin bukti transaksi dan supaya order lebih mudah dicek kalau ada kendala.
           </p>
         </div>
 
@@ -1059,7 +1058,7 @@ if (orderIdTagihan) {
             <div>
               <h2 className="text-xl font-bold text-white">Voucher Promo</h2>
               <p className="text-xs text-gray-500 mt-1">
-                Opsional. Pakai kode voucher kalau lagi ada promo NaXaShop.
+                Punya Voucher? masukkin di sini ya.
               </p>
             </div>
           </div>
@@ -1067,14 +1066,14 @@ if (orderIdTagihan) {
           <div className="flex flex-col sm:flex-row gap-3">
             <input
               type="text"
-              placeholder="Masukkan kode voucher, contoh: NAXA10"
+              placeholder="NaxXXA10"
               value={voucherInput}
               onChange={(e) => {
                 setVoucherInput(e.target.value.toUpperCase().replace(/\s+/g, ''));
                 setVoucherAktif(null);
               }}
               disabled={isCekVoucher || isProsesBeli}
-              className="w-full bg-gray-900 text-white px-5 py-4 rounded-2xl outline-none focus:ring-2 focus:ring-cyan-500 border border-gray-700 transition-all font-black tracking-wide disabled:opacity-60"
+              className="w-full bg-gray-900 text-white px-5 py-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 border border-gray-700 transition-all font-black tracking-wide disabled:opacity-60"
             />
 
             {voucherAktif ? (
@@ -1090,7 +1089,7 @@ if (orderIdTagihan) {
                 type="button"
                 onClick={handleCekVoucher}
                 disabled={isCekVoucher || isProsesBeli || !produkDipilih}
-                className="sm:w-40 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 px-5 py-4 text-sm font-black text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
+                className="sm:w-40 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-600 px-5 py-4 text-sm font-black text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isCekVoucher ? 'Cek...' : 'Pakai'}
               </button>
@@ -1121,22 +1120,21 @@ if (orderIdTagihan) {
             </div>
           ) : (
             <p className="mt-3 text-xs text-gray-500">
-              Pilih produk dulu, lalu masukkan voucher kalau punya. Diskon akan dihitung otomatis sebelum bayar.
+              Voucher aktif. Lumayan, harga turun tanpa drama.
             </p>
           )}
         </div>
 
         <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl p-4">
           <p className="text-xs text-yellow-100/90 leading-relaxed">
-            Pastikan User ID, Zone ID, dan Server sudah benar sebelum lanjut bayar.
-            Kesalahan input bisa menyebabkan top-up gagal atau masuk ke akun lain.
+            Pastikan User ID, Zone ID, dan server sudah benar sebelum lanjut bayar. Salah input bisa bikin top up masuk ke akun lain—dan itu bukan plot twist yang kita cari.
           </p>
         </div>
       </div>
 
       {/* RINGKASAN PESANAN STICKY */}
       <aside className="hidden xl:block xl:sticky xl:top-24 bg-gray-800 border border-gray-700 rounded-3xl shadow-2xl overflow-hidden">
-        <div className="p-5 border-b border-gray-700 bg-gradient-to-r from-blue-600/20 to-cyan-500/10">
+        <div className="p-5 border-b border-gray-700 bg-gradient-to-r from-blue-600/20 to-blue-500/10">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs text-gray-400 font-black uppercase tracking-wider">
@@ -1147,7 +1145,7 @@ if (orderIdTagihan) {
               </h2>
             </div>
 
-            <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-2xl">
+            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-2xl">
               🧾
             </div>
           </div>
@@ -1249,7 +1247,7 @@ if (orderIdTagihan) {
 
           <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl p-4">
             <p className="text-xs text-yellow-100/90 leading-relaxed">
-              Pastikan User ID, Zone ID, atau Server sudah benar sebelum lanjut bayar.
+              Pastikan User ID, Zone ID, atau server sudah benar sebelum lanjut bayar.
             </p>
           </div>
 
@@ -1258,11 +1256,11 @@ if (orderIdTagihan) {
             className={`w-full py-4 rounded-2xl font-black text-lg transition-all duration-300 ${
               checkoutDisabled
                 ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                : 'bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:-translate-y-1'
+                : 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:-translate-y-1'
             }`}
             onClick={handleBeli}
           >
-            {isProsesBeli ? 'Kalem Bre...' : 'Beli Sekarang 🔥'}
+            {isProsesBeli ? 'Memproses...' : 'Lanjut Bayar'}
           </button>
 
           <div className="grid grid-cols-3 gap-2 text-center">
@@ -1300,7 +1298,7 @@ if (orderIdTagihan) {
                     : formatRupiah(produkDipilih.harga)}
                 </p>
 
-                <p className={`mt-1 text-[11px] font-black ${metodeBayar ? 'text-cyan-300' : 'text-yellow-300'}`}>
+                <p className={`mt-1 text-[11px] font-black ${metodeBayar ? 'text-blue-300' : 'text-yellow-300'}`}>
                   {gameComingSoon || isProdukComingSoon(produkDipilih)
                     ? 'Coming Soon • checkout belum dibuka'
                     : metodeBayar
@@ -1327,7 +1325,7 @@ if (orderIdTagihan) {
               className={`relative w-full overflow-hidden rounded-2xl px-5 py-4 text-base font-black transition-all duration-300 ${
                 checkoutDisabled
                   ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 text-white shadow-[0_0_26px_rgba(59,130,246,0.45)] hover:-translate-y-0.5 active:scale-[0.98]'
+                  : 'bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 text-white shadow-[0_0_26px_rgba(59,130,246,0.45)] hover:-translate-y-0.5 active:scale-[0.98]'
               }`}
             >
               {!checkoutDisabled && (
@@ -1336,10 +1334,10 @@ if (orderIdTagihan) {
 
               <span className="relative">
                 {isProsesBeli
-                  ? 'Kalem Bre...'
+                  ? 'Memproses...'
                   : gameComingSoon || isProdukComingSoon(produkDipilih)
                     ? 'Segera Hadir 🕒'
-                    : 'Beli Sekarang 🔥'}
+                    : 'Lanjut Bayar'}
               </span>
             </button>
           </div>

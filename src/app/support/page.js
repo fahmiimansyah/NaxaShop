@@ -1,9 +1,18 @@
+export const metadata = {
+  title: 'Support',
+  description:
+    'Hubungi tim support NaXaShop untuk bantuan transaksi, pembayaran, dan status top up game.',
+  alternates: {
+    canonical: '/support',
+  },
+};
+
 import Link from "next/link";
 import {
   FaWhatsapp,
   FaEnvelope,
   FaReceipt,
-  FaQuestionCircle,
+  FaArrowLeft,
   FaShieldAlt,
   FaClock,
   FaGamepad,
@@ -20,16 +29,16 @@ const bantuanCepat = [
     label: "Cek Order",
   },
   {
-    icon: <FaWhatsapp />,
-    title: "Chat Admin",
-    desc: "Order nyangkut? Kirim Order ID biar admin cek.",
-    href: "whatsapp",
-    label: "Chat Admin",
+    icon: <FaShieldAlt />,
+    title: "Cek Data Dulu",
+    desc: "Pastikan User ID, server, dan nominal sudah sesuai sebelum bikin order baru.",
+    href: "#sebelum-panik",
+    label: "Lihat Checklist",
   },
   {
     icon: <FaEnvelope />,
     title: "Email Support",
-    desc: "Buat laporan yang panjang dan detail.",
+    desc: "Buat laporan yang panjang dan detail kalau butuh lampiran lengkap.",
     href: "email",
     label: "Kirim Email",
   },
@@ -39,7 +48,7 @@ const rules = [
   {
     icon: <FaReceipt />,
     title: "Siapkan Order ID",
-    desc: "Order ID bikin admin bisa langsung masuk ke data pesanan lu.",
+    desc: "Order ID membantu support langsung menemukan data pesanan kamu.",
   },
   {
     icon: <FaGamepad />,
@@ -61,11 +70,11 @@ const rules = [
 const faqItems = [
   {
     q: "Pembayaran sukses tapi top up belum masuk?",
-    a: "Cek dulu status pesanan. Kalau status top up masih proses terlalu lama, chat admin dengan Order ID.",
+    a: "Cek dulu status pesanan. Kalau status top up masih proses terlalu lama, chat support dengan Order ID.",
   },
   {
     q: "Salah input User ID atau server gimana?",
-    a: "Langsung hubungi admin. Tapi kalau top up sudah sukses terkirim ke akun salah, biasanya tidak bisa dibatalkan.",
+    a: "Langsung hubungi support. Tapi kalau top up sudah sukses terkirim ke akun salah, biasanya tidak bisa dibatalkan.",
   },
   {
     q: "Status bayar belum berubah?",
@@ -73,7 +82,7 @@ const faqItems = [
   },
   {
     q: "Support buka 24 jam?",
-    a: "Sistem order bisa jalan otomatis. Admin manusia tetap butuh napas, tapi chat lu bakal dicek secepatnya.",
+    a: "Sistem order bisa jalan otomatis. Support manusia tetap butuh napas, tapi chat kamu bakal dicek secepatnya.",
   },
 ];
 
@@ -84,14 +93,14 @@ export default function SupportPage() {
 
   const whatsappLink = adminWhatsapp
     ? `https://wa.me/${adminWhatsapp}?text=${encodeURIComponent(
-        "Halo admin NaXaShop, saya butuh bantuan.\n\nOrder ID:\nMasalah:\nScreenshot/Detail:"
+        "Halo support NaXaShop, saya butuh bantuan.\n\nOrder ID:\nMasalah:\nScreenshot/Detail:"
       )}`
     : "#";
 
   const emailLink = `mailto:${supportEmail}?subject=${encodeURIComponent(
     "Bantuan Order NaXaShop"
   )}&body=${encodeURIComponent(
-    "Halo admin NaXaShop,\n\nOrder ID:\nMasalah:\nDetail tambahan:"
+    "Halo support NaXaShop,\n\nOrder ID:\nMasalah:\nDetail tambahan:"
   )}`;
 
   const getHref = (href) => {
@@ -102,28 +111,35 @@ export default function SupportPage() {
 
   return (
     <main className="min-h-screen bg-gray-900 text-white">
+
       {/* TOP LINE */}
       <div className="h-px w-full bg-gradient-to-r from-transparent via-blue-500/40 to-transparent" />
 
       {/* HERO */}
       <section className="relative overflow-hidden bg-gradient-to-b from-gray-900 via-gray-950 to-gray-900">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.16),transparent_55%)]" />
-
         <div className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
+          <Link
+          href="/"
+          className="mb-6 inline-flex items-center gap-2 text-xs font-black text-blue-400 hover:text-blue-300"
+        >
+          <FaArrowLeft />
+          Balik ke Beranda
+        </Link>
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_360px] lg:items-center">
             <div>
               <p className="mb-3 text-[11px] font-black uppercase tracking-[0.25em] text-blue-400">
                 NaXaShop Support
               </p>
 
-              <h1 className="max-w-3xl text-3xl font-black leading-tight text-white sm:text-5xl">
+              <h1 className="max-w-xl text-3xl font-black leading-tight text-white sm:text-5xl">
                 Order nyangkut? Kalem, kita cek bareng.
               </h1>
 
               <p className="mt-4 max-w-2xl text-sm leading-relaxed text-gray-400 sm:text-base">
-                Buat kaum push rank yang lagi panik karena top up belum masuk,
-                payment belum kebaca, atau salah server pas checkout. Siapin
-                Order ID biar admin gak nebak-nebak dari langit.
+                Buat kaum gamer yang lagi panik karena top up belum masuk,
+                payment belum kebaca, atau salah server pas checkout. Siapkan
+                Order ID biar support gak nebak-nebak dari langit.
               </p>
 
               <div className="mt-9 flex flex-col gap-3 sm:flex-row">
@@ -135,15 +151,6 @@ export default function SupportPage() {
                   Lacak Pesanan
                 </Link>
 
-                <a
-                  href={whatsappLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-3 rounded-2xl border border-gray-700 bg-gray-800 px-5 py-4 text-sm font-black text-white transition-all hover:-translate-y-1 hover:border-blue-400 hover:bg-blue-500"
-                >
-                  <FaWhatsapp />
-                  Chat Admin
-                </a>
               </div>
             </div>
 
@@ -157,7 +164,7 @@ export default function SupportPage() {
               </h2>
 
               <p className="mt-2 text-sm leading-relaxed text-gray-400">
-                Kirim data ini biar admin langsung bisa cek:
+                Kirim data ini biar support langsung bisa cek:
               </p>
 
               <div className="mt-4 space-y-2 text-sm text-gray-300">
@@ -224,7 +231,7 @@ export default function SupportPage() {
         </div>
 
         {/* INFO + FAQ */}
-        <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+        <div id="sebelum-panik" className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="rounded-3xl border border-gray-800 bg-gray-950/60 p-6">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.2em] text-blue-400">
@@ -232,7 +239,7 @@ export default function SupportPage() {
               </p>
 
               <h2 className="mt-2 text-2xl font-black text-white">
-                Cek ini dulu, bre.
+                Cek ini dulu, jangan langsung panik.
               </h2>
 
               <p className="mt-2 text-sm leading-relaxed text-gray-400">
@@ -273,7 +280,7 @@ export default function SupportPage() {
               </h2>
 
               <p className="mt-2 text-sm leading-relaxed text-gray-400">
-                Biar gak semua masalah ujung-ujungnya “adminnnnn”.
+                Biar masalah kecil gak langsung naik pangkat jadi drama nasional.
               </p>
             </div>
 
@@ -295,19 +302,19 @@ export default function SupportPage() {
         </div>
 
         {/* BOTTOM CTA */}
-        <div className="mt-8 rounded-3xl border border-gray-800 bg-gradient-to-r from-blue-600/15 via-gray-950 to-cyan-500/10 p-6 sm:p-8">
+        <div className="mt-8 rounded-3xl border border-gray-800 bg-gradient-to-r from-blue-600/15 via-gray-950 to-blue-500/10 p-6 sm:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="mb-2 text-[11px] font-black uppercase tracking-[0.25em] text-blue-400">
                 Butuh manusia asli?
               </p>
 
-              <h2 className="text-2xl font-black text-white">
-                Kalau sistem masih ngambek, admin turun tangan.
+              <h2 className="text-xl font-black text-white">
+                Kalau sistem masih ngambek, support turun tangan.
               </h2>
 
               <p className="mt-2 text-sm leading-relaxed text-gray-400">
-                Kirim Order ID dan detail masalah lu. Kita cek status payment,
+                Kirim Order ID dan detail masalah kamu. Tim akan cek status payment,
                 provider, dan catatan prosesnya.
               </p>
             </div>
@@ -319,7 +326,7 @@ export default function SupportPage() {
               className="inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-blue-600 px-5 py-4 text-sm font-black text-white shadow-[0_0_22px_rgba(37,99,235,0.35)] transition-all hover:-translate-y-1 hover:bg-blue-500 sm:w-auto"
             >
               <FaWhatsapp />
-              Chat Admin Sekarang
+              Hubungi Support Sekarang
             </a>
           </div>
         </div>

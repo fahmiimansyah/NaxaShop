@@ -53,15 +53,15 @@ export default function SoftLaunchNotice() {
           </div>
 
           <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-blue-400">
-            Pesan dari Tim NaXaShop
+            Info Singkat NaXaShop
           </p>
 
           <h2 className="mt-1.5 text-xl font-extrabold tracking-tight text-white">
-            Top-Up Aman & Terpantau
+            Top up sat-set, tetap terpantau
           </h2>
 
           <p className="mt-2 text-xs leading-relaxed text-slate-400">
-            Halo! Transaksi kamu dipantau langsung oleh tim kami. Mohon perhatikan beberapa poin penting berikut demi kelancaran pesanan kamu:
+            Sebelum checkout, baca ini sebentar. Gak panjang kok—bukan syarat pinjaman online.
           </p>
         </div>
 
@@ -70,9 +70,9 @@ export default function SoftLaunchNotice() {
           <div className="flex gap-3 rounded-2xl border border-slate-900 bg-slate-900/40 p-3 transition-colors hover:border-slate-800">
             <FaCheckCircle className="mt-0.5 shrink-0 text-base text-emerald-400" />
             <div className="flex flex-col gap-0.5">
-              <span className="text-xs font-semibold text-slate-200">Diproses Cepat & Otomatis</span>
+              <span className="text-xs font-semibold text-slate-200">Diproses otomatis setelah bayar</span>
               <p className="text-[11px] leading-relaxed text-slate-400">
-                Tim kami memastikan sistem berjalan lancar. Pesanan akan langsung masuk ke akun kamu segera setelah pembayaran diverifikasi.
+                Setelah pembayaran berhasil, sistem akan memproses pesanan kamu. Statusnya bisa dipantau, jadi gak perlu tebak-tebakan.
               </p>
             </div>
           </div>
@@ -80,9 +80,9 @@ export default function SoftLaunchNotice() {
           <div className="flex gap-3 rounded-2xl border border-slate-900 bg-slate-900/40 p-3 transition-colors hover:border-slate-800">
             <FaReceipt className="mt-0.5 shrink-0 text-base text-blue-400" />
             <div className="flex flex-col gap-0.5">
-              <span className="text-xs font-semibold text-slate-200">Simpan Order ID Kamu</span>
+              <span className="text-xs font-semibold text-slate-200">Simpan Order ID</span>
               <p className="text-[11px] leading-relaxed text-slate-400">
-                Catat Order ID setelah checkout ya. Ini bukti penting buat ngecek status pesanan kamu di halaman pelacakan.
+                Order ID itu kunci cek pesanan. Jangan dibuang seperti screenshot meme di galeri.
               </p>
             </div>
           </div>
@@ -90,9 +90,9 @@ export default function SoftLaunchNotice() {
           <div className="flex gap-3 rounded-2xl border border-slate-900 bg-slate-900/40 p-3 transition-colors hover:border-slate-800">
             <FaHeadset className="mt-0.5 shrink-0 text-base text-indigo-400" />
             <div className="flex flex-col gap-0.5">
-              <span className="text-xs font-semibold text-slate-200">Tim Support Selalu Hadir</span>
+              <span className="text-xs font-semibold text-slate-200">Support siap bantu</span>
               <p className="text-[11px] leading-relaxed text-slate-400">
-                Kalau ada kendala atau nyangkut, jangan ragu hubungi CS kami. Kasih tau Order ID kamu biar tim kami bisa bantu dengan instan.
+                Kalau ada kendala, kirim Order ID ke support supaya pengecekan gak perlu nebak-nebak dari langit.
               </p>
             </div>
           </div>
@@ -105,7 +105,7 @@ export default function SoftLaunchNotice() {
             onClick={tutupNotice}
             className="w-full cursor-pointer rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:from-blue-500 hover:to-blue-400 hover:shadow-blue-500/30 active:scale-[0.98]"
           >
-            Lanjutkan Ke Pesanan
+            Siap, lanjut pilih game
           </button>
         </div>
 

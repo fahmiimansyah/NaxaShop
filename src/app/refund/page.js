@@ -1,3 +1,12 @@
+export const metadata = {
+  title: 'Kebijakan Refund',
+  description:
+    'Pelajari kebijakan refund NaXaShop untuk pesanan top up game, termasuk kondisi yang bisa dan tidak bisa diajukan pengecekan refund.',
+  alternates: {
+    canonical: '/refund',
+  },
+};
+
 import Link from "next/link";
 import {
   FaArrowLeft,
@@ -34,7 +43,7 @@ export default function RefundPage() {
       <div className="mx-auto max-w-4xl">
         <Link
           href="/"
-          className="mb-6 inline-flex items-center gap-2 text-xs font-black text-cyan-400 hover:text-cyan-300"
+          className="mb-6 inline-flex items-center gap-2 text-xs font-black text-blue-400 hover:text-blue-300"
         >
           <FaArrowLeft />
           Balik ke Beranda
@@ -42,15 +51,15 @@ export default function RefundPage() {
 
         <section className="overflow-hidden rounded-[2rem] border border-gray-800 bg-gray-900 shadow-2xl">
           <div className="relative p-6 sm:p-8">
-            <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-cyan-500/10 blur-[90px]" />
+            <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-blue-500/10 blur-[90px]" />
             <div className="pointer-events-none absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-blue-500/10 blur-[90px]" />
 
             <div className="relative z-10">
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-400">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-400">
                 <FaUndoAlt />
               </div>
 
-              <p className="text-[11px] font-black uppercase tracking-[0.25em] text-cyan-400">
+              <p className="text-[11px] font-black uppercase tracking-[0.25em] text-blue-400">
                 NaXaShop Policy
               </p>
 

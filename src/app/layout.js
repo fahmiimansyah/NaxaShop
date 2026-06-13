@@ -49,9 +49,6 @@ export const metadata = {
   creator: 'NaXaShop',
   publisher: 'NaXaShop',
 
-  alternates: {
-    canonical: '/',
-  },
 
   robots: {
     index: true,

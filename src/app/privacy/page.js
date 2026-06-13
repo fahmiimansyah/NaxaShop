@@ -1,3 +1,12 @@
+export const metadata = {
+  title: 'Kebijakan Privasi',
+  description:
+    'Kebijakan privasi NaXaShop terkait data transaksi, riwayat pesanan, email, WhatsApp, dan penggunaan data untuk membantu proses top up.',
+  alternates: {
+    canonical: '/privacy',
+  },
+};
+
 import Link from "next/link";
 import {
   FaArrowLeft,
@@ -38,7 +47,7 @@ const sections = [
     title: "Kontak dan Bantuan",
     body: [
       "Jika customer menghubungi admin, data seperti Order ID dan detail transaksi dapat digunakan untuk membantu pengecekan.",
-      "Customer disarankan tidak membagikan data sensitif di luar channel resmi NaXaShop.",
+      "Customer disarankan tidak membagikan data sensitif di kamuar channel resmi NaXaShop.",
     ],
   },
 ];
@@ -49,7 +58,7 @@ export default function PrivacyPage() {
       <div className="mx-auto max-w-4xl">
         <Link
           href="/"
-          className="mb-6 inline-flex items-center gap-2 text-xs font-black text-cyan-400 hover:text-cyan-300"
+          className="mb-6 inline-flex items-center gap-2 text-xs font-black text-blue-400 hover:text-blue-300"
         >
           <FaArrowLeft />
           Balik ke Beranda
@@ -57,14 +66,14 @@ export default function PrivacyPage() {
 
         <section className="overflow-hidden rounded-[2rem] border border-gray-800 bg-gray-900 shadow-2xl">
           <div className="relative p-6 sm:p-8">
-            <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-cyan-500/10 blur-[90px]" />
+            <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-blue-500/10 blur-[90px]" />
 
             <div className="relative z-10">
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-400">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-400">
                 <FaUserShield />
               </div>
 
-              <p className="text-[11px] font-black uppercase tracking-[0.25em] text-cyan-400">
+              <p className="text-[11px] font-black uppercase tracking-[0.25em] text-blue-400">
                 NaXaShop Privacy
               </p>
 
@@ -93,7 +102,7 @@ export default function PrivacyPage() {
               className="rounded-3xl border border-gray-800 bg-gray-900/70 p-5"
             >
               <div className="mb-3 flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-400">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-400">
                   {section.icon}
                 </div>
 
