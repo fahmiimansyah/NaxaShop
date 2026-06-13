@@ -9,6 +9,7 @@ export default async function Beranda() {
   const [games] = await db.query(
     `SELECT
        id,
+       slug,
        nama,
        publisher,
        gambar,

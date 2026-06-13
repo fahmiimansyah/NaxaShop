@@ -1,9 +1,58 @@
+import { permanentRedirect } from 'next/navigation';
 import FormKasir from '../../components/Kasir';
+
+function paramAdalahId(value) {
+  return /^\d+$/.test(String(value || '').trim());
+}
+
+export async function generateMetadata({ params }) {
+  const { id } = await params;
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://naxashop.id';
+
+  try {
+    const respon = await fetch(`${baseUrl}/api/games/${id}`, {
+      cache: 'no-store',
+    });
+
+    if (!respon.ok) {
+      return {
+        title: 'Game Tidak Ditemukan | NaXaShop',
+        description: 'Halaman game yang kamu cari tidak ditemukan di NaXaShop.',
+      };
+    }
+
+    const game = await respon.json();
+    const namaGame = game?.nama || 'Game';
+    const slugGame = game?.slug || id;
+    const canonicalUrl = `${baseUrl}/topup/${slugGame}`;
+
+    return {
+      title: `Top Up ${namaGame} | NaXaShop`,
+      description: `Top up ${namaGame} di NaXaShop. Pilih nominal, isi data akun, bayar, lalu pesanan diproses otomatis.`,
+      alternates: {
+        canonical: canonicalUrl,
+      },
+      openGraph: {
+        title: `Top Up ${namaGame} | NaXaShop`,
+        description: `Top up ${namaGame} di NaXaShop dengan proses praktis dan pembayaran mudah.`,
+        url: canonicalUrl,
+        images: game?.gambar ? [game.gambar] : undefined,
+      },
+    };
+  } catch (error) {
+    console.error('Metadata topup error:', error);
+
+    return {
+      title: 'Top Up Game | NaXaShop',
+      description: 'Top up game praktis di NaXaShop.',
+    };
+  }
+}
 
 export default async function HalamanTopUp({ params }) {
   const { id } = await params;
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://naxashop.id';
 
   const respon = await fetch(`${baseUrl}/api/games/${id}`, {
     cache: 'no-store',
@@ -28,6 +77,12 @@ export default async function HalamanTopUp({ params }) {
   }
 
   const dataGame = await respon.json();
+
+  // Kalau user/Google buka URL lama /topup/1, arahkan permanen ke URL SEO.
+  if (paramAdalahId(id) && dataGame?.slug) {
+    permanentRedirect(`/topup/${dataGame.slug}`);
+  }
+
   const gameComingSoon = dataGame.status_game === 'coming_soon';
 
   return (

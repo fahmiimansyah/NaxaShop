@@ -16,6 +16,7 @@ function normalisasiGame(game = {}) {
   return {
     ...game,
     id: game.id,
+    slug: game.slug || '',
     nama: game.nama || game.name || "Game",
     publisher: game.publisher || game.developer || "NaXaShop",
     gambar: game.gambar || game.image || game.image_url || "",
@@ -129,10 +130,11 @@ export default function GlobalGameSearchModal({ open, onClose }) {
   }, [games, kataKunci]);
 
   function bukaGame(game) {
-    if (!game?.id) return;
+    const target = game?.slug || game?.id;
+    if (!target) return;
 
     onClose?.();
-    router.push(`/topup/${game.id}`);
+    router.push(`/topup/${target}`);
   }
 
   return (

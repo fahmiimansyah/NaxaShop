@@ -1,36 +1,43 @@
 import { NextResponse } from 'next/server';
 import db from '../../../lib/db';
 
-function idGameValid(id) {
-  return /^\d+$/.test(String(id));
+function paramGameValid(value) {
+  const param = String(value || '').trim().toLowerCase();
+
+  return /^\d+$/.test(param) || /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(param);
+}
+
+function paramAdalahId(value) {
+  return /^\d+$/.test(String(value || '').trim());
 }
 
 export async function GET(request, { params }) {
   try {
     const paket = await params;
-    const gameId = String(paket.id || '').trim();
+    const gameParam = String(paket.id || '').trim().toLowerCase();
 
-    if (!gameId || !idGameValid(gameId)) {
+    if (!gameParam || !paramGameValid(gameParam)) {
       return NextResponse.json(
         {
           sukses: false,
-          pesan: 'ID game gak valid bre!'
+          pesan: 'ID game atau slug gak valid bre!'
         },
         { status: 400 }
       );
     }
 
-    // 1. Ambil detail game.
-    // Aktif = bisa dibeli.
-    // Coming soon = tampil, tapi checkout dikunci di frontend.
-    // Nonaktif = disembunyikan total.
+    // Support dua versi URL:
+    // - Lama: /topup/1
+    // - SEO:  /topup/mobile-legends
+    const cariPakaiId = paramAdalahId(gameParam);
+
     const [gameResult] = await db.query(
       `SELECT *
        FROM games
-       WHERE id = ?
+       WHERE ${cariPakaiId ? 'id = ?' : 'slug = ?'}
          AND status_game IN ('aktif', 'coming_soon')
        LIMIT 1`,
-      [gameId]
+      [gameParam]
     );
 
     if (gameResult.length === 0) {
@@ -43,8 +50,9 @@ export async function GET(request, { params }) {
       );
     }
 
-    // 2. Ambil produk buat game itu.
-    // Produk coming soon tetap tampil, tapi tidak bisa dipilih/beli.
+    const game = gameResult[0];
+
+    // Produk tetap pakai game.id asli dari database.
     const [produkResult] = await db.query(
       `SELECT
          id,
@@ -57,18 +65,18 @@ export async function GET(request, { params }) {
        FROM produk
        WHERE game_id = ?
          AND status_produk IN ('aktif', 'coming_soon')
-       ORDER BY 
+       ORDER BY
          CASE status_produk
            WHEN 'aktif' THEN 1
            WHEN 'coming_soon' THEN 2
            ELSE 3
          END,
          harga ASC`,
-      [gameId]
+      [game.id]
     );
 
     const dataLengkap = {
-      ...gameResult[0],
+      ...game,
       produk: produkResult
     };
 

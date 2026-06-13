@@ -25,7 +25,7 @@ function GameCard({ game }) {
   const metaKategori = getGameCategoryMeta(kategoriGameDariData(game));
 
   return (
-    <Link href={`/topup/${game.id}`} className="group">
+    <Link href={`/topup/${game.slug || game.id}`} className="group">
       <div className="h-full overflow-hidden rounded-2xl border border-blue-800/35 bg-[#071a33] transition-all duration-300 hover:border-blue-500 hover:shadow-[0_0_20px_rgba(59,130,246,0.35)]">
         <div className="relative aspect-square overflow-hidden bg-[#061426]">
           {game.gambar ? (

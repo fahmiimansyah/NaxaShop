@@ -47,14 +47,14 @@ export default async function sitemap() {
 
   try {
     const [games] = await db.query(
-      `SELECT id
+      `SELECT id, slug
        FROM games
        WHERE COALESCE(status_game, 'aktif') IN ('aktif', 'coming_soon')
        ORDER BY id DESC`
     );
 
     const halamanGame = games.map((game) => ({
-      url: bikinUrl(`/topup/${game.id}`),
+      url: bikinUrl(`/topup/${game.slug || game.id}`),
       lastModified: sekarang,
       changeFrequency: 'daily',
       priority: 0.9,
