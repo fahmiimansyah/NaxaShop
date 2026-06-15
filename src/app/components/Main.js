@@ -22,12 +22,13 @@ export default async function Beranda() {
        badge_label,
        badge_tipe
      FROM games
-     WHERE status_game IN ('aktif', 'coming_soon')
+     WHERE status_game IN ('aktif', 'coming_soon', 'gangguan')
      ORDER BY
        CASE status_game
          WHEN 'aktif' THEN 1
          WHEN 'coming_soon' THEN 2
-         ELSE 3
+         WHEN 'gangguan' THEN 3
+         ELSE 4
        END,
        sort_order ASC,
        id ASC`

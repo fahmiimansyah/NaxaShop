@@ -197,23 +197,35 @@ export default function GlobalGameSearchModal({ open, onClose }) {
                 ) : hasilSearch.length > 0 ? (
                   <div className="grid gap-2">
                     {hasilSearch.map((game) => {
-                      const comingSoon =
-                        String(game.status_game).toLowerCase() ===
-                        "coming_soon";
+                      const statusGame = String(game.status_game || "aktif").toLowerCase();
+                      const comingSoon = statusGame === "coming_soon";
+                      const gangguan = statusGame === "gangguan";
 
                       return (
                         <button
                           key={game.id}
                           type="button"
                           onClick={() => bukaGame(game)}
-                          className="group flex w-full items-center gap-3 rounded-3xl border border-blue-800/35 bg-blue-950/35 p-3 text-left transition hover:border-blue-400/40 hover:bg-blue-800/45"
+                          className={`group flex w-full items-center gap-3 rounded-3xl border p-3 text-left transition ${
+                            gangguan
+                              ? "border-slate-700/70 bg-slate-900/60 hover:border-slate-500/70 hover:bg-slate-800/70"
+                              : "border-blue-800/35 bg-blue-950/35 hover:border-blue-400/40 hover:bg-blue-800/45"
+                          }`}
                         >
-                          <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-blue-800/40 bg-blue-950">
+                          <div
+                            className={`flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border ${
+                              gangguan
+                                ? "border-slate-700 bg-slate-950"
+                                : "border-blue-800/40 bg-blue-950"
+                            }`}
+                          >
                             {game.gambar ? (
                               <img
                                 src={game.gambar}
                                 alt={game.nama}
-                                className="h-full w-full object-cover"
+                                className={`h-full w-full object-cover ${
+                                  gangguan ? "grayscale opacity-55" : ""
+                                }`}
                                 loading="lazy"
                               />
                             ) : (
@@ -232,10 +244,20 @@ export default function GlobalGameSearchModal({ open, onClose }) {
                                   Soon
                                 </span>
                               )}
+
+                              {gangguan && (
+                                <span className="shrink-0 rounded-full border border-slate-500/25 bg-slate-500/10 px-2 py-0.5 text-[9px] font-black text-slate-300">
+                                  Gangguan
+                                </span>
+                              )}
                             </div>
 
-                            <p className="mt-1 truncate text-xs font-semibold text-blue-100/45">
-                              {game.publisher}
+                            <p
+                              className={`mt-1 truncate text-xs font-semibold ${
+                                gangguan ? "text-slate-500" : "text-blue-100/45"
+                              }`}
+                            >
+                              {gangguan ? "Server sedang bermasalah" : game.publisher}
                             </p>
                           </div>
 

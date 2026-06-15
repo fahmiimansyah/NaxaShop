@@ -84,6 +84,8 @@ export default async function HalamanTopUp({ params }) {
   }
 
   const gameComingSoon = dataGame.status_game === 'coming_soon';
+  const gameGangguan = dataGame.status_game === 'nonaktif';
+  const gameTerkunci = gameComingSoon || gameGangguan;
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
@@ -113,6 +115,12 @@ export default async function HalamanTopUp({ params }) {
                     Coming Soon
                   </p>
                 )}
+
+                {gameGangguan && (
+                  <p className="inline-flex rounded-full border border-slate-400/20 bg-slate-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-300">
+                    Server Bermasalah
+                  </p>
+                )}
               </div>
 
               <h1 className="truncate text-2xl font-black leading-tight sm:text-3xl">
@@ -124,9 +132,11 @@ export default async function HalamanTopUp({ params }) {
               </p>
 
               <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-400 sm:text-sm">
-                {gameComingSoon
-                  ? 'Game ini sedang disiapkan. Etalase sudah bisa dilihat, tapi checkout belum dibuka dulu.'
-                  : 'Pilih nominal, isi data akun, lalu checkout. Pastikan ID benar sebelum bayar.'}
+                {gameGangguan
+                  ? 'Game ini sedang gangguan. Etalase tetap bisa dilihat, tapi checkout dikunci dulu sampai server/provider kembali aman.'
+                  : gameComingSoon
+                    ? 'Game ini sedang disiapkan. Etalase sudah bisa dilihat, tapi checkout belum dibuka dulu.'
+                    : 'Pilih nominal, isi data akun, lalu checkout. Pastikan ID benar sebelum bayar.'}
               </p>
             </div>
           </div>
@@ -145,6 +155,26 @@ export default async function HalamanTopUp({ params }) {
 
                 <p className="mt-1 text-xs leading-relaxed text-yellow-100/80 sm:text-sm">
                   Game ini tampil dulu sebagai teaser. Checkout akan dibuka setelah produk siap diproses dengan aman.
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {gameGangguan && (
+          <section className="mt-4 rounded-[1.5rem] border border-slate-500/20 bg-slate-500/10 p-4 shadow-xl">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-500/20 bg-slate-500/10 text-xl">
+                🛠️
+              </div>
+
+              <div>
+                <h2 className="text-base font-black text-slate-200">
+                  Server sedang bermasalah
+                </h2>
+
+                <p className="mt-1 text-xs leading-relaxed text-slate-300 sm:text-sm">
+                  Produk game ini tetap ditampilkan biar kamu tahu etalasenya ada, tapi checkout dikunci dulu sampai provider kembali stabil.
                 </p>
               </div>
             </div>
@@ -229,7 +259,7 @@ export default async function HalamanTopUp({ params }) {
             </div>
           </div>
 
-          {!gameComingSoon && (
+          {!gameTerkunci && (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
               <div className="rounded-[1.5rem] border border-white/10 bg-slate-900/70 p-5 shadow-xl md:p-6">
                 <p className="text-[10px] font-black uppercase tracking-wider text-blue-300">

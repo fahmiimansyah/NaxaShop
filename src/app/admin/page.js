@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Swal from 'sweetalert2';
@@ -46,6 +47,8 @@ function labelMetodeBayarDashboard(value) {
   return map[metode] || value || 'Unknown';
 }
 
+const motionEase = [0.22, 1, 0.36, 1];
+
 function EmptyChartState({ text = 'Belum ada data real yang bisa digambar.' }) {
   return (
     <div className="flex min-h-[190px] items-center justify-center rounded-2xl border border-dashed border-white/10 bg-slate-950/50 text-center text-sm font-bold text-gray-500">
@@ -56,81 +59,195 @@ function EmptyChartState({ text = 'Belum ada data real yang bisa digambar.' }) {
 
 function RevenueLineChart({ data = [] }) {
   const chartData = Array.isArray(data) ? data : [];
-  const width = 720;
-  const height = 220;
-  const paddingX = 28;
-  const paddingY = 28;
+  const width = 760;
+  const height = 260;
+  const paddingX = 34;
+  const paddingY = 34;
   const values = chartData.map((item) => angkaDashboard(item.omset));
   const profitValues = chartData.map((item) => angkaDashboard(item.profit));
   const maxValue = Math.max(...values, ...profitValues, 1);
   const usableWidth = width - paddingX * 2;
   const usableHeight = height - paddingY * 2;
+  const totalOmset = values.reduce((sum, value) => sum + value, 0);
+  const totalProfit = profitValues.reduce((sum, value) => sum + value, 0);
+  const latestOmset = values.at(-1) || 0;
+  const previousOmset = values.at(-2) || 0;
+  const trendPercent = previousOmset > 0 ? ((latestOmset - previousOmset) / previousOmset) * 100 : 0;
+  const trendNaik = trendPercent >= 0;
 
   const pointFor = (value, index) => {
-    const x = paddingX + (chartData.length <= 1 ? 0 : (index / (chartData.length - 1)) * usableWidth);
+    const x = paddingX + (chartData.length <= 1 ? usableWidth / 2 : (index / (chartData.length - 1)) * usableWidth);
     const y = height - paddingY - (angkaDashboard(value) / maxValue) * usableHeight;
     return { x, y };
   };
 
   const omsetPoints = chartData.map((item, index) => pointFor(item.omset, index));
   const profitPoints = chartData.map((item, index) => pointFor(item.profit, index));
-  const omsetPolyline = omsetPoints.map((point) => `${point.x},${point.y}`).join(' ');
-  const profitPolyline = profitPoints.map((point) => `${point.x},${point.y}`).join(' ');
+
+  const pointsToPath = (points) => points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
+  const omsetPath = pointsToPath(omsetPoints);
+  const profitPath = pointsToPath(profitPoints);
   const areaPath = omsetPoints.length
     ? `M ${omsetPoints[0].x} ${height - paddingY} L ${omsetPoints.map((point) => `${point.x} ${point.y}`).join(' L ')} L ${omsetPoints.at(-1).x} ${height - paddingY} Z`
     : '';
 
   if (chartData.length === 0 || values.every((value) => value === 0)) {
-    return <EmptyChartState />;
+    return <EmptyChartState text="Grafik masih kosong. Nanti kalau order mulai hidup, garisnya ikut nyala." />;
   }
 
   return (
-    <div>
-      <div className="mb-4 flex flex-wrap items-center gap-3 text-xs font-black text-gray-400">
-        <span className="inline-flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-cyan-400" /> Omset
-        </span>
-        <span className="inline-flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" /> Profit
-        </span>
-        <span className="ml-auto text-gray-500">14 hari terakhir</span>
+    <motion.div
+      className="relative overflow-hidden rounded-[2rem] border border-blue-300/15 bg-gradient-to-br from-[#071225]/95 via-[#050816]/95 to-[#020617]/95 p-4 shadow-2xl shadow-blue-950/35"
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.55, ease: motionEase }}
+    >
+      <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-blue-500/20 blur-[90px]" />
+      <div className="pointer-events-none absolute -bottom-24 left-16 h-56 w-56 rounded-full bg-emerald-400/10 blur-[90px]" />
+
+      <div className="relative mb-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-blue-300/15 bg-blue-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-blue-200/80">
+              Revenue Engine
+            </span>
+            <span className={`rounded-full border px-3 py-1 text-[10px] font-black ${trendNaik ? 'border-emerald-400/20 bg-emerald-500/10 text-emerald-300' : 'border-red-400/20 bg-red-500/10 text-red-300'}`}>
+              {trendNaik ? 'Naik' : 'Turun'} {Math.abs(trendPercent).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%
+            </span>
+          </div>
+          <h3 className="text-xl font-black text-white sm:text-2xl">Omset & Profit Radar</h3>
+          <p className="mt-1 text-xs font-semibold leading-relaxed text-slate-500">
+            Grafik 14 hari terakhir. Garis biru buat omset, garis hijau buat profit bersih yang bikin hati adem.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 sm:min-w-[320px]">
+          <div className="rounded-2xl border border-blue-300/15 bg-blue-500/10 p-3">
+            <p className="text-[10px] font-black uppercase tracking-wider text-blue-200/70">Total Omset</p>
+            <p className="mt-1 text-xl font-black text-blue-100">{formatCompactDashboard(totalOmset)}</p>
+          </div>
+          <div className="rounded-2xl border border-emerald-300/15 bg-emerald-500/10 p-3">
+            <p className="text-[10px] font-black uppercase tracking-wider text-emerald-200/70">Total Profit</p>
+            <p className="mt-1 text-xl font-black text-emerald-200">{formatCompactDashboard(totalProfit)}</p>
+          </div>
+        </div>
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-3">
-        <svg viewBox={`0 0 ${width} ${height}`} className="h-[230px] w-full overflow-visible">
+      <div className="relative rounded-[1.5rem] border border-white/10 bg-slate-950/55 p-3">
+        <svg viewBox={`0 0 ${width} ${height}`} className="h-[260px] w-full overflow-visible">
+          <defs>
+            <linearGradient id="naxaRevenueArea" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="rgba(59,130,246,0.32)" />
+              <stop offset="55%" stopColor="rgba(34,211,238,0.10)" />
+              <stop offset="100%" stopColor="rgba(2,6,23,0)" />
+            </linearGradient>
+            <linearGradient id="naxaRevenueLine" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0%" stopColor="#60a5fa" />
+              <stop offset="48%" stopColor="#22d3ee" />
+              <stop offset="100%" stopColor="#3b82f6" />
+            </linearGradient>
+            <linearGradient id="naxaProfitLine" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0%" stopColor="#34d399" />
+              <stop offset="100%" stopColor="#a7f3d0" />
+            </linearGradient>
+            <filter id="naxaGlow" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="4" result="coloredBlur" />
+              <feMerge>
+                <feMergeNode in="coloredBlur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
           {[0.25, 0.5, 0.75, 1].map((line) => {
             const y = height - paddingY - line * usableHeight;
             return (
               <g key={line}>
-                <line x1={paddingX} y1={y} x2={width - paddingX} y2={y} stroke="rgba(148,163,184,0.13)" strokeWidth="1" />
-                <text x={0} y={y + 4} fill="rgba(148,163,184,0.55)" fontSize="11" fontWeight="700">
+                <line x1={paddingX} y1={y} x2={width - paddingX} y2={y} stroke="rgba(148,163,184,0.12)" strokeWidth="1" strokeDasharray="6 8" />
+                <text x={0} y={y + 4} fill="rgba(148,163,184,0.55)" fontSize="11" fontWeight="800">
                   {formatCompactDashboard(maxValue * line)}
                 </text>
               </g>
             );
           })}
 
-          {areaPath && <path d={areaPath} fill="rgba(34,211,238,0.08)" />}
+          {areaPath && (
+            <motion.path
+              d={areaPath}
+              fill="url(#naxaRevenueArea)"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.7, delay: 0.15 }}
+            />
+          )}
 
-          <polyline points={omsetPolyline} fill="none" stroke="rgb(34,211,238)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-          <polyline points={profitPolyline} fill="none" stroke="rgb(52,211,153)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          <motion.path
+            d={omsetPath}
+            fill="none"
+            stroke="url(#naxaRevenueLine)"
+            strokeWidth="5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            filter="url(#naxaGlow)"
+            initial={{ pathLength: 0, opacity: 0 }}
+            animate={{ pathLength: 1, opacity: 1 }}
+            transition={{ duration: 1.05, ease: motionEase }}
+          />
+
+          <motion.path
+            d={profitPath}
+            fill="none"
+            stroke="url(#naxaProfitLine)"
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            initial={{ pathLength: 0, opacity: 0 }}
+            animate={{ pathLength: 1, opacity: 1 }}
+            transition={{ duration: 1.05, ease: motionEase, delay: 0.18 }}
+          />
 
           {omsetPoints.map((point, index) => (
-            <circle key={`omset-${chartData[index]?.tanggal || index}`} cx={point.x} cy={point.y} r="4.5" fill="rgb(34,211,238)" stroke="rgb(15,23,42)" strokeWidth="3" />
+            <motion.circle
+              key={`omset-${chartData[index]?.tanggal || index}`}
+              cx={point.x}
+              cy={point.y}
+              r="5"
+              fill="#60a5fa"
+              stroke="#020617"
+              strokeWidth="3"
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.28, delay: 0.35 + index * 0.035 }}
+            />
+          ))}
+
+          {profitPoints.map((point, index) => (
+            <motion.circle
+              key={`profit-${chartData[index]?.tanggal || index}`}
+              cx={point.x}
+              cy={point.y}
+              r="3.6"
+              fill="#34d399"
+              stroke="#020617"
+              strokeWidth="2.5"
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.28, delay: 0.45 + index * 0.035 }}
+            />
           ))}
 
           {chartData.map((item, index) => {
             if (index % 3 !== 0 && index !== chartData.length - 1) return null;
             const point = pointFor(0, index);
             return (
-              <text key={item.tanggal} x={point.x} y={height - 4} textAnchor="middle" fill="rgba(148,163,184,0.65)" fontSize="11" fontWeight="800">
+              <text key={item.tanggal} x={point.x} y={height - 4} textAnchor="middle" fill="rgba(148,163,184,0.68)" fontSize="11" fontWeight="900">
                 {item.label}
               </text>
             );
           })}
         </svg>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -277,6 +394,54 @@ function StatusSnapshot({ stats }) {
   );
 }
 
+function AdminLoadingScreen({ eyebrow = 'Sistem kendali utama', subtitle = 'Dashboard lagi nyusun data biar rapi sebelum dipakai tempur.' }) {
+  return (
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#02040d] px-4 text-white">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(29,78,216,0.32),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.16),transparent_34%),linear-gradient(135deg,#020617,#07111f_52%,#020617)]" />
+      <motion.div
+        className="absolute h-[28rem] w-[28rem] rounded-full border border-blue-300/10"
+        animate={{ rotate: 360 }}
+        transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
+      />
+      <motion.div
+        className="absolute h-[18rem] w-[18rem] rounded-full border border-sky-300/10"
+        animate={{ rotate: -360 }}
+        transition={{ duration: 12, repeat: Infinity, ease: 'linear' }}
+      />
+
+      <motion.div
+        className="relative w-full max-w-lg overflow-hidden rounded-[2.25rem] border border-blue-300/15 bg-slate-950/72 p-8 text-center shadow-2xl shadow-blue-950/50 backdrop-blur-2xl"
+        initial={{ opacity: 0, y: 18, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.55, ease: motionEase }}
+      >
+        <motion.div
+          className="pointer-events-none absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+          initial={{ x: '-140%' }}
+          animate={{ x: '240%' }}
+          transition={{ duration: 1.35, repeat: Infinity, repeatDelay: 0.9, ease: motionEase }}
+        />
+
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[1.35rem] border border-blue-300/20 bg-blue-500/10 text-3xl shadow-xl shadow-blue-950/40">
+          ⚙️
+        </div>
+        <p className="text-[10px] font-black uppercase tracking-[0.35em] text-blue-200/75">{eyebrow}</p>
+        <h1 className="mt-3 text-3xl font-black tracking-tight text-white">Kalem heula...</h1>
+        <p className="mx-auto mt-2 max-w-sm text-sm font-semibold leading-relaxed text-slate-400">{subtitle}</p>
+        <div className="mx-auto mt-6 h-1.5 max-w-xs overflow-hidden rounded-full bg-white/10">
+          <motion.div
+            className="h-full rounded-full bg-gradient-to-r from-blue-600 via-sky-300 to-emerald-300"
+            initial={{ x: '-100%' }}
+            animate={{ x: '100%' }}
+            transition={{ duration: 1.15, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+
 export default function DashboardAdmin() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -387,6 +552,48 @@ const [filterRequestGame, setFilterRequestGame] = useState({
     total: 0,
     totalPage: 1
   });
+
+  const daftarTransaksiPrioritas = useMemo(() => {
+    const scoreTransaksi = (trx) => {
+      const bayar = String(trx.status_bayar || '').toLowerCase();
+      const topup = String(trx.status_topup || '').toLowerCase();
+
+      if (bayar === 'sukses' && ['gagal', 'failed', 'error'].includes(topup)) return 1;
+      if (bayar === 'sukses' && ['pending', 'proses', 'processing'].includes(topup)) return 2;
+      if (bayar === 'pending') return 3;
+      if (bayar === 'gagal' || topup === 'gagal') return 4;
+      if (bayar === 'sukses' && topup === 'sukses') return 9;
+
+      return 5;
+    };
+
+    return [...daftarTransaksi].sort((a, b) => {
+      const scoreA = scoreTransaksi(a);
+      const scoreB = scoreTransaksi(b);
+
+      if (scoreA !== scoreB) return scoreA - scoreB;
+
+      return new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0);
+    });
+  }, [daftarTransaksi]);
+
+  const ringkasanTransaksiAdmin = useMemo(() => {
+    return daftarTransaksi.reduce(
+      (hasil, trx) => {
+        const bayar = String(trx.status_bayar || '').toLowerCase();
+        const topup = String(trx.status_topup || '').toLowerCase();
+
+        if (bayar === 'sukses' && topup === 'sukses') hasil.selesai += 1;
+        else if (bayar === 'sukses' && ['gagal', 'failed', 'error'].includes(topup)) hasil.bermasalah += 1;
+        else if (bayar === 'sukses' && ['pending', 'proses', 'processing'].includes(topup)) hasil.perluDicek += 1;
+        else if (bayar === 'pending') hasil.pendingBayar += 1;
+        else hasil.lainnya += 1;
+
+        return hasil;
+      },
+      { bermasalah: 0, perluDicek: 0, pendingBayar: 0, selesai: 0, lainnya: 0 }
+    );
+  }, [daftarTransaksi]);
   const cariNamaGame = (gameId) => {
     return daftarGame.find((game) => String(game.id) === String(gameId))?.nama || `Game ID: ${gameId}`;
   };
@@ -480,6 +687,7 @@ const getLabelBiayaAdmin = (metode) => {
   const warnaStatusEtalase = (status) => {
     if (status === 'aktif') return 'text-green-400 bg-green-500/10 border-green-500/20';
     if (status === 'coming_soon') return 'text-yellow-300 bg-yellow-500/10 border-yellow-500/20';
+    if (status === 'gangguan') return 'text-slate-300 bg-slate-500/10 border-slate-500/20';
     if (status === 'nonaktif') return 'text-red-400 bg-red-500/10 border-red-500/20';
     return 'text-gray-400 bg-gray-800 border-gray-700';
   };
@@ -487,6 +695,7 @@ const getLabelBiayaAdmin = (metode) => {
   const labelStatusEtalase = (status) => {
     if (status === 'aktif') return 'AKTIF';
     if (status === 'coming_soon') return 'COMING SOON';
+    if (status === 'gangguan') return 'SERVER BERMASALAH';
     if (status === 'nonaktif') return 'NONAKTIF';
     return 'UNKNOWN';
   };
@@ -495,6 +704,7 @@ const getLabelBiayaAdmin = (metode) => {
     if (status === 'aktif') return 'Aktif';
     if (status === 'maintenance') return 'Maintenance';
     if (status === 'coming_soon') return 'Coming Soon';
+    if (status === 'gangguan') return 'Server Bermasalah';
     if (status === 'nonaktif') return 'Nonaktif';
     return 'Unknown';
   };
@@ -503,6 +713,7 @@ const getLabelBiayaAdmin = (metode) => {
     if (status === 'aktif') return 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20';
     if (status === 'maintenance') return 'bg-yellow-500/10 text-yellow-300 border-yellow-500/20';
     if (status === 'coming_soon') return 'bg-sky-500/10 text-sky-300 border-sky-500/20';
+    if (status === 'gangguan') return 'bg-slate-500/10 text-slate-300 border-slate-500/20';
     if (status === 'nonaktif') return 'bg-red-500/10 text-red-300 border-red-500/20';
     return 'bg-gray-800 text-gray-400 border-gray-700';
   };
@@ -1295,7 +1506,24 @@ const handleHapusTransaksi = async (trx) => {
 };
 
 const handleRetryTopup = async (trx) => {
-  const providerLabel = labelProvider(trx.provider);
+  const providerAsli = normalisasiProvider(trx.provider);
+  const kodeDefault = trx.kode_produk_provider || trx.kode_produk || '';
+  const mockRetryDiizinkan =
+    process.env.NEXT_PUBLIC_ALLOW_MOCK_RETRY === 'true' ||
+    process.env.NODE_ENV !== 'production';
+  const daftarProviderRetry = [
+    'vipreseller',
+    'apigames',
+    'digiflazz',
+    ...(mockRetryDiizinkan ? ['mock'] : [])
+  ];
+
+  const optionProvider = daftarProviderRetry
+    .map((provider) => {
+      const selected = provider === providerAsli ? 'selected' : '';
+      return `<option value="${escapeHtml(provider)}" ${selected}>${escapeHtml(labelProvider(provider))}</option>`;
+    })
+    .join('');
 
   const konfirmasi = await Swal.fire({
     title: 'Retry top-up?',
@@ -1303,29 +1531,66 @@ const handleRetryTopup = async (trx) => {
       <div style="text-align:left">
         <b>${escapeHtml(trx.order_id)}</b><br/>
         <small>
-          Ini bakal nembak ulang ke <b>${escapeHtml(providerLabel)}</b>.
+          Retry bakal nembak ulang order ke provider yang dipilih.
           Jangan retry kalau top-up sebenarnya sudah masuk ke akun customer.
         </small>
-        <br/><br/>
+
+        <div style="margin-top:14px; display:grid; gap:10px;">
+          <label style="display:grid; gap:6px; font-size:12px; color:#cbd5e1; font-weight:800;">
+            Provider retry
+            <select id="retry-provider" style="width:100%; border:1px solid #334155; background:#020617; color:white; border-radius:12px; padding:10px; font-weight:800;">
+              ${optionProvider}
+            </select>
+          </label>
+
+          <label style="display:grid; gap:6px; font-size:12px; color:#cbd5e1; font-weight:800;">
+            Kode produk provider
+            <input id="retry-kode-provider" value="${escapeHtml(kodeDefault)}" placeholder="Isi kode produk provider" style="width:100%; border:1px solid #334155; background:#020617; color:white; border-radius:12px; padding:10px; font-weight:800;" />
+          </label>
+        </div>
+
+        <br/>
         <small style="color:#fbbf24">
-          Provider: ${escapeHtml(providerLabel)}<br/>
           Produk: ${escapeHtml(trx.nama_produk || trx.kode_produk || '-')}<br/>
           ID: ${escapeHtml(trx.id_player || '-')}<br/>
           Server/Zone: ${escapeHtml(trx.zone_player || '-')}
+        </small>
+
+        <br/><br/>
+        <small style="color:#94a3b8">
+          Catatan: kalau pindah provider, pastikan kode produk provider-nya benar. Salah kode bisa bikin retry gagal.
         </small>
       </div>
     `,
     icon: 'warning',
     showCancelButton: true,
-    confirmButtonText: `Retry ke ${providerLabel}!`,
+    confirmButtonText: 'Retry sekarang',
     cancelButtonText: 'Batal',
     background: '#1f2937',
     color: '#fff',
     confirmButtonColor: '#7c3aed',
-    cancelButtonColor: '#374151'
+    cancelButtonColor: '#374151',
+    preConfirm: () => {
+      const providerDipilih = document.getElementById('retry-provider')?.value || providerAsli;
+      const kodeProvider = document.getElementById('retry-kode-provider')?.value?.trim() || '';
+
+      if (!kodeProvider) {
+        Swal.showValidationMessage('Kode produk provider wajib diisi.');
+        return false;
+      }
+
+      return {
+        provider: providerDipilih,
+        kode_produk_provider: kodeProvider
+      };
+    }
   });
 
   if (!konfirmasi.isConfirmed) return;
+
+  const providerRetry = konfirmasi.value?.provider || providerAsli;
+  const kodeProviderRetry = konfirmasi.value?.kode_produk_provider || kodeDefault;
+  const providerLabel = labelProvider(providerRetry);
 
   setLoadingAksiTransaksi(`${trx.order_id}-retry`);
 
@@ -1334,7 +1599,9 @@ const handleRetryTopup = async (trx) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        order_id: trx.order_id
+        order_id: trx.order_id,
+        provider_override: providerRetry,
+        kode_produk_provider_override: kodeProviderRetry
       })
     });
 
@@ -1817,10 +2084,10 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
 
   // --- MODE EDIT GAME ---
   const handleToggleGame = async (game) => {
-  const statusBaru = game.status_game === 'aktif' ? 'nonaktif' : 'aktif';
+  const statusBaru = game.status_game === 'aktif' ? 'gangguan' : 'aktif';
 
   const konfirmasi = await Swal.fire({
-    title: `${statusBaru === 'aktif' ? 'Aktifkan' : 'Nonaktifkan'} game ini?`,
+    title: `${statusBaru === 'aktif' ? 'Aktifkan' : 'Tandai server bermasalah'} game ini?`,
     text: `${game.nama} akan jadi ${statusBaru}.`,
     icon: 'warning',
     showCancelButton: true,
@@ -2062,10 +2329,10 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
 
   // --- FUNGSI Set status PRODUK ---
   const handleToggleProduk = async (item) => {
-  const statusBaru = item.status_produk === 'aktif' ? 'nonaktif' : 'aktif';
+  const statusBaru = item.status_produk === 'aktif' ? 'gangguan' : 'aktif';
 
   const konfirmasi = await Swal.fire({
-    title: `${statusBaru === 'aktif' ? 'Aktifkan' : 'Nonaktifkan'} produk ini?`,
+    title: `${statusBaru === 'aktif' ? 'Aktifkan' : 'Tandai server bermasalah'} produk ini?`,
     text: `${item.nama_produk} akan jadi ${statusBaru}.`,
     icon: 'warning',
     showCancelButton: true,
@@ -2290,160 +2557,319 @@ const handleHapusRequestGame = async (item) => {
   // --- KEAMANAN CEO ---
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center font-bold animate-pulse">
-        Saha Maneh?
-      </div>
+      <AdminLoadingScreen
+        eyebrow="Admin Gate"
+        subtitle="Lagi cek kunci ruang kendali. Yang bukan bos tunggu di lobby dulu."
+      />
     );
   }
 
   if (!session || session.user.email !== EMAIL_CEO) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-center">
-        <span className="text-7xl mb-4">🚷</span>
-        <h1 className="text-3xl font-black text-red-500 mb-2">AKSES DITOLAK!</h1>
-        <button
-          onClick={() => router.push('/')}
-          className="px-6 py-3 mt-4 bg-gray-800 text-white font-bold rounded-xl"
-        >
-          Balik Beranda
-        </button>
+      <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#030816] px-4 text-center text-white">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(239,68,68,0.18),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(37,99,235,0.12),transparent_36%)]" />
+        <div className="relative w-full max-w-md rounded-[2rem] border border-red-400/15 bg-slate-950/75 p-8 shadow-2xl shadow-red-950/30 backdrop-blur-2xl">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-3xl border border-red-400/20 bg-red-500/10 text-3xl">
+            🚷
+          </div>
+          <p className="text-[10px] font-black uppercase tracking-[0.35em] text-red-300/80">Bukan pintu customer</p>
+          <h1 className="mt-3 text-3xl font-black text-white">Akses ditolak</h1>
+          <p className="mt-2 text-sm font-semibold text-slate-400">
+            Ruang CEO lagi dikunci. Yang boleh masuk cuma admin utama NaXaShop.
+          </p>
+          <button
+            onClick={() => router.push('/')}
+            className="mt-6 rounded-2xl border border-white/10 bg-white/10 px-6 py-3 text-sm font-black text-white transition hover:bg-white/15"
+          >
+            Balik Beranda
+          </button>
+        </div>
       </div>
     );
   }
 
   if (loadingData) {
     return (
-      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center font-bold animate-pulse">
-        Kalem Heula
-      </div>
+      <AdminLoadingScreen
+        eyebrow="Sistem kendali utama"
+        subtitle="Dashboard lagi nyusun statistik, transaksi, produk, dan drama kecil biar enak dipantau."
+      />
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 p-4 sm:p-8 font-sans text-white">
-      <div className="max-w-7xl mx-auto">
+    <div className="admin-promax relative min-h-screen overflow-hidden bg-[#02040d] px-3 pb-28 pt-4 font-sans text-white selection:bg-blue-500/30 sm:px-6 sm:pb-8 sm:pt-7">
+      <style jsx global>{`
+        .admin-promax .bg-gray-900,
+        .admin-promax .bg-gray-800 {
+          background: rgba(15, 23, 42, 0.72) !important;
+          backdrop-filter: blur(18px);
+        }
+
+        .admin-promax .bg-gray-950,
+        .admin-promax .bg-slate-950 {
+          background: rgba(2, 6, 23, 0.70) !important;
+        }
+
+        .admin-promax .border-gray-800,
+        .admin-promax .border-gray-700 {
+          border-color: rgba(96, 165, 250, 0.14) !important;
+        }
+
+        .admin-promax .shadow-xl,
+        .admin-promax .shadow-2xl {
+          box-shadow: 0 24px 80px -42px rgba(37, 99, 235, 0.65) !important;
+        }
+
+        .admin-promax input,
+        .admin-promax select,
+        .admin-promax textarea {
+          background: rgba(2, 6, 23, 0.78) !important;
+          border-color: rgba(96, 165, 250, 0.16) !important;
+        }
+
+        .admin-promax input:focus,
+        .admin-promax select:focus,
+        .admin-promax textarea:focus {
+          border-color: rgba(59, 130, 246, 0.8) !important;
+          box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12) !important;
+        }
+
+        .admin-promax .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+
+        .admin-promax .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+
+        @keyframes naxaSweep {
+          0% { transform: translateX(-120%); opacity: 0; }
+          35% { opacity: 1; }
+          100% { transform: translateX(220%); opacity: 0; }
+        }
+
+        @keyframes naxaSectionIn {
+          0% { opacity: 0; transform: translateY(16px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+
+        .admin-promax .promax-section {
+          animation: naxaSectionIn 520ms ease both;
+        }
+
+        .admin-promax .lux-card {
+          background: linear-gradient(145deg, rgba(15, 23, 42, 0.78), rgba(2, 6, 23, 0.62)) !important;
+          border-color: rgba(147, 197, 253, 0.16) !important;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 24px 90px -48px rgba(37,99,235,0.65) !important;
+        }
+
+        .admin-promax .lux-hover {
+          transition: transform 220ms ease, border-color 220ms ease, background 220ms ease, box-shadow 220ms ease;
+        }
+
+        .admin-promax .lux-hover:hover {
+          transform: translateY(-2px);
+          border-color: rgba(147, 197, 253, 0.32) !important;
+          box-shadow: 0 26px 90px -46px rgba(59,130,246,0.85) !important;
+        }
+
+        @keyframes theNaxaGlow {
+          0%, 100% { filter: drop-shadow(0 0 16px rgba(59,130,246,0.45)); opacity: 0.92; }
+          50% { filter: drop-shadow(0 0 26px rgba(14,165,233,0.75)); opacity: 1; }
+        }
+
+        @keyframes theNaxaGradient {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+
+        .admin-promax .the-naxa-word {
+          background: linear-gradient(90deg, #dbeafe, #38bdf8, #60a5fa, #dbeafe);
+          background-size: 240% 100%;
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          animation: theNaxaGlow 2.6s ease-in-out infinite, theNaxaGradient 4.8s ease-in-out infinite;
+        }
+      `}</style>
+
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.32),transparent_34%),radial-gradient(circle_at_top_right,rgba(14,165,233,0.18),transparent_30%),radial-gradient(circle_at_bottom,rgba(15,23,42,0.92),transparent_42%)]" />
+      <div className="pointer-events-none absolute left-1/2 top-0 h-px w-[82%] -translate-x-1/2 bg-gradient-to-r from-transparent via-blue-300/35 to-transparent" />
+
+      <div className="relative z-10 mx-auto max-w-7xl">
 
         {/* HEADER & TAB MENU */}
-        <div className="mb-8 border-b border-gray-800 pb-6 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
-          <div>
-            <h1 className="text-3xl font-black tracking-tight">Ruang CEO NaXaShop 👑</h1>
-            <p className="text-sm text-gray-400 mt-1">
-              Sistem kendali utama bos{' '}
-              <span className="text-blue-400 font-bold">{session.user.name}</span>.
-            </p>
+        <div className="promax-section mb-6 overflow-hidden rounded-[2rem] border border-blue-400/15 bg-slate-950/70 shadow-2xl shadow-blue-950/35 backdrop-blur-2xl">
+          <div className="relative p-5 sm:p-7">
+            <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-blue-500/20 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-20 left-16 h-40 w-40 rounded-full bg-emerald-500/10 blur-3xl" />
+
+            <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+              <div className="min-w-0">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-blue-400/20 bg-blue-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em] text-blue-200">
+                    Sistem Kendali Utama
+                  </span>
+                  <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-[10px] font-black text-emerald-200">
+                    Live • mode tempur aman
+                  </span>
+                </div>
+
+                <h1 className="text-3xl font-black tracking-tight sm:text-5xl">
+                  Sistem Kendali Utama <span className="text-blue-200">Bos Fahmi</span>
+                </h1>
+
+                <motion.div
+                  className="mt-2 inline-flex items-center gap-2 text-3xl font-black tracking-tight sm:text-5xl"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.55, ease: motionEase, delay: 0.1 }}
+                >
+                  <span className="the-naxa-word">The NaXa</span>
+                  <motion.span
+                    className="text-2xl"
+                    animate={{ rotate: [-8, 8, -8], scale: [1, 1.08, 1] }}
+                    transition={{ duration: 2.1, repeat: Infinity, ease: 'easeInOut' }}
+                  >
+                    ⚡
+                  </motion.span>
+                </motion.div>
+
+                <p className="mt-3 max-w-2xl text-sm font-semibold leading-relaxed text-slate-400">
+                  Ruang kontrol buat transaksi, produk, promo, metode bayar, dan urusan kecil yang harus kelihatan sebelum jadi “bang kok belum masuk?”.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 rounded-3xl border border-white/10 bg-white/[0.03] p-2 text-center sm:min-w-[360px]">
+                <div className="rounded-2xl border border-red-400/15 bg-red-500/10 px-3 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-red-200/80">Gawat</p>
+                  <p className="mt-1 text-2xl font-black text-red-300">{alerts?.ringkasan?.topupGagal || 0}</p>
+                </div>
+                <div className="rounded-2xl border border-yellow-400/15 bg-yellow-500/10 px-3 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-yellow-200/80">Pending</p>
+                  <p className="mt-1 text-2xl font-black text-yellow-300">{alerts?.ringkasan?.pendingLama || 0}</p>
+                </div>
+                <div className="rounded-2xl border border-emerald-400/15 bg-emerald-500/10 px-3 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-emerald-200/80">Request</p>
+                  <p className="mt-1 text-2xl font-black text-emerald-300">{Number(statsRequestGame?.baru || 0)}</p>
+                </div>
+              </div>
+            </div>
           </div>
+        </div>
 
-          <div className="flex flex-wrap bg-gray-900 p-1 rounded-xl border border-gray-800 shadow-lg gap-1">
-            <button
-              onClick={() => setTabAktif('statistik')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                tabAktif === 'statistik'
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'text-gray-400 hover:text-white'
-              }`}
+        <div className="promax-section mb-6 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            { label: 'Beresi order nyangkut', desc: 'Langsung ke transaksi bermasalah.', icon: '🚨', tab: 'transaksi', tone: 'from-red-500/18 to-slate-950/40', border: 'border-red-300/15' },
+            { label: 'Tambah produk tempur', desc: 'Isi nominal yang profitnya sehat.', icon: '📦', tab: 'produk', tone: 'from-blue-500/18 to-slate-950/40', border: 'border-blue-300/15' },
+            { label: 'Tambah game baru', desc: 'Biar katalog makin hidup.', icon: '🎮', tab: 'game', tone: 'from-purple-500/18 to-slate-950/40', border: 'border-purple-300/15' },
+            { label: 'Promo & etalase', desc: 'Rapihin banner biar toko gak sepi.', icon: '✨', tab: 'promo', tone: 'from-emerald-500/18 to-slate-950/40', border: 'border-emerald-300/15' }
+          ].map((aksi, index) => (
+            <motion.button
+              key={aksi.label}
+              type="button"
+              onClick={() => setTabAktif(aksi.tab)}
+              className={`lux-card lux-hover group overflow-hidden rounded-[1.65rem] border ${aksi.border} bg-gradient-to-br ${aksi.tone} p-4 text-left`}
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, ease: motionEase, delay: 0.08 * index }}
+              whileHover={{ y: -5, scale: 1.015 }}
+              whileTap={{ scale: 0.98 }}
             >
-              📊 Statistik
-            </button>
-            <button
-              onClick={() => setTabAktif('transaksi')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                tabAktif === 'transaksi'
-                  ? 'bg-emerald-600 text-white shadow-md'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              🧾 Kelola Transaksi
-            </button>
-            <button
-              onClick={() => setTabAktif('game')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                tabAktif === 'game'
-                  ? 'bg-purple-600 text-white shadow-md'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              🎮 Kelola Game
-            </button>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-2xl shadow-lg">
+                    {aksi.icon}
+                  </div>
+                  <h3 className="text-sm font-black text-white">{aksi.label}</h3>
+                  <p className="mt-1 text-xs font-semibold leading-relaxed text-slate-400">{aksi.desc}</p>
+                </div>
+                <span className="mt-1 rounded-full border border-white/10 bg-white/10 px-2 py-1 text-[10px] font-black text-slate-300 transition group-hover:translate-x-1 group-hover:text-white">
+                  buka →
+                </span>
+              </div>
+            </motion.button>
+          ))}
+        </div>
 
-            <button
-              onClick={() => setTabAktif('produk')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                tabAktif === 'produk'
-                  ? 'bg-cyan-600 text-white shadow-md'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              📦 Kelola Produk
-            </button>
-            <button
-  onClick={() => setTabAktif('promo')}
-  className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-    tabAktif === 'promo'
-      ? 'bg-sky-600 text-white shadow-md'
-      : 'text-gray-400 hover:text-white'
-  }`}
->
-  🎞️ Kelola Promo
-</button>
+        <div className="promax-section sticky top-3 z-40 mb-8 rounded-[1.65rem] border border-blue-400/15 bg-[#061426]/88 p-2 shadow-2xl shadow-blue-950/30 backdrop-blur-2xl">
+          <div className="no-scrollbar flex gap-2 overflow-x-auto">
+            {[
+              { id: 'statistik', icon: '📊', label: 'Statistik', tone: 'from-blue-600 to-blue-500' },
+              { id: 'transaksi', icon: '🧾', label: 'Transaksi', tone: 'from-emerald-600 to-teal-500' },
+              { id: 'game', icon: '🎮', label: 'Game', tone: 'from-purple-600 to-fuchsia-500' },
+              { id: 'produk', icon: '📦', label: 'Produk', tone: 'from-cyan-600 to-blue-500' },
+              { id: 'promo', icon: '🎞️', label: 'Promo', tone: 'from-sky-600 to-blue-500' },
+              { id: 'metode-bayar', icon: '💳', label: 'Payment', tone: 'from-indigo-600 to-blue-500' },
+              { id: 'voucher', icon: '🎟️', label: 'Voucher', tone: 'from-pink-600 to-rose-500' },
+              { id: 'maintenance', icon: '🛠️', label: 'Maintenance', tone: 'from-amber-600 to-orange-500' },
+              { id: 'request-game', icon: '💡', label: 'Request', tone: 'from-blue-600 to-cyan-500', badge: Number(statsRequestGame?.baru || 0) }
+            ].map((item) => {
+              const aktif = tabAktif === item.id;
 
+              return (
+                <motion.button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setTabAktif(item.id)}
+                  className={`relative flex shrink-0 items-center gap-2 rounded-2xl border px-4 py-3 text-xs font-black transition-all duration-300 ${
+                    aktif
+                      ? `border-blue-300/40 bg-gradient-to-r ${item.tone} text-white shadow-lg shadow-blue-950/35`
+                      : 'border-white/5 bg-white/[0.03] text-slate-400 hover:border-blue-300/20 hover:bg-blue-500/10 hover:text-white'
+                  }`}
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.96 }}
+                >
+                  <span>{item.icon}</span>
+                  <span>{item.label}</span>
+                  {item.badge > 0 && (
+                    <span className="ml-1 rounded-full bg-red-500 px-2 py-0.5 text-[10px] text-white">
+                      {item.badge}
+                    </span>
+                  )}
+                </motion.button>
+              );
+            })}
+          </div>
+        </div>
 
-<button
-  onClick={() => setTabAktif('metode-bayar')}
-  className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-    tabAktif === 'metode-bayar'
-      ? 'bg-indigo-600 text-white shadow-md'
-      : 'text-gray-400 hover:text-white'
-  }`}
->
-  💳 Metode Bayar
-</button>
+        <div className="fixed inset-x-3 bottom-3 z-50 rounded-[1.6rem] border border-blue-300/15 bg-[#061426]/92 p-2 shadow-2xl shadow-blue-950/50 backdrop-blur-2xl sm:hidden">
+          <div className="grid grid-cols-4 gap-1">
+            {[
+              { id: 'transaksi', icon: '🚨', label: 'Order' },
+              { id: 'produk', icon: '📦', label: 'Produk' },
+              { id: 'game', icon: '🎮', label: 'Game' },
+              { id: 'promo', icon: '✨', label: 'Promo' }
+            ].map((item) => {
+              const aktif = tabAktif === item.id;
 
-
-
-<button
-  onClick={() => setTabAktif('voucher')}
-  className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-    tabAktif === 'voucher'
-      ? 'bg-pink-600 text-white shadow-md'
-      : 'text-gray-400 hover:text-white'
-  }`}
->
-  🎟️ Voucher
-</button>
-
-
-<button
-  onClick={() => setTabAktif('maintenance')}
-  className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-    tabAktif === 'maintenance'
-      ? 'bg-amber-600 text-white shadow-md'
-      : 'text-gray-400 hover:text-white'
-  }`}
->
-  🛠️ Maintenance
-</button>
-
-<button
-  onClick={() => setTabAktif('request-game')}
-  className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-    tabAktif === 'request-game'
-      ? 'bg-blue-600 text-white shadow-md'
-      : 'text-gray-400 hover:text-white'
-  }`}
->
-  💡 Request Game
-  {Number(statsRequestGame?.baru || 0) > 0 && (
-    <span className="ml-2 rounded-full bg-red-500 px-2 py-0.5 text-[10px] text-white">
-      {statsRequestGame.baru}
-    </span>
-  )}
-</button>
+              return (
+                <motion.button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setTabAktif(item.id)}
+                  className={`rounded-2xl px-2 py-2 text-[10px] font-black transition ${
+                    aktif
+                      ? 'bg-blue-500 text-white shadow-lg shadow-blue-950/50'
+                      : 'text-slate-400 hover:bg-white/10 hover:text-white'
+                  }`}
+                  whileTap={{ scale: 0.92 }}
+                >
+                  <span className="block text-lg leading-none">{item.icon}</span>
+                  <span className="mt-1 block">{item.label}</span>
+                </motion.button>
+              );
+            })}
           </div>
         </div>
 
 {/* TAB STATISTIK */}
+
 {tabAktif === 'statistik' && (
-  <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+  <div className="promax-section animate-in fade-in slide-in-from-bottom-4 duration-500">
 
     {/* GRAFIK PALING ATAS */}
     <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 mb-8">
@@ -2951,13 +3377,39 @@ const handleHapusRequestGame = async (item) => {
                     </div>              
           </aside>      
             <section className="min-w-0 space-y-6">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <div className="rounded-3xl border border-red-400/15 bg-red-500/10 p-4 shadow-xl">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-red-200/80">Bermasalah dulu</p>
+                  <p className="mt-1 text-3xl font-black text-red-300">{ringkasanTransaksiAdmin.bermasalah}</p>
+                  <p className="mt-1 text-[11px] font-bold text-red-100/55">Ini yang jangan ditinggal ngopi.</p>
+                </div>
+
+                <div className="rounded-3xl border border-purple-400/15 bg-purple-500/10 p-4 shadow-xl">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-purple-200/80">Perlu dicek</p>
+                  <p className="mt-1 text-3xl font-black text-purple-300">{ringkasanTransaksiAdmin.perluDicek}</p>
+                  <p className="mt-1 text-[11px] font-bold text-purple-100/55">Bayar sukses, top-up belum final.</p>
+                </div>
+
+                <div className="rounded-3xl border border-yellow-400/15 bg-yellow-500/10 p-4 shadow-xl">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-yellow-200/80">Pending bayar</p>
+                  <p className="mt-1 text-3xl font-black text-yellow-300">{ringkasanTransaksiAdmin.pendingBayar}</p>
+                  <p className="mt-1 text-[11px] font-bold text-yellow-100/55">Nunggu user atau Midtrans.</p>
+                </div>
+
+                <div className="rounded-3xl border border-emerald-400/15 bg-emerald-500/10 p-4 shadow-xl">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-emerald-200/80">Aman</p>
+                  <p className="mt-1 text-3xl font-black text-emerald-300">{ringkasanTransaksiAdmin.selesai}</p>
+                  <p className="mt-1 text-[11px] font-bold text-emerald-100/55">Sukses, silakan senyum mahal.</p>
+                </div>
+              </div>
+
                             {/* FILTER */}
             <div className="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl">
               <div className="flex flex-col lg:flex-row justify-between gap-4 mb-6">
                 <div>
                   <h2 className="text-xl font-black">🧾 Kelola Transaksi</h2>
                   <p className="text-xs text-gray-500 mt-1">
-                    Cari order nyangkut, retry top-up, dan update status manual.
+                    Problem-first mode aktif: order yang perlu perhatian dinaikin duluan, sukses-sukses santai di bawah.
                   </p>
                 </div>
 
@@ -3064,10 +3516,10 @@ const handleHapusRequestGame = async (item) => {
                 </div>
              ) : (
   <div className="p-4 space-y-3">
-    {daftarTransaksi.map((trx) => (
+    {daftarTransaksiPrioritas.map((trx) => (
       <div
         key={trx.id}
-        className="bg-slate-950 border border-gray-800 rounded-2xl p-4 hover:border-emerald-500/30 transition-all"
+        className="lux-card lux-hover rounded-2xl border border-gray-800 p-4 transition-all"
       >
         <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
           
@@ -3420,6 +3872,7 @@ const handleHapusRequestGame = async (item) => {
                   >
                     <option value="aktif">Aktif - tampil & bisa dibeli</option>
                     <option value="coming_soon">Coming Soon - tampil tapi belum bisa checkout</option>
+                    <option value="gangguan">Server Bermasalah - tampil abu-abu & checkout dikunci</option>
                     <option value="nonaktif">Nonaktif - sembunyi dari customer</option>
                   </select>
                 </div>
@@ -3587,7 +4040,7 @@ const handleHapusRequestGame = async (item) => {
                             : 'bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-600 hover:text-white'
                         }`}
                       >
-                        {game.status_game === 'aktif' ? '⛔ Nonaktifkan' : '✅ Aktifkan'}
+                        {game.status_game === 'aktif' ? '🛠️ Gangguan' : '✅ Aktifkan'}
                       </button>
                       <button
                         onClick={() => handleHapusGame(game)}
@@ -3685,6 +4138,7 @@ const handleHapusRequestGame = async (item) => {
                   >
                     <option value="aktif">Aktif - tampil & bisa dibeli</option>
                     <option value="coming_soon">Coming Soon - tampil tapi belum bisa checkout</option>
+                    <option value="gangguan">Server Bermasalah - tampil abu-abu & checkout dikunci</option>
                     <option value="nonaktif">Nonaktif - sembunyi dari customer</option>
                   </select>
                 </div>
@@ -3946,7 +4400,7 @@ const handleHapusRequestGame = async (item) => {
                               : 'bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-600 hover:text-white'
                           }`}
                         >
-                          {item.status_produk === 'aktif' ? '⛔ Nonaktifkan' : '✅ Aktifkan'}
+                          {item.status_produk === 'aktif' ? '🛠️ Gangguan' : '✅ Aktifkan'}
                         </button>
                       <button
                         onClick={() => handleHapusProduk(item)}
@@ -4496,7 +4950,7 @@ const handleHapusRequestGame = async (item) => {
         )}
 
         {tabAktif === 'request-game' && (
-  <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+  <div className="promax-section animate-in fade-in slide-in-from-bottom-4 duration-500">
     <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-5">
       <div className="rounded-3xl border border-gray-800 bg-gray-900 p-4">
         <p className="text-[11px] font-black uppercase tracking-wider text-gray-500">

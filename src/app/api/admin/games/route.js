@@ -9,7 +9,7 @@ import {
 } from '../../../lib/game-categories';
 
 const EMAIL_CEO = 'fahmiimansyah28@gmail.com';
-const STATUS_GAME_VALID = ['aktif', 'nonaktif', 'coming_soon'];
+const STATUS_GAME_VALID = ['aktif', 'gangguan', 'nonaktif', 'coming_soon'];
 const BADGE_TIPE_VALID = ['none', 'popular', 'promo', 'fast', 'new', 'comingsoon'];
 
 async function cekAdmin() {

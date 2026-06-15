@@ -21,8 +21,13 @@ export default function FormKasir({ dataGame }) {
   const butuhZoneId = Number(dataGame.zone_id) === 1;
   const butuhServer = dataGame.server_game && dataGame.server_game.trim() !== '';
   const gameComingSoon = dataGame.status_game === 'coming_soon';
+  const gameGangguan = dataGame.status_game === 'gangguan';
+  const gameTerkunci = gameComingSoon || gameGangguan;
 
   const isProdukComingSoon = (produk) => produk?.status_produk === 'coming_soon';
+  const isProdukGangguan = (produk) => produk?.status_produk === 'gangguan';
+  const isProdukTerkunci = (produk) =>
+    isProdukComingSoon(produk) || isProdukGangguan(produk);
   const formatRupiah = (angka) => {
     return `Rp ${Number(angka || 0).toLocaleString('id-ID')}`;
   };
@@ -206,8 +211,8 @@ export default function FormKasir({ dataGame }) {
 
   const checkoutDisabled =
     !produkDipilih ||
-    gameComingSoon ||
-    isProdukComingSoon(produkDipilih) ||
+    gameTerkunci ||
+    isProdukTerkunci(produkDipilih) ||
     !inputUserId.trim() ||
     (butuhZoneId && !inputZoneId.trim()) ||
     (butuhServer && !inputZoneId.trim()) ||
@@ -297,7 +302,7 @@ export default function FormKasir({ dataGame }) {
         'Jika game membutuhkan server atau zone, pastikan pilih dengan benar.',
         'Kesalahan input bisa menyebabkan top-up gagal atau masuk ke akun lain.'
       ],
-      contoh: 'User ID / UID akun game'
+      contoh: 'UID 800xxxxxxx'
     };
   };
 
@@ -474,8 +479,18 @@ export default function FormKasir({ dataGame }) {
       return;
     }
 
+    if (gameGangguan) {
+      tampilWarning('Server sedang bermasalah. Checkout dikunci dulu sampai server kembali aman.', 'Server Bermasalah');
+      return;
+    }
+
     if (isProdukComingSoon(produkDipilih)) {
       tampilWarning('Produk ini masih segera hadir. Belum bisa dibeli dulu ya.', 'Segera Hadir');
+      return;
+    }
+
+    if (isProdukGangguan(produkDipilih)) {
+      tampilWarning('Produk ini sedang gangguan. Coba produk lain dulu atau cek lagi nanti ya.', 'Server Bermasalah');
       return;
     }
 
@@ -724,23 +739,36 @@ if (orderIdTagihan) {
             </div>
           )}
 
+          {gameGangguan && (
+            <div className="mb-4 rounded-2xl border border-slate-500/20 bg-slate-500/10 p-4">
+              <p className="text-sm font-black text-slate-200">🛠️ Server sedang bermasalah</p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-300">
+                Produk tetap ditampilkan, tapi checkout dikunci dulu sampai server kembali stabil.
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 sm:grid-cols-2 2xl:grid-cols-3 gap-3 sm:gap-4">
             {(dataGame.produk || []).map((item) => {
               const produkComingSoon = isProdukComingSoon(item) || gameComingSoon;
+              const produkGangguan = isProdukGangguan(item) || gameGangguan;
+              const produkTerkunci = produkComingSoon || produkGangguan;
               const produkAktif = produkDipilih?.id === item.id;
 
               return (
               <div
                 key={item.id}
                 onClick={() => {
-                  if (produkComingSoon) {
+                  if (produkTerkunci) {
                     Swal.fire({
                       background: '#1f2937',
                       color: '#fff',
-                      title: 'Coming Soon 🕒',
-                      text: gameComingSoon
-                        ? 'Game ini belum dibuka untuk checkout.'
-                        : 'Produk ini belum bisa dibeli dulu ya.',
+                      title: produkGangguan ? 'Server Bermasalah 🛠️' : 'Coming Soon 🕒',
+                      text: produkGangguan
+                        ? 'Produk ini sedang gangguan. Coba produk lain dulu atau cek lagi nanti ya.'
+                        : gameComingSoon
+                          ? 'Game ini belum dibuka untuk checkout.'
+                          : 'Produk ini belum bisa dibeli dulu ya.',
                       icon: 'info',
                       confirmButtonColor: '#3b82f6'
                     });
@@ -755,19 +783,34 @@ if (orderIdTagihan) {
                   }
                 }}
                 className={`relative overflow-hidden p-3 sm:p-5 rounded-2xl border-2 transition-all duration-300 flex flex-col justify-between min-h-28 ${
-                  produkComingSoon
-                    ? 'cursor-not-allowed bg-gray-950/80 border-yellow-500/20 opacity-75'
+                  produkTerkunci
+                    ? produkGangguan
+                      ? 'cursor-not-allowed bg-slate-950/80 border-slate-500/20 opacity-75 grayscale-[30%]'
+                      : 'cursor-not-allowed bg-gray-950/80 border-yellow-500/20 opacity-75'
                     : produkAktif
                       ? 'cursor-pointer bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)]'
                       : 'cursor-pointer bg-gray-900 border-gray-700 hover:border-blue-400'
                 }`}
               >
-                {produkComingSoon && (
-                  <div className="absolute right-2 top-2 rounded-full border border-yellow-500/20 bg-yellow-500/10 px-2 py-1 text-[10px] font-black text-yellow-300">
-                    Coming Soon
+                {produkTerkunci && (
+                  <div className="mb-2 flex justify-end">
+                    <span
+                      className={`rounded-full border px-2 py-1 text-[10px] font-black ${
+                        produkGangguan
+                          ? 'border-slate-500/20 bg-slate-500/10 text-slate-300'
+                          : 'border-yellow-500/20 bg-yellow-500/10 text-yellow-300'
+                      }`}
+                    >
+                      {produkGangguan ? 'Server Bermasalah' : 'Coming Soon'}
+                    </span>
                   </div>
                 )}
-                <p className="text-white font-black text-sm sm:text-base leading-tight">
+
+                <p
+                  className={`font-black text-sm sm:text-base leading-tight ${
+                    produkGangguan ? 'text-slate-300' : 'text-white'
+                  }`}
+                >
                   {item.nama_produk}
                 </p>
 
@@ -1299,8 +1342,10 @@ if (orderIdTagihan) {
                 </p>
 
                 <p className={`mt-1 text-[11px] font-black ${metodeBayar ? 'text-blue-300' : 'text-yellow-300'}`}>
-                  {gameComingSoon || isProdukComingSoon(produkDipilih)
-                    ? 'Coming Soon • checkout belum dibuka'
+                  {gameGangguan || isProdukGangguan(produkDipilih)
+                    ? 'Server bermasalah • checkout dikunci dulu'
+                    : gameComingSoon || isProdukComingSoon(produkDipilih)
+                      ? 'Coming Soon • checkout belum dibuka'
                     : metodeBayar
                       ? `${namaMetodeBayar[metodeBayar]} • ${getLabelBiayaAdmin(metodeBayar)}${voucherAktif ? ` • Voucher -${formatRupiah(voucherAktif.diskon)}` : ''}`
                       : voucherAktif
@@ -1335,8 +1380,10 @@ if (orderIdTagihan) {
               <span className="relative">
                 {isProsesBeli
                   ? 'Memproses...'
-                  : gameComingSoon || isProdukComingSoon(produkDipilih)
-                    ? 'Segera Hadir 🕒'
+                  : gameGangguan || isProdukGangguan(produkDipilih)
+                    ? 'Server Bermasalah 🛠️'
+                    : gameComingSoon || isProdukComingSoon(produkDipilih)
+                      ? 'Segera Hadir 🕒'
                     : 'Lanjut Bayar'}
               </span>
             </button>

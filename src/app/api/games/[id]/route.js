@@ -35,7 +35,7 @@ export async function GET(request, { params }) {
       `SELECT *
        FROM games
        WHERE ${cariPakaiId ? 'id = ?' : 'slug = ?'}
-         AND status_game IN ('aktif', 'coming_soon')
+         AND status_game IN ('aktif', 'coming_soon', 'gangguan')
        LIMIT 1`,
       [gameParam]
     );
@@ -64,12 +64,13 @@ export async function GET(request, { params }) {
          status_produk
        FROM produk
        WHERE game_id = ?
-         AND status_produk IN ('aktif', 'coming_soon')
+         AND status_produk IN ('aktif', 'coming_soon', 'gangguan')
        ORDER BY
          CASE status_produk
            WHEN 'aktif' THEN 1
            WHEN 'coming_soon' THEN 2
-           ELSE 3
+           WHEN 'gangguan' THEN 3
+           ELSE 4
          END,
          harga ASC`,
       [game.id]

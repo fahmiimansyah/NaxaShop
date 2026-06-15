@@ -512,14 +512,6 @@ export default function RiwayatTransaksiPage() {
                   </p>
                 </div>
 
-                <div className="col-span-2 rounded-2xl border border-gray-800 bg-slate-950 px-5 py-4 sm:col-span-1">
-                  <p className="text-xs font-black uppercase text-gray-500">
-                    Total Selesai
-                  </p>
-                  <p className="mt-1 text-xl font-black text-green-400">
-                    {formatRupiah(totalSukses)}
-                  </p>
-                </div>
               </div>
             </div>
           </div>

@@ -9,6 +9,7 @@ import { prosesVoucherMakasihOrderPertama } from '../../../../lib/voucher';
 import { transaksiDigiflazz } from '../../../../lib/digiflazz';
 
 const EMAIL_CEO = 'fahmiimansyah28@gmail.com';
+const PROVIDER_VALID = ['apigames', 'digiflazz', 'vipreseller', 'mock'];
 
 async function cekAdmin() {
   const session = await getServerSession(authOptions);
@@ -34,6 +35,10 @@ function normalisasiProvider(value) {
 
 function normalisasiStatus(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+function mockRetryDiizinkan() {
+  return process.env.ALLOW_MOCK_RETRY === 'true' || process.env.NODE_ENV !== 'production';
 }
 
 function statusTopupBolehRetry(status) {
@@ -385,10 +390,30 @@ export async function POST(request) {
   try {
     const body = await request.json();
     const orderId = bersihinText(body.order_id);
+    const providerOverrideMentah = bersihinText(body.provider_override).toLowerCase();
+    const providerOverride = providerOverrideMentah || '';
+    const kodeProdukProviderOverride = bersihinText(body.kode_produk_provider_override);
 
     if (!orderId) {
       return NextResponse.json(
         { sukses: false, pesan: 'Order ID wajib dikirim.' },
+        { status: 400 }
+      );
+    }
+
+    if (providerOverride && !PROVIDER_VALID.includes(providerOverride)) {
+      return NextResponse.json(
+        { sukses: false, pesan: 'Provider retry tidak valid.' },
+        { status: 400 }
+      );
+    }
+
+    if (providerOverride === 'mock' && !mockRetryDiizinkan()) {
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan: 'Mock Provider dikunci di production biar status order real tidak jadi sukses palsu.'
+        },
         { status: 400 }
       );
     }
@@ -413,7 +438,26 @@ export async function POST(request) {
     }
 
     const trx = dataTrx[0];
-    const provider = normalisasiProvider(trx.provider);
+    const providerAsli = normalisasiProvider(trx.provider);
+    const provider = providerOverride || providerAsli;
+    const kodeProdukProviderRetry =
+      kodeProdukProviderOverride || trx.kode_produk_provider || trx.kode_produk;
+    const trxRetry = {
+      ...trx,
+      provider,
+      kode_produk_provider: kodeProdukProviderRetry
+    };
+
+
+    if (provider === 'mock' && !mockRetryDiizinkan()) {
+      return NextResponse.json(
+        {
+          sukses: false,
+          pesan: 'Mock Provider dikunci di production biar status order real tidak jadi sukses palsu.'
+        },
+        { status: 400 }
+      );
+    }
 
     if (trx.status_bayar !== 'sukses') {
       return NextResponse.json(
@@ -487,12 +531,29 @@ export async function POST(request) {
     const [hasilLock] = await db.query(
       `UPDATE transaksi
        SET status_topup = 'proses',
-           catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nRetry top-up oleh admin via ', ?, ' pada ', NOW()),
+           provider = ?,
+           kode_produk_provider = ?,
+           catatan_admin = CONCAT(
+             IFNULL(catatan_admin, ''),
+             '\nRetry top-up oleh admin via ', ?,
+             CASE WHEN ? != ? THEN CONCAT(' (sebelumnya ', ?, ')') ELSE '' END,
+             ' pada ', NOW(),
+             '\nKode provider retry: ', ?
+           ),
            updated_at = NOW()
        WHERE order_id = ?
          AND status_bayar = 'sukses'
          AND status_topup != 'sukses'`,
-      [provider, orderId]
+      [
+        provider,
+        kodeProdukProviderRetry,
+        provider,
+        provider,
+        providerAsli,
+        providerAsli,
+        kodeProdukProviderRetry,
+        orderId
+      ]
     );
 
     if (hasilLock.affectedRows === 0) {
@@ -508,7 +569,7 @@ export async function POST(request) {
     let hasilProvider;
 
     try {
-      hasilProvider = await tembakProvider(trx);
+      hasilProvider = await tembakProvider(trxRetry);
     } catch (error) {
       await updateGagal(
         orderId,

@@ -23,16 +23,27 @@ function warnaBadgeGame(tipe) {
 
 function GameCard({ game }) {
   const metaKategori = getGameCategoryMeta(kategoriGameDariData(game));
+  const statusGame = String(game.status_game || 'aktif').toLowerCase();
+  const gameComingSoon = statusGame === 'coming_soon';
+  const gameGangguan = statusGame === 'gangguan';
 
   return (
     <Link href={`/topup/${game.slug || game.id}`} className="group">
-      <div className="h-full overflow-hidden rounded-2xl border border-blue-800/35 bg-[#071a33] transition-all duration-300 hover:border-blue-500 hover:shadow-[0_0_20px_rgba(59,130,246,0.35)]">
+      <div
+        className={`h-full overflow-hidden rounded-2xl border transition-all duration-300 ${
+          gameGangguan
+            ? 'border-slate-700/80 bg-slate-900/70 opacity-80 hover:border-slate-500/70'
+            : 'border-blue-800/35 bg-[#071a33] hover:border-blue-500 hover:shadow-[0_0_20px_rgba(59,130,246,0.35)]'
+        }`}
+      >
         <div className="relative aspect-square overflow-hidden bg-[#061426]">
           {game.gambar ? (
             <img
               src={game.gambar}
               alt={`Top up ${game.nama || 'game'}`}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+              className={`h-full w-full object-cover transition-transform duration-500 ${
+                gameGangguan ? 'grayscale opacity-55' : 'group-hover:scale-110'
+              }`}
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-3xl">
@@ -40,9 +51,15 @@ function GameCard({ game }) {
             </div>
           )}
 
-          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent" />
+          <div
+            className={`absolute inset-0 ${
+              gameGangguan
+                ? 'bg-gradient-to-t from-black/90 via-slate-950/40 to-slate-950/10'
+                : 'bg-gradient-to-t from-black/75 via-transparent to-transparent'
+            }`}
+          />
 
-          {game.badge_label && game.badge_tipe !== 'none' && (
+          {game.badge_label && game.badge_tipe !== 'none' && !gameGangguan && (
             <div
               className={`absolute left-2 top-2 z-20 rounded-full border px-2 py-1 text-[9px] font-black shadow-lg backdrop-blur-md sm:text-[10px] ${warnaBadgeGame(
                 game.badge_tipe
@@ -52,21 +69,34 @@ function GameCard({ game }) {
             </div>
           )}
 
-          {game.status_game === 'coming_soon' && (
+          {gameComingSoon && (
             <div className="absolute bottom-2 left-2 right-2 z-20 rounded-xl border border-indigo-300/20 bg-indigo-500/20 px-2 py-1 text-center text-[9px] font-black text-indigo-100 backdrop-blur-md sm:text-[10px]">
               Coming Soon
+            </div>
+          )}
+
+          {gameGangguan && (
+            <div className="absolute bottom-2 left-2 right-2 z-20 rounded-xl border border-slate-400/20 bg-slate-950/70 px-2 py-1 text-center text-[9px] font-black text-slate-200 backdrop-blur-md sm:text-[10px]">
+              Server Bermasalah
             </div>
           )}
         </div>
 
         <div className="p-3">
-
-          <h3 className="truncate text-sm font-semibold text-white md:text-base">
+          <h3
+            className={`truncate text-sm font-semibold md:text-base ${
+              gameGangguan ? 'text-slate-300' : 'text-white'
+            }`}
+          >
             {game.nama || 'Game Tanpa Nama'}
           </h3>
 
-          <p className="mt-1 truncate text-xs text-blue-100/45">
-            {game.publisher || 'NaXaShop'}
+          <p
+            className={`mt-1 truncate text-xs ${
+              gameGangguan ? 'text-slate-500' : 'text-blue-100/45'
+            }`}
+          >
+            {gameGangguan ? 'Server sedang bermasalah' : game.publisher || 'NaXaShop'}
           </p>
         </div>
       </div>

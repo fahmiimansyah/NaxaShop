@@ -5,7 +5,7 @@ import db from '../../../lib/db';
 
 const EMAIL_CEO = 'fahmiimansyah28@gmail.com';
 
-const STATUS_PRODUK_VALID = ['aktif', 'nonaktif', 'coming_soon'];
+const STATUS_PRODUK_VALID = ['aktif', 'gangguan', 'nonaktif', 'coming_soon'];
 const PROVIDER_VALID = ['apigames', 'digiflazz', 'mock', 'vipreseller'];
 
 async function cekAdmin() {

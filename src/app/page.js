@@ -1,7 +1,7 @@
 export const metadata = {
-  title: 'NaXaShop - Top Up Game Sat-Set & Terlacak',
+  title: 'NaXaShop - Top Up Game Praktis & Terlacak',
   description:
-    'Top up game favorit di NaXaShop dengan proses sat-set, pembayaran praktis, dan status pesanan yang bisa dilacak.',
+    'Top up game favorit kamu di NaXaShop dengan pembayaran mudah, proses otomatis, dan status pesanan yang bisa dipantau sampai selesai.',
   alternates: {
     canonical: '/',
   },
