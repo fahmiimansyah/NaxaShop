@@ -127,6 +127,23 @@ async function fetchVipReseller(payload, timeoutMs = 15000) {
   return fetchVipResellerLangsung(payload, timeoutMs);
 }
 
+
+export async function ambilLayananVipReseller({ filterGame = '', filterStatus = '' } = {}) {
+  const payload = {
+    type: 'services'
+  };
+
+  if (filterGame) {
+    payload.filter_game = String(filterGame).trim();
+  }
+
+  if (filterStatus) {
+    payload.filter_status = String(filterStatus).trim();
+  }
+
+  return fetchVipReseller(payload, 20000);
+}
+
 export function ambilVipResellerTrxIdDariResponse(value) {
   if (!value) return null;
 

@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Swal from 'sweetalert2';
+import { FiActivity, FiArrowRight, FiBarChart2, FiBell, FiBox, FiCreditCard, FiGift, FiGrid, FiImage, FiMenu, FiMessageSquare, FiRefreshCw, FiSearch, FiSettings, FiShoppingBag, FiTool, FiX } from 'react-icons/fi';
 import AdminVoucherPanel from '../components/AdminVoucherPanel';
 import AdminMaintenancePanel from '../components/AdminMaintenancePanel';
+import AdminVipSyncPanel from '../components/AdminVipSyncPanel';
 import { GAME_CATEGORIES, getGameCategoryMeta } from '../lib/game-categories';
 function angkaDashboard(value) {
   return Number(value || 0);
@@ -49,9 +51,157 @@ function labelMetodeBayarDashboard(value) {
 
 const motionEase = [0.22, 1, 0.36, 1];
 
+function AnimatedNumber({ value = 0, prefix = '', suffix = '', compact = false, className = '' }) {
+  const target = Number(value || 0);
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    let frameId;
+    const startTime = performance.now();
+    const duration = 850;
+    const startValue = 0;
+    const delta = target - startValue;
+
+    const tick = (now) => {
+      const progress = Math.min((now - startTime) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplayValue(startValue + delta * eased);
+
+      if (progress < 1) {
+        frameId = requestAnimationFrame(tick);
+      }
+    };
+
+    frameId = requestAnimationFrame(tick);
+
+    return () => cancelAnimationFrame(frameId);
+  }, [target]);
+
+  const rounded = Math.round(displayValue);
+  const formatted = compact
+    ? formatCompactDashboard(rounded).replace('Rp ', '')
+    : rounded.toLocaleString('id-ID');
+
+  return <span className={className}>{prefix}{formatted}{suffix}</span>;
+}
+
+function MetricCard({ label, value, prefix = '', suffix = '', compact = false, hint, Icon, tone = 'purple' }) {
+  const toneClass = {
+    purple: 'from-purple-500/20 to-purple-950/20 text-purple-100',
+    blue: 'from-blue-500/20 to-blue-950/20 text-blue-100',
+    emerald: 'from-emerald-500/18 to-emerald-950/20 text-emerald-100',
+    amber: 'from-amber-500/18 to-amber-950/20 text-amber-100'
+  }[tone] || 'from-purple-500/20 to-purple-950/20 text-purple-100';
+
+  return (
+    <motion.div
+      className={`figma-card figma-shine relative overflow-hidden rounded-[0.9rem] bg-gradient-to-br ${toneClass} p-3`}
+      initial={{ opacity: 0, y: 16, scale: 0.985 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.48, ease: motionEase }}
+    >
+      <div className="soft-blob pointer-events-none absolute -right-10 -top-12 h-28 w-28 rounded-full bg-white/10 blur-[42px]" />
+
+      <div className="relative flex items-start justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">{label}</p>
+          <p className="mt-1.5 text-lg font-black tracking-tight text-white sm:text-xl">
+            <AnimatedNumber value={value} prefix={prefix} suffix={suffix} compact={compact} />
+          </p>
+          {hint && <p className="mt-1.5 text-[11px] font-semibold text-slate-500">{hint}</p>}
+        </div>
+
+        {Icon && (
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.08] text-base text-white">
+            <Icon />
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+function StatusDonutCard({ stats }) {
+  const statusBayar = stats?.statusBayar || {};
+  const sukses = Number(statusBayar.sukses || 0);
+  const pending = Number(statusBayar.pending || 0);
+  const gagal = Number(statusBayar.gagal || 0);
+  const total = Math.max(sukses + pending + gagal, 1);
+  const suksesPct = Math.round((sukses / total) * 100);
+  const pendingPct = Math.round((pending / total) * 100);
+  const gagalPct = Math.max(0, 100 - suksesPct - pendingPct);
+  const circumference = 2 * Math.PI * 42;
+
+  const segments = [
+    { label: 'Sukses', value: sukses, pct: suksesPct, color: '#34d399', offset: 0 },
+    { label: 'Pending', value: pending, pct: pendingPct, color: '#fbbf24', offset: suksesPct },
+    { label: 'Gagal', value: gagal, pct: gagalPct, color: '#f87171', offset: suksesPct + pendingPct }
+  ];
+
+  return (
+    <motion.div
+      className="figma-card relative overflow-hidden rounded-[0.95rem] p-4"
+      initial={{ opacity: 0, y: 16, scale: 0.985 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.52, ease: motionEase }}
+    >
+      <div className="soft-blob pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-purple-500/18 blur-[90px]" />
+
+      <div className="relative mb-4 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.20em] text-slate-500">Payment Status</p>
+          <h3 className="mt-1 text-base font-black text-white">Ringkasan order</h3>
+        </div>
+        <span className="rounded-full bg-white/[0.06] px-3 py-1 text-[10px] font-black text-slate-400">live</span>
+      </div>
+
+      <div className="relative grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)]">
+        <div className="mx-auto flex h-[180px] w-[180px] items-center justify-center">
+          <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
+            <circle cx="60" cy="60" r="42" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="16" />
+            {segments.map((item) => (
+              <motion.circle
+                key={item.label}
+                cx="60"
+                cy="60"
+                r="42"
+                fill="none"
+                stroke={item.color}
+                strokeWidth="16"
+                strokeLinecap="round"
+                strokeDasharray={`${(item.pct / 100) * circumference} ${circumference}`}
+                strokeDashoffset={-(item.offset / 100) * circumference}
+                initial={{ strokeDasharray: `0 ${circumference}` }}
+                animate={{ strokeDasharray: `${(item.pct / 100) * circumference} ${circumference}` }}
+                transition={{ duration: 0.9, ease: motionEase }}
+              />
+            ))}
+          </svg>
+          <div className="absolute text-center">
+            <p className="text-2xl font-black text-white">{suksesPct}%</p>
+            <p className="text-[11px] font-black uppercase tracking-wider text-slate-500">paid</p>
+          </div>
+        </div>
+
+        <div className="grid content-center gap-3">
+          {segments.map((item) => (
+            <div key={item.label} className="flex items-center justify-between rounded-xl bg-white/[0.05] px-4 py-3">
+              <div className="flex items-center gap-3">
+                <span className="h-3 w-3 rounded-full" style={{ background: item.color }} />
+                <span className="text-sm font-black text-white">{item.label}</span>
+              </div>
+              <span className="text-sm font-black text-slate-300">{item.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 function EmptyChartState({ text = 'Belum ada data real yang bisa digambar.' }) {
   return (
-    <div className="flex min-h-[190px] items-center justify-center rounded-2xl border border-dashed border-white/10 bg-slate-950/50 text-center text-sm font-bold text-gray-500">
+    <div className="flex min-h-[190px] items-center justify-center rounded-xl border border-dashed border-purple-300/10 bg-slate-950/50 text-center text-sm font-bold text-gray-500">
       {text}
     </div>
   );
@@ -60,7 +210,7 @@ function EmptyChartState({ text = 'Belum ada data real yang bisa digambar.' }) {
 function RevenueLineChart({ data = [] }) {
   const chartData = Array.isArray(data) ? data : [];
   const width = 760;
-  const height = 260;
+  const height = 270;
   const paddingX = 34;
   const paddingY = 34;
   const values = chartData.map((item) => angkaDashboard(item.omset));
@@ -70,10 +220,6 @@ function RevenueLineChart({ data = [] }) {
   const usableHeight = height - paddingY * 2;
   const totalOmset = values.reduce((sum, value) => sum + value, 0);
   const totalProfit = profitValues.reduce((sum, value) => sum + value, 0);
-  const latestOmset = values.at(-1) || 0;
-  const previousOmset = values.at(-2) || 0;
-  const trendPercent = previousOmset > 0 ? ((latestOmset - previousOmset) / previousOmset) * 100 : 0;
-  const trendNaik = trendPercent >= 0;
 
   const pointFor = (value, index) => {
     const x = paddingX + (chartData.length <= 1 ? usableWidth / 2 : (index / (chartData.length - 1)) * usableWidth);
@@ -81,89 +227,76 @@ function RevenueLineChart({ data = [] }) {
     return { x, y };
   };
 
+  const makeSmoothPath = (points) => {
+    if (points.length === 0) return '';
+    if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
+
+    return points.reduce((path, point, index) => {
+      if (index === 0) return `M ${point.x} ${point.y}`;
+
+      const previous = points[index - 1];
+      const midX = (previous.x + point.x) / 2;
+
+      return `${path} C ${midX} ${previous.y}, ${midX} ${point.y}, ${point.x} ${point.y}`;
+    }, '');
+  };
+
   const omsetPoints = chartData.map((item, index) => pointFor(item.omset, index));
   const profitPoints = chartData.map((item, index) => pointFor(item.profit, index));
-
-  const pointsToPath = (points) => points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
-  const omsetPath = pointsToPath(omsetPoints);
-  const profitPath = pointsToPath(profitPoints);
+  const omsetPath = makeSmoothPath(omsetPoints);
+  const profitPath = makeSmoothPath(profitPoints);
   const areaPath = omsetPoints.length
-    ? `M ${omsetPoints[0].x} ${height - paddingY} L ${omsetPoints.map((point) => `${point.x} ${point.y}`).join(' L ')} L ${omsetPoints.at(-1).x} ${height - paddingY} Z`
+    ? `${omsetPath} L ${omsetPoints.at(-1).x} ${height - paddingY} L ${omsetPoints[0].x} ${height - paddingY} Z`
     : '';
 
   if (chartData.length === 0 || values.every((value) => value === 0)) {
-    return <EmptyChartState text="Grafik masih kosong. Nanti kalau order mulai hidup, garisnya ikut nyala." />;
+    return <EmptyChartState text="Grafik masih kosong. Nanti kalau order mulai hidup, chart ikut nyala." />;
   }
 
   return (
     <motion.div
-      className="relative overflow-hidden rounded-[2rem] border border-blue-300/15 bg-gradient-to-br from-[#071225]/95 via-[#050816]/95 to-[#020617]/95 p-4 shadow-2xl shadow-blue-950/35"
-      initial={{ opacity: 0, y: 18 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.55, ease: motionEase }}
+      className="figma-card relative overflow-hidden rounded-[0.95rem] p-4"
+      initial={{ opacity: 0, y: 16, scale: 0.985 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.52, ease: motionEase }}
     >
-      <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-blue-500/20 blur-[90px]" />
-      <div className="pointer-events-none absolute -bottom-24 left-16 h-56 w-56 rounded-full bg-emerald-400/10 blur-[90px]" />
+      <div className="soft-blob pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-blue-500/16 blur-[90px]" />
 
-      <div className="relative mb-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="relative mb-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-blue-300/15 bg-blue-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-blue-200/80">
-              Revenue Engine
-            </span>
-            <span className={`rounded-full border px-3 py-1 text-[10px] font-black ${trendNaik ? 'border-emerald-400/20 bg-emerald-500/10 text-emerald-300' : 'border-red-400/20 bg-red-500/10 text-red-300'}`}>
-              {trendNaik ? 'Naik' : 'Turun'} {Math.abs(trendPercent).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%
-            </span>
-          </div>
-          <h3 className="text-xl font-black text-white sm:text-2xl">Omset & Profit Radar</h3>
-          <p className="mt-1 text-xs font-semibold leading-relaxed text-slate-500">
-            Grafik 14 hari terakhir. Garis biru buat omset, garis hijau buat profit bersih yang bikin hati adem.
-          </p>
+          <p className="text-[11px] font-black uppercase tracking-[0.20em] text-slate-500">Sales Analytics</p>
+          <h3 className="mt-1 text-base font-black text-white">Revenue trend</h3>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 sm:min-w-[320px]">
-          <div className="rounded-2xl border border-blue-300/15 bg-blue-500/10 p-3">
-            <p className="text-[10px] font-black uppercase tracking-wider text-blue-200/70">Total Omset</p>
-            <p className="mt-1 text-xl font-black text-blue-100">{formatCompactDashboard(totalOmset)}</p>
-          </div>
-          <div className="rounded-2xl border border-emerald-300/15 bg-emerald-500/10 p-3">
-            <p className="text-[10px] font-black uppercase tracking-wider text-emerald-200/70">Total Profit</p>
-            <p className="mt-1 text-xl font-black text-emerald-200">{formatCompactDashboard(totalProfit)}</p>
-          </div>
+        <div className="flex flex-wrap gap-2">
+          <span className="rounded-full bg-purple-500/10 px-3 py-1 text-[10px] font-black text-purple-200">
+            Omset {formatCompactDashboard(totalOmset)}
+          </span>
+          <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-[10px] font-black text-emerald-200">
+            Profit {formatCompactDashboard(totalProfit)}
+          </span>
         </div>
       </div>
 
-      <div className="relative rounded-[1.5rem] border border-white/10 bg-slate-950/55 p-3">
+      <div className="relative overflow-hidden rounded-[0.85rem] bg-[#0e0a1a]/72 p-2.5">
         <svg viewBox={`0 0 ${width} ${height}`} className="h-[260px] w-full overflow-visible">
           <defs>
-            <linearGradient id="naxaRevenueArea" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="rgba(59,130,246,0.32)" />
-              <stop offset="55%" stopColor="rgba(34,211,238,0.10)" />
-              <stop offset="100%" stopColor="rgba(2,6,23,0)" />
+            <linearGradient id="naxaFigmaArea" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="rgba(168,85,247,0.26)" />
+              <stop offset="100%" stopColor="rgba(168,85,247,0)" />
             </linearGradient>
-            <linearGradient id="naxaRevenueLine" x1="0" x2="1" y1="0" y2="0">
-              <stop offset="0%" stopColor="#60a5fa" />
-              <stop offset="48%" stopColor="#22d3ee" />
-              <stop offset="100%" stopColor="#3b82f6" />
+            <linearGradient id="naxaFigmaLine" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0%" stopColor="#a855f7" />
+              <stop offset="50%" stopColor="#60a5fa" />
+              <stop offset="100%" stopColor="#c084fc" />
             </linearGradient>
-            <linearGradient id="naxaProfitLine" x1="0" x2="1" y1="0" y2="0">
-              <stop offset="0%" stopColor="#34d399" />
-              <stop offset="100%" stopColor="#a7f3d0" />
-            </linearGradient>
-            <filter id="naxaGlow" x="-30%" y="-30%" width="160%" height="160%">
-              <feGaussianBlur stdDeviation="4" result="coloredBlur" />
-              <feMerge>
-                <feMergeNode in="coloredBlur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
           </defs>
 
           {[0.25, 0.5, 0.75, 1].map((line) => {
             const y = height - paddingY - line * usableHeight;
             return (
               <g key={line}>
-                <line x1={paddingX} y1={y} x2={width - paddingX} y2={y} stroke="rgba(148,163,184,0.12)" strokeWidth="1" strokeDasharray="6 8" />
+                <line x1={paddingX} y1={y} x2={width - paddingX} y2={y} stroke="rgba(148,163,184,0.09)" strokeWidth="1" strokeDasharray="4 12" />
                 <text x={0} y={y + 4} fill="rgba(148,163,184,0.55)" fontSize="11" fontWeight="800">
                   {formatCompactDashboard(maxValue * line)}
                 </text>
@@ -174,30 +307,29 @@ function RevenueLineChart({ data = [] }) {
           {areaPath && (
             <motion.path
               d={areaPath}
-              fill="url(#naxaRevenueArea)"
+              fill="url(#naxaFigmaArea)"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.7, delay: 0.15 }}
+              transition={{ duration: 0.8, delay: 0.1 }}
             />
           )}
 
           <motion.path
             d={omsetPath}
             fill="none"
-            stroke="url(#naxaRevenueLine)"
+            stroke="url(#naxaFigmaLine)"
             strokeWidth="5"
             strokeLinecap="round"
             strokeLinejoin="round"
-            filter="url(#naxaGlow)"
             initial={{ pathLength: 0, opacity: 0 }}
             animate={{ pathLength: 1, opacity: 1 }}
-            transition={{ duration: 1.05, ease: motionEase }}
+            transition={{ duration: 1.15, ease: motionEase }}
           />
 
           <motion.path
             d={profitPath}
             fill="none"
-            stroke="url(#naxaProfitLine)"
+            stroke="#34d399"
             strokeWidth="3.5"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -208,39 +340,25 @@ function RevenueLineChart({ data = [] }) {
 
           {omsetPoints.map((point, index) => (
             <motion.circle
-              key={`omset-${chartData[index]?.tanggal || index}`}
+              key={`omset-dot-${chartData[index]?.tanggal || index}`}
               cx={point.x}
               cy={point.y}
-              r="5"
-              fill="#60a5fa"
-              stroke="#020617"
-              strokeWidth="3"
+              r="6"
+              fill="#a855f7"
+              stroke="#0e0a1a"
+              strokeWidth="4"
               initial={{ scale: 0, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.28, delay: 0.35 + index * 0.035 }}
-            />
-          ))}
-
-          {profitPoints.map((point, index) => (
-            <motion.circle
-              key={`profit-${chartData[index]?.tanggal || index}`}
-              cx={point.x}
-              cy={point.y}
-              r="3.6"
-              fill="#34d399"
-              stroke="#020617"
-              strokeWidth="2.5"
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.28, delay: 0.45 + index * 0.035 }}
+              transition={{ duration: 0.3, delay: 0.28 + index * 0.035 }}
             />
           ))}
 
           {chartData.map((item, index) => {
             if (index % 3 !== 0 && index !== chartData.length - 1) return null;
             const point = pointFor(0, index);
+
             return (
-              <text key={item.tanggal} x={point.x} y={height - 4} textAnchor="middle" fill="rgba(148,163,184,0.68)" fontSize="11" fontWeight="900">
+              <text key={item.tanggal || index} x={point.x} y={height - 6} textAnchor="middle" fill="rgba(148,163,184,0.68)" fontSize="11" fontWeight="900">
                 {item.label}
               </text>
             );
@@ -260,7 +378,7 @@ function OrderBarChart({ data = [] }) {
   }
 
   return (
-    <div className="flex h-[260px] items-end gap-2 rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+    <div className="flex h-[260px] items-end gap-2 rounded-xl border border-purple-300/10 bg-slate-950/50 p-4">
       {chartData.map((item) => {
         const order = angkaDashboard(item.orderSukses);
         const tinggi = Math.max((order / maxOrder) * 100, order > 0 ? 9 : 2);
@@ -272,7 +390,7 @@ function OrderBarChart({ data = [] }) {
                 className="w-full max-w-[24px] rounded-t-xl bg-gradient-to-t from-blue-600 to-cyan-400 shadow-lg shadow-cyan-950/30 transition group-hover:scale-105"
                 style={{ height: `${tinggi}%` }}
               />
-              <div className="pointer-events-none absolute bottom-full mb-2 hidden rounded-xl border border-white/10 bg-slate-900 px-2 py-1 text-[10px] font-black text-white shadow-xl group-hover:block">
+              <div className="pointer-events-none absolute bottom-full mb-2 hidden rounded-xl border border-purple-300/10 bg-slate-900 px-2 py-1 text-[10px] font-black text-white shadow-xl group-hover:block">
                 {order} order
               </div>
             </div>
@@ -304,7 +422,7 @@ function CompactRankList({ title, subtitle, data = [], type = 'game' }) {
           {list.map((item, index) => {
             const persen = Math.max((angkaDashboard(item.totalOrder) / maxOrder) * 100, 8);
             return (
-              <div key={`${type}-${item.nama}-${index}`} className="rounded-2xl border border-white/10 bg-slate-950/45 p-3">
+              <div key={`${type}-${item.nama}-${index}`} className="rounded-xl border border-purple-300/10 bg-slate-950/45 p-3">
                 <div className="mb-2 flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-black text-white">#{index + 1} {item.nama}</p>
@@ -367,25 +485,32 @@ function StatusSnapshot({ stats }) {
   const statusTopup = stats?.statusTopup || {};
 
   const items = [
-    { label: 'Bayar Sukses', value: statusBayar.sukses || 0, className: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20' },
-    { label: 'Bayar Pending', value: statusBayar.pending || 0, className: 'text-yellow-300 bg-yellow-500/10 border-yellow-500/20' },
-    { label: 'Bayar Gagal', value: statusBayar.gagal || 0, className: 'text-red-300 bg-red-500/10 border-red-500/20' },
-    { label: 'Topup Proses', value: statusTopup.proses || 0, className: 'text-purple-300 bg-purple-500/10 border-purple-500/20' },
-    { label: 'Topup Sukses', value: statusTopup.sukses || 0, className: 'text-blue-300 bg-blue-500/10 border-blue-500/20' },
-    { label: 'Topup Gagal', value: statusTopup.gagal || 0, className: 'text-orange-300 bg-orange-500/10 border-orange-500/20' }
+    { label: 'Bayar Sukses', value: statusBayar.sukses || 0, className: 'text-emerald-200 bg-emerald-500/10 border-emerald-400/15' },
+    { label: 'Bayar Pending', value: statusBayar.pending || 0, className: 'text-yellow-200 bg-yellow-500/10 border-yellow-400/15' },
+    { label: 'Bayar Gagal', value: statusBayar.gagal || 0, className: 'text-red-200 bg-red-500/10 border-red-400/15' },
+    { label: 'Topup Proses', value: statusTopup.proses || 0, className: 'text-purple-200 bg-purple-500/10 border-purple-400/15' },
+    { label: 'Topup Sukses', value: statusTopup.sukses || 0, className: 'text-blue-200 bg-blue-500/10 border-blue-400/15' },
+    { label: 'Topup Gagal', value: statusTopup.gagal || 0, className: 'text-orange-200 bg-orange-500/10 border-orange-400/15' }
   ];
 
   return (
-    <div className="rounded-3xl border border-gray-800 bg-gray-900 p-5 shadow-xl">
-      <div className="mb-4">
-        <h3 className="text-lg font-black text-white">Status Snapshot</h3>
-        <p className="text-xs font-semibold text-gray-500">Pantauan cepat pembayaran dan top-up.</p>
+    <div className="relative overflow-hidden rounded-[1.75rem] border border-purple-200/10 bg-gradient-to-br from-[#1a1230] via-[#111827] to-[#0b0716] p-5 shadow-xl shadow-purple-950/25">
+      <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-purple-500/20 blur-[80px]" />
+
+      <div className="relative mb-4 flex items-end justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-purple-200/55">Ops Snapshot</p>
+          <h3 className="mt-1 text-base font-black text-white">Status transaksi</h3>
+        </div>
+        <span className="rounded-full border border-purple-300/10 bg-white/[0.05] px-3 py-1 text-[10px] font-black text-slate-400">
+          live
+        </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="relative grid grid-cols-2 gap-3 sm:grid-cols-3">
         {items.map((item) => (
-          <div key={item.label} className={`rounded-2xl border p-3 ${item.className}`}>
-            <p className="text-[11px] font-black uppercase tracking-wide opacity-80">{item.label}</p>
+          <div key={item.label} className={`rounded-xl border p-3 ${item.className}`}>
+            <p className="text-[10px] font-black uppercase tracking-wide opacity-80">{item.label}</p>
             <p className="mt-1 text-2xl font-black">{item.value}</p>
           </div>
         ))}
@@ -396,41 +521,36 @@ function StatusSnapshot({ stats }) {
 
 function AdminLoadingScreen({ eyebrow = 'Sistem kendali utama', subtitle = 'Dashboard lagi nyusun data biar rapi sebelum dipakai tempur.' }) {
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#02040d] px-4 text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(29,78,216,0.32),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.16),transparent_34%),linear-gradient(135deg,#020617,#07111f_52%,#020617)]" />
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0b0716] px-4 text-white">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(168,85,247,0.34),transparent_34%),radial-gradient(circle_at_78%_24%,rgba(37,99,235,0.20),transparent_30%),radial-gradient(circle_at_50%_90%,rgba(236,72,153,0.14),transparent_35%),linear-gradient(135deg,#0b0716,#14102a_55%,#080612)]" />
       <motion.div
-        className="absolute h-[28rem] w-[28rem] rounded-full border border-blue-300/10"
-        animate={{ rotate: 360 }}
-        transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
-      />
-      <motion.div
-        className="absolute h-[18rem] w-[18rem] rounded-full border border-sky-300/10"
-        animate={{ rotate: -360 }}
-        transition={{ duration: 12, repeat: Infinity, ease: 'linear' }}
-      />
-
-      <motion.div
-        className="relative w-full max-w-lg overflow-hidden rounded-[2.25rem] border border-blue-300/15 bg-slate-950/72 p-8 text-center shadow-2xl shadow-blue-950/50 backdrop-blur-2xl"
-        initial={{ opacity: 0, y: 18, scale: 0.96 }}
+        className="relative w-full max-w-md overflow-hidden rounded-[1rem] border border-purple-200/15 bg-white/[0.06] p-7 text-center shadow-2xl shadow-purple-950/40 backdrop-blur-2xl"
+        initial={{ opacity: 0, y: 14, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.55, ease: motionEase }}
+        transition={{ duration: 0.45, ease: motionEase }}
       >
         <motion.div
-          className="pointer-events-none absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-transparent via-white/10 to-transparent"
-          initial={{ x: '-140%' }}
-          animate={{ x: '240%' }}
-          transition={{ duration: 1.35, repeat: Infinity, repeatDelay: 0.9, ease: motionEase }}
+          className="pointer-events-none absolute -left-20 -top-20 h-48 w-48 rounded-full bg-purple-500/20 blur-[70px]"
+          animate={{ scale: [1, 1.08, 1], opacity: [0.45, 0.72, 0.45] }}
+          transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
         />
 
-        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[1.35rem] border border-blue-300/20 bg-blue-500/10 text-3xl shadow-xl shadow-blue-950/40">
-          ⚙️
+        <div className="relative mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[1rem] border border-purple-200/20 bg-gradient-to-br from-purple-500/20 to-blue-500/10 shadow-xl shadow-purple-950/40">
+          <motion.div
+            className="absolute inset-2 rounded-[1rem] border border-purple-200/20"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
+          />
+          <span className="relative text-lg font-black tracking-tight text-purple-50">NX</span>
         </div>
-        <p className="text-[10px] font-black uppercase tracking-[0.35em] text-blue-200/75">{eyebrow}</p>
-        <h1 className="mt-3 text-3xl font-black tracking-tight text-white">Kalem heula...</h1>
+
+        <p className="text-[10px] font-black uppercase tracking-[0.34em] text-purple-200/70">{eyebrow}</p>
+        <h1 className="mt-3 text-2xl font-black tracking-tight text-white">Kalem Heula</h1>
         <p className="mx-auto mt-2 max-w-sm text-sm font-semibold leading-relaxed text-slate-400">{subtitle}</p>
+
         <div className="mx-auto mt-6 h-1.5 max-w-xs overflow-hidden rounded-full bg-white/10">
           <motion.div
-            className="h-full rounded-full bg-gradient-to-r from-blue-600 via-sky-300 to-emerald-300"
+            className="h-full rounded-full bg-gradient-to-r from-purple-500 via-blue-400 to-fuchsia-400"
             initial={{ x: '-100%' }}
             animate={{ x: '100%' }}
             transition={{ duration: 1.15, repeat: Infinity, ease: 'easeInOut' }}
@@ -442,6 +562,273 @@ function AdminLoadingScreen({ eyebrow = 'Sistem kendali utama', subtitle = 'Dash
 }
 
 
+function AdminMascot({
+  className = 'h-16 w-16',
+  imageClassName = 'h-full w-full object-cover',
+  fallbackText = 'NX',
+  frameless = false
+}) {
+  const [imageError, setImageError] = useState(false);
+
+  if (frameless) {
+    return (
+      <div className={`relative shrink-0 ${className}`}>
+        {!imageError ? (
+          <img
+            src="/admin-mascot.png"
+            alt="NaXa admin mascot"
+            onError={() => setImageError(true)}
+            className={`relative z-10 ${imageClassName}`}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-purple-600 via-blue-600 to-fuchsia-500 text-sm font-black text-white shadow-xl shadow-purple-950/35">
+            {fallbackText}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 via-blue-600 to-fuchsia-500 text-white shadow-xl shadow-purple-950/35 ${className}`}>
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_35%_20%,rgba(255,255,255,0.30),transparent_34%)]" />
+
+      {!imageError ? (
+        <img
+          src="/admin-mascot.png"
+          alt="NaXa admin mascot"
+          onError={() => setImageError(true)}
+          className={`relative z-10 ${imageClassName}`}
+        />
+      ) : (
+        <span className="relative z-10 text-sm font-black tracking-tight">{fallbackText}</span>
+      )}
+    </div>
+  );
+}
+
+function AdminCompanionCard({ stats, onOpenOrders, onOpenVipSync }) {
+  const pendingBayar = Number(stats?.pendingBayar || 0);
+  const topupProses = Number(stats?.statusTopup?.proses || 0);
+  const topupGagal = Number(stats?.statusTopup?.gagal || 0);
+  const profit = Number(stats?.totalProfit || 0);
+
+  const moodText = topupGagal > 0
+    ? 'Ada top-up yang perlu dicek. Kalem, kita beresin satu-satu.'
+    : pendingBayar > 0
+      ? 'Ada customer yang masih mikir bayar. Kita pantau pelan-pelan.'
+      : 'Dashboard aman. Tinggal lanjut rapihin produk biar toko makin gacor.';
+
+  return (
+    <motion.div
+      className="figma-card figma-shine relative overflow-hidden rounded-[1.2rem] p-4 sm:min-h-[230px] sm:p-5"
+      initial={{ opacity: 0, y: 16, scale: 0.985 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.52, ease: motionEase }}
+    >
+      <div className="soft-blob pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-purple-500/20 blur-[90px]" />
+      <div className="soft-blob pointer-events-none absolute -bottom-24 left-1/3 h-64 w-64 rounded-full bg-blue-500/10 blur-[90px]" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[46%] bg-gradient-to-l from-purple-500/10 via-blue-500/5 to-transparent sm:block" />
+
+      <div className="pointer-events-none absolute -right-10 -top-8 h-40 w-40 opacity-65 sm:hidden">
+        <motion.div
+          className="h-full w-full"
+          animate={{ y: [0, -5, 0], rotate: [0, 1.2, 0] }}
+          transition={{ duration: 4.2, repeat: Infinity, ease: 'easeInOut' }}
+        >
+          <AdminMascot
+            frameless
+            className="h-full w-full"
+            imageClassName="h-full w-full object-contain object-bottom drop-shadow-[0_24px_45px_rgba(59,130,246,0.32)]"
+            fallbackText="NX"
+          />
+        </motion.div>
+      </div>
+
+      <div className="pointer-events-none absolute -right-8 top-1/2 hidden h-[270px] w-[270px] -translate-y-1/2 opacity-85 sm:block xl:right-2 xl:h-[310px] xl:w-[310px]">
+        <motion.div
+          className="h-full w-full"
+          animate={{ y: [0, -8, 0], rotate: [0, 1.4, 0] }}
+          transition={{ duration: 4.8, repeat: Infinity, ease: 'easeInOut' }}
+        >
+          <AdminMascot
+            frameless
+            className="h-full w-full"
+            imageClassName="h-full w-full object-contain object-bottom drop-shadow-[0_32px_60px_rgba(59,130,246,0.34)]"
+            fallbackText="NX"
+          />
+        </motion.div>
+      </div>
+
+      <div className="relative z-10 max-w-[720px] pr-20 sm:pr-[210px] xl:pr-[260px]">
+        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-purple-300/10 bg-white/[0.06] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-purple-200">
+          <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_16px_rgba(52,211,153,0.75)]" />
+          NaXaMate standby
+        </div>
+
+        <h3 className="text-xl font-black tracking-tight text-white sm:text-2xl">
+          Gak sendirian, Boss.
+        </h3>
+
+        <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-slate-400">
+          {moodText}
+        </p>
+
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
+            <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Pending</p>
+            <p className="text-lg font-black text-yellow-200">{pendingBayar}</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
+            <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Proses</p>
+            <p className="text-lg font-black text-blue-200">{topupProses}</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
+            <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Profit</p>
+            <p className="truncate text-lg font-black text-emerald-200">{formatCompactDashboard(profit)}</p>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={onOpenVipSync}
+            className="rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-4 py-3 text-xs font-black text-white transition hover:-translate-y-0.5 hover:from-purple-500 hover:to-blue-500"
+          >
+            Cek VIP Sync
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenOrders}
+            className="rounded-xl border border-purple-300/10 bg-white/[0.06] px-4 py-3 text-xs font-black text-slate-200 transition hover:bg-white/10 hover:text-white"
+          >
+            Pantau Orders
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function AdminMascotDock({ tabAktif, stats, onOpenOrders, onOpenVipSync }) {
+  const [open, setOpen] = useState(false);
+
+  const pendingBayar = Number(stats?.pendingBayar || 0);
+  const topupGagal = Number(stats?.statusTopup?.gagal || 0);
+
+  const pesanByTab = {
+    statistik: 'Radar utama aman. Pantau angka, jangan panik dulu.',
+    transaksi: topupGagal > 0
+      ? 'Ada top-up gagal. Cek pelan-pelan, jangan asal retry.'
+      : 'Mode order aktif. Yang bermasalah taruh paling atas.',
+    produk: 'Mode produk. Cek kode provider, harga modal, dan profit dulu.',
+    'vip-sync': 'Tarik data provider, lalu pilih yang bener-bener mau dijual.',
+    game: 'Etalase game. Nama, server, dan kategori jangan ketuker.',
+    promo: 'Mode promo. Bikin cakep, tapi jangan terlalu rame.',
+    'metode-bayar': 'Payment control. Jangan aktifin metode yang belum siap.',
+    voucher: 'Voucher harus manis, tapi jangan bikin toko boncos.',
+    maintenance: 'Control room. Hati-hati full maintenance, boss.',
+    'request-game': 'Dengerin user, tapi tetap pilih yang masuk akal.'
+  };
+
+  const pesanAktif = pesanByTab[tabAktif] || 'NaXaMate standby nemenin admin.';
+  const statusPendek = pendingBayar > 0
+    ? `${pendingBayar} pending`
+    : topupGagal > 0
+      ? `${topupGagal} gagal`
+      : 'standby';
+
+  return (
+    <div className="pointer-events-none fixed bottom-3 right-3 z-[80] lg:bottom-5 lg:right-5">
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            className="pointer-events-auto mb-3 w-[min(310px,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-purple-300/10 bg-[#0f0a1d]/95 p-3 shadow-2xl shadow-black/70 backdrop-blur-2xl"
+            initial={{ opacity: 0, y: 12, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.97 }}
+            transition={{ duration: 0.2, ease: motionEase }}
+          >
+            <div className="pointer-events-none absolute -right-14 -top-14 h-36 w-36 rounded-full bg-purple-500/20 blur-[60px]" />
+
+            <div className="relative flex items-start gap-3">
+              <AdminMascot
+                className="h-12 w-12 rounded-2xl"
+                imageClassName="h-full w-full object-cover"
+                fallbackText="NX"
+              />
+
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-black text-white">NaXaMate</p>
+                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-black text-emerald-200">
+                    {statusPendek}
+                  </span>
+                </div>
+
+                <p className="mt-1 text-xs font-semibold leading-relaxed text-slate-400">
+                  {pesanAktif}
+                </p>
+              </div>
+            </div>
+
+            <div className="relative mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenVipSync?.();
+                  setOpen(false);
+                }}
+                className="rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-3 py-2.5 text-[11px] font-black text-white transition hover:from-purple-500 hover:to-blue-500"
+              >
+                VIP Sync
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenOrders?.();
+                  setOpen(false);
+                }}
+                className="rounded-xl border border-purple-300/10 bg-white/[0.06] px-3 py-2.5 text-[11px] font-black text-slate-200 transition hover:bg-white/10"
+              >
+                Orders
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <motion.button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="pointer-events-auto group flex items-center gap-2 rounded-2xl border border-purple-300/10 bg-[#0f0a1d]/92 p-2 pr-3 text-left shadow-2xl shadow-black/50 backdrop-blur-2xl transition hover:-translate-y-0.5 hover:border-purple-300/20 hover:bg-[#15102a]/95"
+        whileTap={{ scale: 0.96 }}
+        aria-label="Buka NaXaMate"
+      >
+        <motion.div
+          animate={{ y: [0, -3, 0] }}
+          transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
+        >
+          <AdminMascot
+            className="h-11 w-11 rounded-2xl"
+            imageClassName="h-full w-full object-cover"
+            fallbackText="NX"
+          />
+        </motion.div>
+
+        <div className="hidden sm:block">
+          <p className="text-[11px] font-black text-white">NaXaMate</p>
+          <p className="max-w-[130px] truncate text-[10px] font-semibold text-slate-500">
+            {pesanAktif}
+          </p>
+        </div>
+      </motion.button>
+    </div>
+  );
+}
+
 export default function DashboardAdmin() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -450,7 +837,11 @@ export default function DashboardAdmin() {
 
   // State Navigasi
   const [tabAktif, setTabAktif] = useState('statistik');
-
+  const [adminSearchQuery, setAdminSearchQuery] = useState('');
+  const [notifPanelOpen, setNotifPanelOpen] = useState(false);
+  const [mobileAdminMenuOpen, setMobileAdminMenuOpen] = useState(false);
+  const [mobileAdminSearchOpen, setMobileAdminSearchOpen] = useState(false);
+  
   // State Data
   const [stats, setStats] = useState(null);
   const [daftarProduk, setDaftarProduk] = useState([]);
@@ -617,6 +1008,52 @@ const [filterRequestGame, setFilterRequestGame] = useState({
 
   const formatRupiah = (angka) => {
   return `Rp ${Number(angka || 0).toLocaleString('id-ID')}`;
+  };
+
+  const cariGameDariNamaVip = (namaProvider = '') => {
+    const target = String(namaProvider || '')
+      .toLowerCase()
+      .replace(/mobile legends\s+[a-z]\b/g, 'mobile legends')
+      .replace(/\([^)]*\)/g, '')
+      .replace(/global|indonesia|malaysia|philippines|brazil|russia|singapore|turkey/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return daftarGame.find((game) => {
+      const nama = String(game.nama || '').toLowerCase().trim();
+      const kode = String(game.kode_game || '').toLowerCase().trim();
+
+      if (!nama) return false;
+
+      return (
+        target.includes(nama) ||
+        nama.includes(target) ||
+        (kode && target.includes(kode))
+      );
+    });
+  };
+
+  const handlePakaiProdukVipKeForm = (item) => {
+    const gameCocok = cariGameDariNamaVip(`${item.game_provider || ''} ${item.nama_produk_provider || ''}`);
+    const kodeProvider = String(item.kode_produk_provider || '').trim();
+
+    setModeEditProduk(false);
+    setProdukEditId(null);
+
+    setFormProduk({
+      game_id: gameCocok?.id ? String(gameCocok.id) : '',
+      kode_produk: kodeProvider,
+      nama_produk: item.nama_produk_provider || '',
+      harga: String(item.harga_jual || ''),
+      harga_coret: '',
+      harga_modal: String(item.harga_modal || 0),
+      status_produk: item.status_final || 'aktif',
+      provider: 'vipreseller',
+      kode_produk_provider: kodeProvider
+    });
+
+    setFilterProdukGame(gameCocok?.id ? String(gameCocok.id) : 'all');
+    setTabAktif('produk');
   };
 
   const trenHarianDashboard = useMemo(() => stats?.trenHarian || [], [stats?.trenHarian]);
@@ -858,7 +1295,7 @@ const ambilPromo = async () => {
     }
   } catch (error) {
     Swal.fire({
-      title: 'ERROR SERVER!',
+      title: 'Error server',
       text: 'Gagal ambil promo bre',
       icon: 'error',
       background: '#1f2937',
@@ -894,7 +1331,7 @@ const handleSubmitPromo = async (e) => {
 
     if (respon.ok) {
       Swal.fire({
-        title: modeEditPromo ? 'PROMO DIUPDATE! ✨' : 'PROMO MASUK! 🚀',
+        title: modeEditPromo ? 'Promo diupdate' : 'Promo masuk',
         text: hasil.pesan,
         icon: 'success',
         background: '#1f2937',
@@ -905,7 +1342,7 @@ const handleSubmitPromo = async (e) => {
       ambilPromo();
     } else {
       Swal.fire({
-        title: 'WADUH! ❌',
+        title: 'Waduh',
         text: hasil.pesan,
         icon: 'error',
         background: '#1f2937',
@@ -914,7 +1351,7 @@ const handleSubmitPromo = async (e) => {
     }
   } catch (error) {
     Swal.fire({
-      title: 'ERROR SERVER!',
+      title: 'Error server',
       text: 'Gagal simpan promo bre',
       icon: 'error',
       background: '#1f2937',
@@ -982,7 +1419,7 @@ const handleTogglePromo = async (promo) => {
     }
   } catch (error) {
     Swal.fire({
-      title: 'ERROR SERVER!',
+      title: 'Error server',
       text: 'Gagal update promo bre',
       icon: 'error',
       background: '#1f2937',
@@ -1016,7 +1453,7 @@ const handleHapusPromo = async (promo) => {
 
     if (respon.ok) {
       Swal.fire({
-        title: 'PROMO KEHAPUS! 🗑️',
+        title: 'Promo kehapus',
         text: hasil.pesan,
         icon: 'success',
         background: '#1f2937',
@@ -1035,7 +1472,7 @@ const handleHapusPromo = async (promo) => {
     }
   } catch (error) {
     Swal.fire({
-      title: 'ERROR SERVER!',
+      title: 'Error server',
       text: 'Gagal hapus promo bre',
       icon: 'error',
       background: '#1f2937',
@@ -1051,7 +1488,7 @@ const handlePilihPromoGambar = (e) => {
 
   if (!file.type.startsWith('image/')) {
     Swal.fire({
-      title: 'FILE SALAH! ❌',
+      title: 'File salah',
       text: 'Yang diupload harus gambar bre!',
       icon: 'error',
       background: '#1f2937',
@@ -1066,7 +1503,7 @@ const handlePilihPromoGambar = (e) => {
 
   if (file.size > maxSize) {
     Swal.fire({
-      title: 'GEDE BANGET! ❌',
+      title: 'File kegedean',
       text: 'Ukuran banner maksimal 5MB bre.',
       icon: 'error',
       background: '#1f2937',
@@ -1218,7 +1655,7 @@ const ambilTransaksi = async (filterManual = filterTransaksi) => {
     }
   } catch (error) {
     Swal.fire({
-      title: 'ERROR SERVER!',
+      title: 'Error server',
       text: 'Gagal ambil transaksi bre',
       icon: 'error',
       background: '#1f2937',
@@ -1283,7 +1720,7 @@ const handleDetailTransaksi = (trx) => {
   const kodeProvider = kodeProviderEfektif(trx);
 
   Swal.fire({
-    title: 'Detail Transaksi 🧾',
+    title: 'Detail Transaksi',
     width: 760,
     background: '#1f2937',
     color: '#fff',
@@ -1408,7 +1845,7 @@ const handleUpdateTransaksi = async (trx, payload, teksKonfirmasi) => {
 
     if (respon.ok) {
       Swal.fire({
-        title: 'BERHASIL! ✅',
+        title: 'Berhasil',
         text: hasil.pesan,
         icon: 'success',
         background: '#1f2937',
@@ -1429,7 +1866,7 @@ const handleUpdateTransaksi = async (trx, payload, teksKonfirmasi) => {
     }
   } catch (error) {
     Swal.fire({
-      title: 'ERROR SERVER!',
+      title: 'Error server',
       text: 'Gagal update transaksi bre',
       icon: 'error',
       background: '#1f2937',
@@ -1609,7 +2046,7 @@ const handleRetryTopup = async (trx) => {
 
     if (respon.ok) {
       Swal.fire({
-        title: 'RETRY TERKIRIM! 🚀',
+        title: 'Retry terkirim',
         html: `
           <b>${escapeHtml(hasil.pesan || 'Retry berhasil dikirim.')}</b><br/>
           <small>Provider: ${escapeHtml(hasil.data?.provider || providerLabel)}</small>
@@ -1624,7 +2061,7 @@ const handleRetryTopup = async (trx) => {
       ambilAlerts();
     } else {
       Swal.fire({
-        title: 'RETRY GAGAL ❌',
+        title: 'Retry gagal',
         html: `
           <b>${escapeHtml(hasil.pesan || 'Retry gagal.')}</b><br/>
           <small>Provider: ${escapeHtml(hasil.data?.provider || providerLabel)}</small>
@@ -1644,7 +2081,7 @@ const handleRetryTopup = async (trx) => {
     }
   } catch (error) {
     Swal.fire({
-      title: 'ERROR SERVER!',
+      title: 'Error server',
       text: 'Gagal retry top-up bre',
       icon: 'error',
       background: '#1f2937',
@@ -1700,7 +2137,7 @@ const handleCekProvider = async (trx) => {
 
     if (respon.ok && hasil.sukses) {
       Swal.fire({
-        title: 'STATUS PROVIDER KECEK! 🔄',
+        title: 'Status provider dicek',
         html: `
           <b>${escapeHtml(hasil.pesan || 'Status provider berhasil dicek.')}</b><br/>
           <small>Provider: ${escapeHtml(labelProvider(hasil.data?.provider || trx.provider))}</small><br/>
@@ -1721,7 +2158,7 @@ const handleCekProvider = async (trx) => {
       ambilAlerts();
     } else {
       Swal.fire({
-        title: 'CEK PROVIDER GAGAL ❌',
+        title: 'Cek provider gagal',
         html: `
           <b>${escapeHtml(hasil.pesan || 'Gagal cek provider.')}</b><br/>
           <small>Provider: ${escapeHtml(labelProvider(hasil.data?.provider || trx.provider))}</small>
@@ -1736,7 +2173,7 @@ const handleCekProvider = async (trx) => {
     }
   } catch (error) {
     Swal.fire({
-      title: 'ERROR SERVER!',
+      title: 'Error server',
       text: 'Gagal cek status provider bre',
       icon: 'error',
       background: '#1f2937',
@@ -1749,7 +2186,7 @@ const handleCekProvider = async (trx) => {
 
 const handleEditCatatan = async (trx) => {
   const hasilInput = await Swal.fire({
-    title: 'Catatan Admin 📝',
+    title: 'Catatan Admin',
     input: 'textarea',
     inputValue: trx.catatan_admin || '',
     inputPlaceholder: 'Contoh: customer sudah chat WA, topup diretry...',
@@ -1834,7 +2271,7 @@ const ambilMetodeBayarAdmin = async () => {
     }
   } catch (error) {
     Swal.fire({
-      title: 'ERROR SERVER!',
+      title: 'Error server',
       text: 'Gagal ambil setting metode bayar bre',
       icon: 'error',
       background: '#1f2937',
@@ -1960,7 +2397,7 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
 
     if (!file.type.startsWith('image/')) {
       Swal.fire({
-        title: 'FILE SALAH! ❌',
+        title: 'File salah',
         text: 'Yang diupload harus gambar bre!',
         icon: 'error',
         background: '#1f2937',
@@ -1975,7 +2412,7 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
 
     if (file.size > maxSize) {
       Swal.fire({
-        title: 'GEDE BANGET! ❌',
+        title: 'File kegedean',
         text: 'Ukuran gambar maksimal 2MB bre.',
         icon: 'error',
         background: '#1f2937',
@@ -2051,7 +2488,7 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
 
       if (respon.ok) {
         Swal.fire({
-          title: modeEditGame ? 'GAME DIUPDATE! ✨' : 'GAME MASUK! 🎮',
+          title: modeEditGame ? 'Game diupdate' : 'Game masuk',
           text: hasil.pesan,
           icon: 'success',
           background: '#1f2937',
@@ -2062,7 +2499,7 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
         ambilDataSultan();
       } else {
         Swal.fire({
-          title: 'WADUH! ❌',
+          title: 'Waduh',
           text: hasil.pesan,
           icon: 'error',
           background: '#1f2937',
@@ -2071,7 +2508,7 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
       }
     } catch (error) {
       Swal.fire({
-        title: 'ERROR SERVER!',
+        title: 'Error server',
         text: error.message || 'Gagal proses game bre',
         icon: 'error',
         background: '#1f2937',
@@ -2125,7 +2562,7 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
 
     if (respon.ok) {
       Swal.fire({
-        title: 'BERHASIL! ✅',
+        title: 'Berhasil',
         text: `Game berhasil jadi ${statusBaru}.`,
         icon: 'success',
         background: '#1f2937',
@@ -2135,7 +2572,7 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
       ambilDataSultan();
     } else {
       Swal.fire({
-        title: 'GAGAL! ❌',
+        title: 'Gagal',
         text: hasil.pesan,
         icon: 'error',
         background: '#1f2937',
@@ -2144,7 +2581,7 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
     }
   } catch (error) {
     Swal.fire({
-      title: 'ERROR SERVER!',
+      title: 'Error server',
       text: 'Gagal ubah status game bre',
       icon: 'error',
       background: '#1f2937',
@@ -2210,7 +2647,7 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
 
       if (respon.ok) {
         Swal.fire({
-          title: 'GAME KEHAPUS! 🗑️',
+          title: 'Game kehapus',
           text: hasil.pesan,
           icon: 'success',
           background: '#1f2937',
@@ -2229,7 +2666,7 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
       }
     } catch (error) {
       Swal.fire({
-        title: 'ERROR SERVER!',
+        title: 'Error server',
         text: 'Gagal nembak API hapus game bre',
         icon: 'error',
         background: '#1f2937',
@@ -2286,7 +2723,7 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
         ambilDataSultan();
       } else {
         Swal.fire({
-          title: 'WADUH! ❌',
+          title: 'Waduh',
           text: hasil.pesan,
           icon: 'error',
           background: '#1f2937',
@@ -2295,7 +2732,7 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
       }
     } catch (error) {
       Swal.fire({
-        title: 'ERROR SERVER!',
+        title: 'Error server',
         text: 'Gagal nembak API produk bre',
         icon: 'error',
         background: '#1f2937',
@@ -2368,7 +2805,7 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
 
     if (respon.ok) {
       Swal.fire({
-        title: 'BERHASIL! ✅',
+        title: 'Berhasil',
         text: `Produk berhasil jadi ${statusBaru}.`,
         icon: 'success',
         background: '#1f2937',
@@ -2378,7 +2815,7 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
       ambilDataSultan();
     } else {
       Swal.fire({
-        title: 'GAGAL! ❌',
+        title: 'Gagal',
         text: hasil.pesan,
         icon: 'error',
         background: '#1f2937',
@@ -2387,7 +2824,7 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
     }
   } catch (error) {
     Swal.fire({
-      title: 'ERROR SERVER!',
+      title: 'Error server',
       text: 'Gagal ubah status produk bre',
       icon: 'error',
       background: '#1f2937',
@@ -2426,7 +2863,7 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
 
       if (respon.ok) {
         Swal.fire({
-          title: 'KEHAPUS BRE! 🗑️',
+          title: 'Produk kehapus',
           text: hasil.pesan,
           icon: 'success',
           background: '#1f2937',
@@ -2445,7 +2882,7 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
       }
     } catch (error) {
       Swal.fire({
-        title: 'ERROR SERVER!',
+        title: 'Error server',
         text: 'Gagal nembak API hapus produk bre',
         icon: 'error',
         background: '#1f2937',
@@ -2554,6 +2991,49 @@ const handleHapusRequestGame = async (item) => {
   }
 };
 
+  const metaPrioritasTransaksi = (trx) => {
+    const bayar = String(trx.status_bayar || '').toLowerCase();
+    const topup = String(trx.status_topup || '').toLowerCase();
+
+    if (bayar === 'sukses' && ['gagal', 'failed', 'error'].includes(topup)) {
+      return {
+        label: 'P1 • Bayar masuk, top-up gagal',
+        ring: 'border-red-400/35 bg-red-950/10',
+        badge: 'bg-red-500/15 text-red-200 border-red-300/20'
+      };
+    }
+
+    if (bayar === 'sukses' && ['pending', 'proses', 'processing'].includes(topup)) {
+      return {
+        label: 'P2 • Bayar aman, top-up belum final',
+        ring: 'border-purple-400/30 bg-purple-950/10',
+        badge: 'bg-purple-500/15 text-purple-200 border-purple-300/20'
+      };
+    }
+
+    if (bayar === 'pending') {
+      return {
+        label: 'P3 • Pending bayar',
+        ring: 'border-yellow-400/25 bg-yellow-950/10',
+        badge: 'bg-yellow-500/15 text-yellow-200 border-yellow-300/20'
+      };
+    }
+
+    if (bayar === 'sukses' && topup === 'sukses') {
+      return {
+        label: 'Selesai • aman',
+        ring: 'border-emerald-400/15',
+        badge: 'bg-emerald-500/10 text-emerald-200 border-emerald-300/15'
+      };
+    }
+
+    return {
+      label: 'Monitor',
+      ring: 'border-blue-400/15',
+      badge: 'bg-blue-500/10 text-blue-200 border-blue-300/15'
+    };
+  };
+
   // --- KEAMANAN CEO ---
   if (status === 'loading') {
     return (
@@ -2568,18 +3048,18 @@ const handleHapusRequestGame = async (item) => {
     return (
       <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#030816] px-4 text-center text-white">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(239,68,68,0.18),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(37,99,235,0.12),transparent_36%)]" />
-        <div className="relative w-full max-w-md rounded-[2rem] border border-red-400/15 bg-slate-950/75 p-8 shadow-2xl shadow-red-950/30 backdrop-blur-2xl">
+        <div className="relative w-full max-w-md rounded-[1rem] border border-red-400/15 bg-slate-950/75 p-8 shadow-2xl shadow-red-950/30 backdrop-blur-2xl">
           <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-3xl border border-red-400/20 bg-red-500/10 text-3xl">
             🚷
           </div>
           <p className="text-[10px] font-black uppercase tracking-[0.35em] text-red-300/80">Bukan pintu customer</p>
-          <h1 className="mt-3 text-3xl font-black text-white">Akses ditolak</h1>
+          <h1 className="mt-3 text-2xl font-black text-white">Akses ditolak</h1>
           <p className="mt-2 text-sm font-semibold text-slate-400">
             Ruang CEO lagi dikunci. Yang boleh masuk cuma admin utama NaXaShop.
           </p>
           <button
             onClick={() => router.push('/')}
-            className="mt-6 rounded-2xl border border-white/10 bg-white/10 px-6 py-3 text-sm font-black text-white transition hover:bg-white/15"
+            className="mt-6 rounded-xl border border-purple-300/10 bg-white/10 px-6 py-3 text-sm font-black text-white transition hover:bg-white/15"
           >
             Balik Beranda
           </button>
@@ -2597,513 +3077,746 @@ const handleHapusRequestGame = async (item) => {
     );
   }
 
+  const menuAdminDashboard = [
+    { id: 'statistik', label: 'Dashboard', desc: 'Radar utama', Icon: FiBarChart2 },
+    { id: 'transaksi', label: 'Orders', desc: 'Problem-first', Icon: FiShoppingBag },
+    { id: 'produk', label: 'Products', desc: 'Nominal & provider', Icon: FiBox },
+    { id: 'vip-sync', label: 'VIP Sync', desc: 'Tarik provider', Icon: FiRefreshCw },
+    { id: 'game', label: 'Games', desc: 'Etalase game', Icon: FiGrid },
+    { id: 'promo', label: 'Promo', desc: 'Banner toko', Icon: FiImage },
+    { id: 'metode-bayar', label: 'Payment', desc: 'Metode bayar', Icon: FiCreditCard },
+    { id: 'voucher', label: 'Voucher', desc: 'Kupon user', Icon: FiGift },
+    { id: 'maintenance', label: 'Control', desc: 'Maintenance', Icon: FiTool },
+    { id: 'request-game', label: 'Requests', desc: 'Masukan user', Icon: FiMessageSquare, badge: Number(statsRequestGame?.baru || 0) }
+  ];
+
+  const keywordAdminSearch = adminSearchQuery.trim().toLowerCase();
+
+  const hasilSearchAdmin = keywordAdminSearch
+    ? [
+        ...menuAdminDashboard
+          .filter((item) =>
+            `${item.label} ${item.desc}`.toLowerCase().includes(keywordAdminSearch)
+          )
+          .map((item) => ({
+            key: `menu-${item.id}`,
+            label: item.label,
+            desc: item.desc,
+            type: 'Menu',
+            action: () => setTabAktif(item.id)
+          })),
+        ...daftarGame
+          .filter((game) =>
+            `${game.nama || ''} ${game.publisher || ''} ${game.kode_game || ''}`.toLowerCase().includes(keywordAdminSearch)
+          )
+          .slice(0, 4)
+          .map((game) => ({
+            key: `game-${game.id}`,
+            label: game.nama,
+            desc: game.publisher || game.kode_game || 'Game',
+            type: 'Game',
+            action: () => setTabAktif('game')
+          })),
+        ...daftarProduk
+          .filter((produk) =>
+            `${produk.nama_produk || ''} ${produk.kode_produk || ''} ${produk.kode_produk_provider || ''}`.toLowerCase().includes(keywordAdminSearch)
+          )
+          .slice(0, 4)
+          .map((produk) => ({
+            key: `produk-${produk.id}`,
+            label: produk.nama_produk,
+            desc: `${cariNamaGame(produk.game_id)} • ${formatRupiah(produk.harga)}`,
+            type: 'Produk',
+            action: () => {
+              setFilterProdukGame(String(produk.game_id || 'all'));
+              setTabAktif('produk');
+            }
+          })),
+        ...daftarTransaksiPrioritas
+          .filter((trx) =>
+            `${trx.order_id || ''} ${trx.id_player || ''} ${trx.nama_produk || ''} ${trx.nama_game || ''}`.toLowerCase().includes(keywordAdminSearch)
+          )
+          .slice(0, 4)
+          .map((trx) => ({
+            key: `trx-${trx.order_id}`,
+            label: trx.order_id,
+            desc: `${trx.nama_game || 'Order'} • ${trx.status_bayar}/${trx.status_topup}`,
+            type: 'Order',
+            action: () => setTabAktif('transaksi')
+          }))
+      ].slice(0, 9)
+    : [];
+
+  const jalankanSearchAdmin = (e) => {
+  e.preventDefault();
+
+  const hasilPertama = hasilSearchAdmin[0];
+  if (!hasilPertama) return;
+
+  hasilPertama.action();
+  setAdminSearchQuery('');
+  setMobileAdminSearchOpen(false);
+};
+
   return (
-    <div className="admin-promax relative min-h-screen overflow-hidden bg-[#02040d] px-3 pb-28 pt-4 font-sans text-white selection:bg-blue-500/30 sm:px-6 sm:pb-8 sm:pt-7">
+    <div className="admin-figma relative h-screen overflow-hidden bg-[#0b0714] font-sans text-slate-100 selection:bg-purple-500/25">
       <style jsx global>{`
-        .admin-promax .bg-gray-900,
-        .admin-promax .bg-gray-800 {
-          background: rgba(15, 23, 42, 0.72) !important;
-          backdrop-filter: blur(18px);
+        .admin-figma .app-aurora {
+          background:
+            radial-gradient(circle at 12% 8%, rgba(168, 85, 247, 0.30), transparent 30%),
+            radial-gradient(circle at 88% 18%, rgba(59, 130, 246, 0.18), transparent 28%),
+            radial-gradient(circle at 45% 96%, rgba(217, 70, 239, 0.14), transparent 34%),
+            linear-gradient(135deg, #0b0714, #15102a 46%, #080511);
         }
 
-        .admin-promax .bg-gray-950,
-        .admin-promax .bg-slate-950 {
-          background: rgba(2, 6, 23, 0.70) !important;
+        .admin-figma .figma-card {
+          background: rgba(22, 17, 39, 0.82);
+          border: 1px solid rgba(168, 85, 247, 0.13);
+          box-shadow: 0 26px 75px -54px rgba(0, 0, 0, 0.88);
+          backdrop-filter: blur(20px);
         }
 
-        .admin-promax .border-gray-800,
-        .admin-promax .border-gray-700 {
-          border-color: rgba(96, 165, 250, 0.14) !important;
+        .admin-figma .content-shell [class*="border-white"] {
+          border-color: rgba(168, 85, 247, 0.12) !important;
         }
 
-        .admin-promax .shadow-xl,
-        .admin-promax .shadow-2xl {
-          box-shadow: 0 24px 80px -42px rgba(37, 99, 235, 0.65) !important;
+        .admin-figma .content-shell .bg-gray-900,
+        .admin-figma .content-shell .bg-gray-800 {
+          background: rgba(22, 17, 39, 0.84) !important;
+          backdrop-filter: blur(16px);
         }
 
-        .admin-promax input,
-        .admin-promax select,
-        .admin-promax textarea {
-          background: rgba(2, 6, 23, 0.78) !important;
-          border-color: rgba(96, 165, 250, 0.16) !important;
+        .admin-figma .content-shell .bg-gray-950,
+        .admin-figma .content-shell .bg-slate-950 {
+          background: rgba(10, 7, 19, 0.78) !important;
         }
 
-        .admin-promax input:focus,
-        .admin-promax select:focus,
-        .admin-promax textarea:focus {
-          border-color: rgba(59, 130, 246, 0.8) !important;
-          box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12) !important;
+        .admin-figma .content-shell .border-gray-800,
+        .admin-figma .content-shell .border-gray-700 {
+          border-color: rgba(168, 85, 247, 0.13) !important;
         }
 
-        .admin-promax .no-scrollbar {
+        .admin-figma .content-shell .text-white {
+          color: #f8fafc !important;
+        }
+
+        .admin-figma .content-shell .text-gray-500 {
+          color: #94a3b8 !important;
+        }
+
+        .admin-figma .content-shell .text-gray-400 {
+          color: #cbd5e1 !important;
+        }
+
+        .admin-figma .content-shell input,
+        .admin-figma .content-shell select,
+        .admin-figma .content-shell textarea {
+          background: rgba(9, 7, 19, 0.78) !important;
+          border-color: rgba(168, 85, 247, 0.16) !important;
+          color: #f8fafc !important;
+        }
+
+        .admin-figma .content-shell input:focus,
+        .admin-figma .content-shell select:focus,
+        .admin-figma .content-shell textarea:focus {
+          border-color: rgba(168, 85, 247, 0.86) !important;
+          box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.16) !important;
+        }
+
+        .admin-figma .content-shell .lux-card {
+          background: rgba(22, 17, 39, 0.84) !important;
+          border-color: rgba(168, 85, 247, 0.13) !important;
+          box-shadow: 0 26px 75px -54px rgba(0, 0, 0, 0.86) !important;
+        }
+
+        .admin-figma .content-shell .lux-hover {
+          transition: transform 190ms ease, border-color 190ms ease, box-shadow 190ms ease, background 190ms ease;
+        }
+
+        .admin-figma .content-shell .lux-hover:hover {
+          transform: translateY(-3px) scale(1.005);
+          border-color: rgba(192, 132, 252, 0.34) !important;
+          box-shadow: 0 30px 95px -60px rgba(168, 85, 247, 0.62) !important;
+        }
+
+        .admin-figma .no-scrollbar {
           -ms-overflow-style: none;
           scrollbar-width: none;
         }
 
-        .admin-promax .no-scrollbar::-webkit-scrollbar {
+        .admin-figma .no-scrollbar::-webkit-scrollbar {
           display: none;
         }
 
-        @keyframes naxaSweep {
-          0% { transform: translateX(-120%); opacity: 0; }
-          35% { opacity: 1; }
-          100% { transform: translateX(220%); opacity: 0; }
+        .admin-figma .thin-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(168, 85, 247, 0.42) rgba(255,255,255,0.04);
         }
 
-        @keyframes naxaSectionIn {
-          0% { opacity: 0; transform: translateY(16px); }
-          100% { opacity: 1; transform: translateY(0); }
+        .admin-figma .thin-scrollbar::-webkit-scrollbar {
+          width: 6px;
+          height: 6px;
         }
 
-        .admin-promax .promax-section {
-          animation: naxaSectionIn 520ms ease both;
+        .admin-figma .thin-scrollbar::-webkit-scrollbar-track {
+          background: rgba(255,255,255,0.04);
+          border-radius: 999px;
         }
 
-        .admin-promax .lux-card {
-          background: linear-gradient(145deg, rgba(15, 23, 42, 0.78), rgba(2, 6, 23, 0.62)) !important;
-          border-color: rgba(147, 197, 253, 0.16) !important;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 24px 90px -48px rgba(37,99,235,0.65) !important;
+        .admin-figma .thin-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(168, 85, 247, 0.42);
+          border-radius: 999px;
         }
 
-        .admin-promax .lux-hover {
-          transition: transform 220ms ease, border-color 220ms ease, background 220ms ease, box-shadow 220ms ease;
+        @keyframes figmaFadeUp {
+          from { opacity: 0; transform: translateY(16px) scale(0.985); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
         }
 
-        .admin-promax .lux-hover:hover {
-          transform: translateY(-2px);
-          border-color: rgba(147, 197, 253, 0.32) !important;
-          box-shadow: 0 26px 90px -46px rgba(59,130,246,0.85) !important;
+        @keyframes figmaFloat {
+          0%, 100% { transform: translate3d(0,0,0) scale(1); opacity: 0.55; }
+          50% { transform: translate3d(10px,-12px,0) scale(1.08); opacity: 0.9; }
         }
 
-        @keyframes theNaxaGlow {
-          0%, 100% { filter: drop-shadow(0 0 16px rgba(59,130,246,0.45)); opacity: 0.92; }
-          50% { filter: drop-shadow(0 0 26px rgba(14,165,233,0.75)); opacity: 1; }
+        @keyframes figmaShine {
+          0% { transform: translateX(-140%); opacity: 0; }
+          40% { opacity: 0.9; }
+          100% { transform: translateX(180%); opacity: 0; }
         }
 
-        @keyframes theNaxaGradient {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
+        .admin-figma .promax-section {
+          animation: figmaFadeUp 520ms cubic-bezier(.22,1,.36,1) both;
         }
 
-        .admin-promax .the-naxa-word {
-          background: linear-gradient(90deg, #dbeafe, #38bdf8, #60a5fa, #dbeafe);
-          background-size: 240% 100%;
-          -webkit-background-clip: text;
-          background-clip: text;
-          color: transparent;
-          animation: theNaxaGlow 2.6s ease-in-out infinite, theNaxaGradient 4.8s ease-in-out infinite;
+        .admin-figma .soft-blob {
+          animation: figmaFloat 6s ease-in-out infinite;
+        }
+
+        .admin-figma .figma-shine::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(110deg, transparent, rgba(255,255,255,0.10), transparent);
+          transform: translateX(-140%);
+          pointer-events: none;
+        }
+
+        .admin-figma .figma-shine:hover::after {
+          animation: figmaShine 950ms ease;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .admin-figma *,
+          .admin-figma *::before,
+          .admin-figma *::after {
+            animation-duration: 0.001ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.001ms !important;
+            scroll-behavior: auto !important;
+          }
         }
       `}</style>
 
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.32),transparent_34%),radial-gradient(circle_at_top_right,rgba(14,165,233,0.18),transparent_30%),radial-gradient(circle_at_bottom,rgba(15,23,42,0.92),transparent_42%)]" />
-      <div className="pointer-events-none absolute left-1/2 top-0 h-px w-[82%] -translate-x-1/2 bg-gradient-to-r from-transparent via-blue-300/35 to-transparent" />
+      <div className="app-aurora fixed inset-0" />
 
-      <div className="relative z-10 mx-auto max-w-7xl">
-
-        {/* HEADER & TAB MENU */}
-        <div className="promax-section mb-6 overflow-hidden rounded-[2rem] border border-blue-400/15 bg-slate-950/70 shadow-2xl shadow-blue-950/35 backdrop-blur-2xl">
-          <div className="relative p-5 sm:p-7">
-            <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-blue-500/20 blur-3xl" />
-            <div className="pointer-events-none absolute -bottom-20 left-16 h-40 w-40 rounded-full bg-emerald-500/10 blur-3xl" />
-
-            <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-              <div className="min-w-0">
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-blue-400/20 bg-blue-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em] text-blue-200">
-                    Sistem Kendali Utama
-                  </span>
-                  <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-[10px] font-black text-emerald-200">
-                    Live • mode tempur aman
-                  </span>
-                </div>
-
-                <h1 className="text-3xl font-black tracking-tight sm:text-5xl">
-                  Sistem Kendali Utama <span className="text-blue-200">Bos Fahmi</span>
-                </h1>
-
-                <motion.div
-                  className="mt-2 inline-flex items-center gap-2 text-3xl font-black tracking-tight sm:text-5xl"
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.55, ease: motionEase, delay: 0.1 }}
-                >
-                  <span className="the-naxa-word">The NaXa</span>
-                  <motion.span
-                    className="text-2xl"
-                    animate={{ rotate: [-8, 8, -8], scale: [1, 1.08, 1] }}
-                    transition={{ duration: 2.1, repeat: Infinity, ease: 'easeInOut' }}
-                  >
-                    ⚡
-                  </motion.span>
-                </motion.div>
-
-                <p className="mt-3 max-w-2xl text-sm font-semibold leading-relaxed text-slate-400">
-                  Ruang kontrol buat transaksi, produk, promo, metode bayar, dan urusan kecil yang harus kelihatan sebelum jadi “bang kok belum masuk?”.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 rounded-3xl border border-white/10 bg-white/[0.03] p-2 text-center sm:min-w-[360px]">
-                <div className="rounded-2xl border border-red-400/15 bg-red-500/10 px-3 py-3">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-red-200/80">Gawat</p>
-                  <p className="mt-1 text-2xl font-black text-red-300">{alerts?.ringkasan?.topupGagal || 0}</p>
-                </div>
-                <div className="rounded-2xl border border-yellow-400/15 bg-yellow-500/10 px-3 py-3">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-yellow-200/80">Pending</p>
-                  <p className="mt-1 text-2xl font-black text-yellow-300">{alerts?.ringkasan?.pendingLama || 0}</p>
-                </div>
-                <div className="rounded-2xl border border-emerald-400/15 bg-emerald-500/10 px-3 py-3">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-emerald-200/80">Request</p>
-                  <p className="mt-1 text-2xl font-black text-emerald-300">{Number(statsRequestGame?.baru || 0)}</p>
-                </div>
-              </div>
+      <div className="relative z-10 mx-auto flex h-screen w-full max-w-[1500px] gap-3 p-3">
+        <aside className="hidden h-[calc(100vh-1.5rem)] w-[224px] shrink-0 overflow-hidden rounded-[0.95rem] bg-[#0a0814]/88 p-2.5 text-white shadow-2xl shadow-black/45 backdrop-blur-2xl lg:flex lg:flex-col">
+          <div className="mb-2 flex items-center gap-2 rounded-lg bg-white/[0.05] p-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-purple-600 to-blue-600 shadow-lg shadow-purple-950/40">
+              <FiActivity className="text-base" />
+            </div>
+            <div>
+              <h1 className="text-sm font-black tracking-wide">NaXaShop</h1>
+              <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-purple-200/55">Admin Center</p>
             </div>
           </div>
-        </div>
 
-        <div className="promax-section mb-6 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {[
-            { label: 'Beresi order nyangkut', desc: 'Langsung ke transaksi bermasalah.', icon: '🚨', tab: 'transaksi', tone: 'from-red-500/18 to-slate-950/40', border: 'border-red-300/15' },
-            { label: 'Tambah produk tempur', desc: 'Isi nominal yang profitnya sehat.', icon: '📦', tab: 'produk', tone: 'from-blue-500/18 to-slate-950/40', border: 'border-blue-300/15' },
-            { label: 'Tambah game baru', desc: 'Biar katalog makin hidup.', icon: '🎮', tab: 'game', tone: 'from-purple-500/18 to-slate-950/40', border: 'border-purple-300/15' },
-            { label: 'Promo & etalase', desc: 'Rapihin banner biar toko gak sepi.', icon: '✨', tab: 'promo', tone: 'from-emerald-500/18 to-slate-950/40', border: 'border-emerald-300/15' }
-          ].map((aksi, index) => (
-            <motion.button
-              key={aksi.label}
-              type="button"
-              onClick={() => setTabAktif(aksi.tab)}
-              className={`lux-card lux-hover group overflow-hidden rounded-[1.65rem] border ${aksi.border} bg-gradient-to-br ${aksi.tone} p-4 text-left`}
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.45, ease: motionEase, delay: 0.08 * index }}
-              whileHover={{ y: -5, scale: 1.015 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-2xl shadow-lg">
-                    {aksi.icon}
-                  </div>
-                  <h3 className="text-sm font-black text-white">{aksi.label}</h3>
-                  <p className="mt-1 text-xs font-semibold leading-relaxed text-slate-400">{aksi.desc}</p>
-                </div>
-                <span className="mt-1 rounded-full border border-white/10 bg-white/10 px-2 py-1 text-[10px] font-black text-slate-300 transition group-hover:translate-x-1 group-hover:text-white">
-                  buka →
-                </span>
-              </div>
-            </motion.button>
-          ))}
-        </div>
-
-        <div className="promax-section sticky top-3 z-40 mb-8 rounded-[1.65rem] border border-blue-400/15 bg-[#061426]/88 p-2 shadow-2xl shadow-blue-950/30 backdrop-blur-2xl">
-          <div className="no-scrollbar flex gap-2 overflow-x-auto">
-            {[
-              { id: 'statistik', icon: '📊', label: 'Statistik', tone: 'from-blue-600 to-blue-500' },
-              { id: 'transaksi', icon: '🧾', label: 'Transaksi', tone: 'from-emerald-600 to-teal-500' },
-              { id: 'game', icon: '🎮', label: 'Game', tone: 'from-purple-600 to-fuchsia-500' },
-              { id: 'produk', icon: '📦', label: 'Produk', tone: 'from-cyan-600 to-blue-500' },
-              { id: 'promo', icon: '🎞️', label: 'Promo', tone: 'from-sky-600 to-blue-500' },
-              { id: 'metode-bayar', icon: '💳', label: 'Payment', tone: 'from-indigo-600 to-blue-500' },
-              { id: 'voucher', icon: '🎟️', label: 'Voucher', tone: 'from-pink-600 to-rose-500' },
-              { id: 'maintenance', icon: '🛠️', label: 'Maintenance', tone: 'from-amber-600 to-orange-500' },
-              { id: 'request-game', icon: '💡', label: 'Request', tone: 'from-blue-600 to-cyan-500', badge: Number(statsRequestGame?.baru || 0) }
-            ].map((item) => {
+          <nav className="thin-scrollbar min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
+            <p className="px-2.5 pb-1.5 text-[9px] font-black uppercase tracking-[0.24em] text-slate-500">Main Menu</p>
+            {menuAdminDashboard.map((item) => {
               const aktif = tabAktif === item.id;
+              const Icon = item.Icon;
 
               return (
-                <motion.button
+                <button
                   key={item.id}
                   type="button"
                   onClick={() => setTabAktif(item.id)}
-                  className={`relative flex shrink-0 items-center gap-2 rounded-2xl border px-4 py-3 text-xs font-black transition-all duration-300 ${
+                  className={`group relative flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left transition ${
                     aktif
-                      ? `border-blue-300/40 bg-gradient-to-r ${item.tone} text-white shadow-lg shadow-blue-950/35`
-                      : 'border-white/5 bg-white/[0.03] text-slate-400 hover:border-blue-300/20 hover:bg-blue-500/10 hover:text-white'
+                      ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-950/35'
+                      : 'text-slate-400 hover:bg-white/[0.07] hover:text-white'
                   }`}
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.96 }}
                 >
-                  <span>{item.icon}</span>
-                  <span>{item.label}</span>
+                  <span className={`flex h-7 w-7 items-center justify-center rounded-md ${
+                    aktif ? 'bg-white/[0.16] text-white' : 'bg-white/[0.05] text-slate-300 group-hover:bg-white/10'
+                  }`}>
+                    <Icon className="text-sm" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[12px] font-black">{item.label}</span>
+                    <span className={`hidden text-[10px] font-semibold ${aktif ? 'text-purple-100/70' : 'text-slate-500'}`}>
+                      {item.desc}
+                    </span>
+                  </span>
                   {item.badge > 0 && (
-                    <span className="ml-1 rounded-full bg-red-500 px-2 py-0.5 text-[10px] text-white">
+                    <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black text-white">
                       {item.badge}
                     </span>
                   )}
-                </motion.button>
+                </button>
               );
             })}
+          </nav>
+
+          <button
+            type="button"
+            onClick={ambilDataSultan}
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-white/[0.06] px-3 py-2.5 text-xs font-black text-slate-200 transition hover:bg-white/10"
+          >
+            <FiRefreshCw />
+            Sync Dashboard
+          </button>
+        </aside>
+
+        <section className="flex h-[calc(100vh-1.5rem)] min-w-0 flex-1 flex-col overflow-hidden">
+          <header className="relative z-40 mb-2 shrink-0 rounded-[0.95rem] bg-[#0f0a1d]/82 p-3 shadow-2xl shadow-black/20 backdrop-blur-2xl">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex min-w-0 items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[9px] font-black uppercase tracking-[0.22em] text-purple-300/80 lg:text-[10px]">
+  Command Center
+</p>
+
+<h2 className="truncate text-xs font-black tracking-tight text-white sm:text-sm lg:text-base">
+  Welcome Back, Boss Fahmi
+</h2>
+                </div>
+
+                <div className="flex items-center gap-2 lg:hidden">
+  <button
+    type="button"
+    onClick={() => setMobileAdminSearchOpen((prev) => !prev)}
+    className={`flex h-9 w-9 items-center justify-center rounded-xl text-sm transition ${
+      mobileAdminSearchOpen
+        ? 'bg-gradient-to-br from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-950/35'
+        : 'bg-white/[0.06] text-purple-200 hover:bg-white/10'
+    }`}
+    aria-label="Cari admin"
+  >
+    <FiSearch />
+  </button>
+
+  <AdminMascot
+    className="h-9 w-9 rounded-xl"
+    imageClassName="h-full w-full object-cover"
+    fallbackText="FT"
+  />
+</div>
+              </div>
+
+<form
+  onSubmit={jalankanSearchAdmin}
+  className={`relative w-full sm:max-w-[320px] lg:ml-auto lg:max-w-[245px] ${
+    mobileAdminSearchOpen ? 'block' : 'hidden'
+  } lg:block`}
+>                <div className="flex items-center gap-2 rounded-lg bg-white/[0.07] px-3 py-2 text-slate-300 transition focus-within:bg-white/[0.10]">
+                  <FiSearch className="shrink-0 text-purple-200/75" />
+                  <input
+                    type="search"
+                    value={adminSearchQuery}
+                    onChange={(e) => setAdminSearchQuery(e.target.value)}
+                    placeholder="Cari apa aja..."
+                    className="w-full border-0 bg-transparent text-xs font-semibold text-white outline-none placeholder:text-slate-500"
+                  />
+                  {adminSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setAdminSearchQuery('')}
+                      className="rounded-full p-1 text-slate-500 transition hover:bg-white/10 hover:text-white"
+                      aria-label="Clear search"
+                    >
+                      <FiX />
+                    </button>
+                  )}
+                </div>
+
+                {adminSearchQuery && (
+                  <div className="absolute left-0 right-0 top-[calc(100%+10px)] z-50 overflow-hidden rounded-[0.95rem] bg-[#120d22]/95 p-2 shadow-2xl shadow-black/45 backdrop-blur-2xl">
+                    {hasilSearchAdmin.length > 0 ? (
+                      <div className="max-h-[360px] overflow-y-auto no-scrollbar">
+                        {hasilSearchAdmin.map((item) => (
+                          <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => {
+                              item.action();
+                              setAdminSearchQuery('');
+                              setMobileAdminSearchOpen(false);
+                            }}
+                            className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-white/[0.07]"
+                          >
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-black text-white">{item.label}</span>
+                              <span className="block truncate text-[10px] font-semibold text-slate-500">{item.type} • {item.desc}</span>
+                            </span>
+                            <FiArrowRight className="shrink-0 text-slate-500" />
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="px-4 py-5 text-center text-sm font-bold text-slate-500">
+                        Belum ketemu. Coba keyword lain.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </form>
+
+              <div className="flex items-center justify-between gap-2 lg:justify-end">
+                <div className="flex flex-1 items-center gap-2 lg:hidden">
+  <button
+    type="button"
+    onClick={() => setMobileAdminMenuOpen(true)}
+    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-4 py-3 text-xs font-black text-white shadow-lg shadow-purple-950/35"
+  >
+    <FiMenu className="text-base" />
+    Menu Admin
+  </button>
+
+  <button
+    type="button"
+    onClick={ambilDataSultan}
+    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-slate-200 transition hover:bg-white/10"
+    aria-label="Sync dashboard"
+  >
+    <FiRefreshCw />
+  </button>
+</div>
+
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNotifPanelOpen((prev) => !prev);
+                      ambilAlerts();
+                    }}
+                    className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.07] text-slate-200 transition hover:bg-white/10"
+                    aria-label="Buka notifikasi"
+                  >
+                    <FiBell />
+                    {(alerts?.ringkasan?.total || 0) > 0 && (
+                      <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-black text-white">
+                        {alerts?.ringkasan?.total || ''}
+                      </span>
+                    )}
+                  </button>
+
+                  {notifPanelOpen && (
+                    <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-[310px] overflow-hidden rounded-[0.95rem] bg-[#120d22]/95 p-4 shadow-2xl shadow-black/45 backdrop-blur-2xl">
+                      <div className="mb-3 flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-black text-white">Notification Center</p>
+                          <p className="text-xs font-semibold text-slate-500">Alert order & payment</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setNotifPanelOpen(false)}
+                          className="rounded-full p-1 text-slate-500 transition hover:bg-white/10 hover:text-white"
+                          aria-label="Tutup notifikasi"
+                        >
+                          <FiX />
+                        </button>
+                      </div>
+
+                      <div className="space-y-2">
+                        {[
+                          { label: 'Top-up gagal', value: alerts?.ringkasan?.topupGagal || 0, tone: 'text-red-200 bg-red-500/10' },
+                          { label: 'Proses kelamaan', value: alerts?.ringkasan?.prosesKelamaan || 0, tone: 'text-purple-200 bg-purple-500/10' },
+                          { label: 'Pending lama', value: alerts?.ringkasan?.pendingLama || 0, tone: 'text-yellow-200 bg-yellow-500/10' }
+                        ].map((item) => (
+                          <div key={item.label} className={`flex items-center justify-between rounded-xl px-3 py-3 ${item.tone}`}>
+                            <span className="text-xs font-black">{item.label}</span>
+                            <span className="text-lg font-black">{item.value}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTabAktif('transaksi');
+                          setNotifPanelOpen(false);
+                        }}
+                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-4 py-3 text-sm font-black text-white transition hover:bg-purple-500"
+                      >
+                        Buka order bermasalah
+                        <FiArrowRight />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="hidden items-center gap-2 rounded-lg bg-white/[0.06] px-2 py-1.5 xl:flex">
+                  <AdminMascot
+                    className="h-7 w-7 rounded-md"
+                    imageClassName="h-full w-full object-cover"
+                    fallbackText="FT"
+                  />
+                  <div className="leading-tight">
+                    <p className="text-[11px] font-black text-white">Fahmi TheNaxa</p>
+                    <p className="text-[10px] font-semibold text-slate-500">Owner</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </header>
+<AnimatePresence>
+  {mobileAdminMenuOpen && (
+    <motion.div
+      className="fixed inset-0 z-[999] flex items-center justify-center bg-black/55 px-3 backdrop-blur-sm lg:hidden"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18, ease: motionEase }}
+    >
+      <motion.button
+        type="button"
+        className="absolute inset-0"
+        onClick={() => setMobileAdminMenuOpen(false)}
+        aria-label="Tutup menu admin"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      />
+
+      <motion.div
+        className="relative w-full max-w-[390px] overflow-hidden rounded-[1.35rem] border border-purple-300/10 bg-[#0f0a1d]/95 shadow-2xl shadow-black/70"
+        initial={{ opacity: 0, scale: 0.94, y: 14 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 10 }}
+        transition={{
+          duration: 0.24,
+          ease: motionEase,
+        }}
+      >
+        <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-purple-500/20 blur-[70px]" />
+        <div className="pointer-events-none absolute -bottom-20 -left-16 h-48 w-48 rounded-full bg-blue-500/10 blur-[80px]" />
+
+        <div className="relative flex items-center justify-between overflow-hidden border-b border-purple-300/10 px-4 py-4">
+          <div className="pointer-events-none absolute -right-5 -bottom-8 opacity-60">
+            <AdminMascot
+              frameless
+              className="h-28 w-28"
+              imageClassName="h-full w-full object-contain object-bottom drop-shadow-2xl"
+              fallbackText="NX"
+            />
           </div>
+
+          <div className="relative z-10">
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-purple-300/80">
+              Admin Navigation
+            </p>
+            <h3 className="mt-1 text-base font-black text-white">
+              Pilih ruang kontrol
+            </h3>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setMobileAdminMenuOpen(false)}
+            className="relative z-10 flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06] text-slate-300 transition hover:bg-white/10 hover:text-white"
+            aria-label="Tutup menu"
+          >
+            <FiX />
+          </button>
         </div>
 
-        <div className="fixed inset-x-3 bottom-3 z-50 rounded-[1.6rem] border border-blue-300/15 bg-[#061426]/92 p-2 shadow-2xl shadow-blue-950/50 backdrop-blur-2xl sm:hidden">
-          <div className="grid grid-cols-4 gap-1">
-            {[
-              { id: 'transaksi', icon: '🚨', label: 'Order' },
-              { id: 'produk', icon: '📦', label: 'Produk' },
-              { id: 'game', icon: '🎮', label: 'Game' },
-              { id: 'promo', icon: '✨', label: 'Promo' }
-            ].map((item) => {
-              const aktif = tabAktif === item.id;
+        <div className="thin-scrollbar relative grid max-h-[68vh] grid-cols-2 gap-2 overflow-y-auto p-3">
+          {menuAdminDashboard.map((item, index) => {
+            const aktif = tabAktif === item.id;
+            const Icon = item.Icon;
 
-              return (
-                <motion.button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setTabAktif(item.id)}
-                  className={`rounded-2xl px-2 py-2 text-[10px] font-black transition ${
+            return (
+              <motion.button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  setTabAktif(item.id);
+                  setMobileAdminMenuOpen(false);
+                }}
+                className={`relative rounded-2xl p-3 text-left transition ${
+                  aktif
+                    ? 'bg-gradient-to-br from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-950/35'
+                    : 'bg-white/[0.06] text-slate-300 hover:bg-white/[0.10] hover:text-white'
+                }`}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: 0.18,
+                  delay: index * 0.025,
+                  ease: motionEase,
+                }}
+              >
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <span
+                    className={`flex h-9 w-9 items-center justify-center rounded-xl ${
+                      aktif ? 'bg-white/[0.16]' : 'bg-white/[0.06]'
+                    }`}
+                  >
+                    <Icon />
+                  </span>
+
+                  {item.badge > 0 && (
+                    <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black text-white">
+                      {item.badge}
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-sm font-black">{item.label}</p>
+
+                <p
+                  className={
                     aktif
-                      ? 'bg-blue-500 text-white shadow-lg shadow-blue-950/50'
-                      : 'text-slate-400 hover:bg-white/10 hover:text-white'
-                  }`}
-                  whileTap={{ scale: 0.92 }}
+                      ? 'mt-0.5 text-[11px] font-semibold text-purple-100/75'
+                      : 'mt-0.5 text-[11px] font-semibold text-slate-500'
+                  }
                 >
-                  <span className="block text-lg leading-none">{item.icon}</span>
-                  <span className="mt-1 block">{item.label}</span>
-                </motion.button>
-              );
-            })}
-          </div>
+                  {item.desc}
+                </p>
+              </motion.button>
+            );
+          })}
         </div>
-
+      </motion.div>
+    </motion.div>
+  )}
+</AnimatePresence>
+          <main className="content-shell thin-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
 {/* TAB STATISTIK */}
 
 {tabAktif === 'statistik' && (
-  <div className="promax-section animate-in fade-in slide-in-from-bottom-4 duration-500">
-
-    {/* GRAFIK PALING ATAS */}
-    <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 mb-8">
-      <div className="xl:col-span-3 rounded-3xl border border-gray-800 bg-gray-900 p-5 shadow-xl">
-        <div className="mb-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
-          <div>
-            <h2 className="text-xl font-black text-white">Grafik Omset & Profit 📈</h2>
-            <p className="text-xs font-semibold text-gray-500">
-              Pantau naik-turun uang masuk dari order sukses.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-right">
-            <p className="text-[10px] font-black uppercase tracking-wide text-emerald-300/80">
-              Bulan Ini
-            </p>
-            <p className="text-sm font-black text-emerald-300">
-              {formatRupiah(stats?.profitBulanIni)}
-            </p>
-          </div>
-        </div>
-
-        <RevenueLineChart data={trenHarianDashboard} />
-      </div>
-
-      <div className="xl:col-span-2 rounded-3xl border border-gray-800 bg-gray-900 p-5 shadow-xl">
-        <div className="mb-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
-          <div>
-            <h2 className="text-xl font-black text-white">Order Harian 🚀</h2>
-            <p className="text-xs font-semibold text-gray-500">
-              Jumlah top-up sukses per hari.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-right">
-            <p className="text-[10px] font-black uppercase tracking-wide text-cyan-300/80">
-              Hari Ini
-            </p>
-            <p className="text-sm font-black text-cyan-300">
-              {stats?.orderHariIni || 0} order
-            </p>
-          </div>
-        </div>
-
-        <OrderBarChart data={trenHarianDashboard} />
-      </div>
-    </div>
-
-    {/* KARTU STATISTIK */}
-    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
-      <div className="bg-gradient-to-br from-gray-900 to-slate-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
-        <div className="absolute top-4 right-4 text-3xl opacity-20">💰</div>
-        <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">
-          Total Omset
-        </p>
-        <h3 className="text-2xl font-black text-green-400">
-          {formatRupiah(stats?.totalOmset ?? stats?.totalCuan)}
-        </h3>
-      </div>
-
-      <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
-        <div className="absolute top-4 right-4 text-3xl opacity-20">📦</div>
-        <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">
-          Total Modal
-        </p>
-        <h3 className="text-2xl font-black text-orange-400">
-          {formatRupiah(stats?.totalModal)}
-        </h3>
-      </div>
-
-      <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
-        <div className="absolute top-4 right-4 text-3xl opacity-20">💸</div>
-        <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">
-          Profit
-        </p>
-        <h3 className="text-2xl font-black text-emerald-400">
-          {formatRupiah(stats?.totalProfit)}
-        </h3>
-      </div>
-
-      <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
-        <div className="absolute top-4 right-4 text-3xl opacity-20">🚀</div>
-        <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">
-          Topup Sukses
-        </p>
-        <h3 className="text-2xl font-black text-blue-400">
-          {stats?.suksesTopup || 0}
-        </h3>
-      </div>
-
-      <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
-        <div className="absolute top-4 right-4 text-3xl opacity-20">⏳</div>
-        <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">
-          Pending Bayar
-        </p>
-        <h3 className="text-2xl font-black text-yellow-400">
-          {stats?.pendingBayar || 0}
-        </h3>
-      </div>
-
-      <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
-        <div className="absolute top-4 right-4 text-3xl opacity-20">👥</div>
-        <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">
-          Total User
-        </p>
-        <h3 className="text-2xl font-black text-purple-400">
-          {stats?.totalUser || 0}
-        </h3>
-      </div>
-
-      <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
-        <div className="absolute top-4 right-4 text-3xl opacity-20">✅</div>
-        <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">
-          Verified
-        </p>
-        <h3 className="text-2xl font-black text-emerald-400">
-          {stats?.userVerified || 0}
-        </h3>
-      </div>
-
-      <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
-        <div className="absolute top-4 right-4 text-3xl opacity-20">🟢</div>
-        <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">
-          Login 15 Menit
-        </p>
-        <h3 className="text-2xl font-black text-lime-400">
-          {stats?.userAktif15Menit || 0}
-        </h3>
-      </div>
-    </div>
-
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-      <PaymentMethodList data={metodeBayarDashboard} />
-
-      <CompactRankList
-        title="Game Terlaris"
-        subtitle="Game paling sering dibeli customer."
-        data={gameTerlarisDashboard}
-        type="game"
+  <div className="promax-section space-y-4">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <MetricCard
+        label="Total Omset"
+        value={stats?.totalOmset || 0}
+        prefix="Rp "
+        hint="Uang masuk keseluruhan"
+        Icon={FiCreditCard}
+        tone="purple"
       />
 
-      <CompactRankList
-        title="Produk Terlaris"
-        subtitle="Nominal yang paling laku."
-        data={produkTerlarisDashboard}
-        type="produk"
+      <MetricCard
+        label="Profit"
+        value={stats?.totalProfit || 0}
+        prefix="Rp "
+        hint="Estimasi margin bersih"
+        Icon={FiActivity}
+        tone="emerald"
+      />
+
+      <MetricCard
+        label="Top-up Sukses"
+        value={stats?.suksesTopup || 0}
+        hint="Order yang sudah aman"
+        Icon={FiShoppingBag}
+        tone="blue"
+      />
+
+      <MetricCard
+        label="Pending Bayar"
+        value={stats?.pendingBayar || 0}
+        hint="Masih nunggu customer"
+        Icon={FiBell}
+        tone="amber"
       />
     </div>
 
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-      <StatusSnapshot stats={stats} />
+    <AdminCompanionCard
+      stats={stats}
+      onOpenOrders={() => setTabAktif('transaksi')}
+      onOpenVipSync={() => setTabAktif('vip-sync')}
+    />
 
-      <div className="bg-gray-900 p-5 rounded-3xl border border-gray-800">
-        <p className="text-xs text-gray-500 font-bold uppercase">User Google</p>
-        <h3 className="text-3xl font-black text-white mt-1">
-          {stats?.userGoogle || 0}
-        </h3>
-      </div>
-
-      <div className="bg-gray-900 p-5 rounded-3xl border border-gray-800">
-        <p className="text-xs text-gray-500 font-bold uppercase">User Manual</p>
-        <h3 className="text-3xl font-black text-white mt-1">
-          {stats?.userManual || 0}
-        </h3>
-      </div>
-
-      <div className="bg-gray-900 p-5 rounded-3xl border border-gray-800">
-        <p className="text-xs text-gray-500 font-bold uppercase">Login 24 Jam</p>
-        <h3 className="text-3xl font-black text-white mt-1">
-          {stats?.userAktif24Jam || 0}
-        </h3>
-      </div>
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[0.78fr_1.22fr]">
+      <StatusDonutCard stats={stats} />
+      <RevenueLineChart data={trenHarianDashboard} />
     </div>
 
-    <div className="bg-gray-900 rounded-3xl border border-gray-800 shadow-xl overflow-hidden">
-      <div className="p-6 border-b border-gray-800">
-        <h2 className="text-xl font-bold">5 Transaksi Terakhir 🛒</h2>
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      {[
+        { label: 'Total User', value: stats?.totalUser || 0 },
+        { label: 'User Verified', value: stats?.userVerified || 0 },
+        { label: 'Login 24 Jam', value: stats?.userAktif24Jam || 0 }
+      ].map((item) => (
+        <div key={item.label} className="figma-card rounded-[1.1rem] p-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">{item.label}</p>
+          <p className="mt-2 text-xl font-black text-white">
+            <AnimatedNumber value={item.value} />
+          </p>
+        </div>
+      ))}
+    </div>
+
+    <div className="figma-card overflow-hidden rounded-[1.2rem]">
+      <div className="flex flex-col gap-2 p-5 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.20em] text-slate-500">Recent Orders</p>
+          <h2 className="mt-1 text-base font-black text-white">Transaksi paling baru</h2>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setTabAktif('transaksi')}
+          className="rounded-xl bg-purple-600 px-4 py-2 text-[11px] font-black text-white transition hover:bg-purple-500"
+        >
+          Lihat semua
+        </button>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+        <table className="w-full min-w-[760px] text-left text-sm">
           <thead>
-            <tr className="bg-gray-950 text-gray-400 text-xs uppercase tracking-wider font-bold">
-              <th className="p-4">Order ID</th>
-              <th className="p-4">Target Player</th>
-              <th className="p-4">Nominal / Produk</th>
-              <th className="p-4">Bayar</th>
-              <th className="p-4">Top Up</th>
+            <tr className="bg-white/[0.04] text-[11px] font-black uppercase tracking-wider text-slate-500">
+              <th className="px-5 py-4">Order ID</th>
+              <th className="px-5 py-4">Target Player</th>
+              <th className="px-5 py-4">Produk</th>
+              <th className="px-5 py-4">Bayar</th>
+              <th className="px-5 py-4">Top-up</th>
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-gray-800 text-sm">
+          <tbody className="divide-y divide-purple-300/10">
             {stats?.orderanTerbaru?.map((trx) => (
-              <tr key={trx.id} className="hover:bg-gray-800/40">
-                <td className="p-4 font-mono font-bold text-gray-300">
+              <tr key={trx.id} className="transition hover:bg-white/[0.04]">
+                <td className="px-5 py-4 font-mono text-xs font-black text-purple-200">
                   {trx.order_id}
                 </td>
 
-                <td className="p-4 font-bold text-white">
+                <td className="px-5 py-4 font-bold text-white">
                   {trx.id_player}
-                  <span className="text-xs text-gray-500 block">
+                  <span className="block text-xs font-semibold text-slate-500">
                     {trx.zone_player || '-'}
                   </span>
                 </td>
 
-                <td className="p-4 font-bold text-gray-300">
+                <td className="px-5 py-4 font-bold text-slate-200">
                   Rp {Number(trx.harga || 0).toLocaleString('id-ID')}
-                  <span className="text-[10px] text-blue-400 block">
+                  <span className="block text-[10px] font-black text-blue-300">
                     {trx.kode_produk}
                   </span>
                 </td>
 
-                <td className="p-4">
-                  <span
-                    className={`px-2 py-1 rounded-md text-[10px] font-bold ${
-                      trx.status_bayar === 'sukses'
-                        ? 'bg-green-500/10 text-green-400'
-                        : 'bg-yellow-500/10 text-yellow-400'
-                    }`}
-                  >
+                <td className="px-5 py-4">
+                  <span className={`rounded-full border px-3 py-1 text-[10px] font-black ${warnaStatusBayar(trx.status_bayar)}`}>
                     {trx.status_bayar}
                   </span>
                 </td>
 
-                <td className="p-4">
-                  <span
-                    className={`px-2 py-1 rounded-md text-[10px] font-bold ${
-                      trx.status_topup === 'sukses'
-                        ? 'bg-blue-500/10 text-blue-400'
-                        : trx.status_topup === 'proses'
-                          ? 'bg-purple-500/10 text-purple-400'
-                          : 'bg-gray-800 text-gray-500'
-                    }`}
-                  >
+                <td className="px-5 py-4">
+                  <span className={`rounded-full border px-3 py-1 text-[10px] font-black ${warnaStatusTopup(trx.status_topup)}`}>
                     {trx.status_topup}
                   </span>
                 </td>
@@ -3112,7 +3825,7 @@ const handleHapusRequestGame = async (item) => {
 
             {(!stats?.orderanTerbaru || stats.orderanTerbaru.length === 0) && (
               <tr>
-                <td colSpan={5} className="p-6 text-center text-sm font-bold text-gray-500">
+                <td colSpan={5} className="px-5 py-8 text-center text-sm font-bold text-slate-500">
                   Belum ada transaksi terbaru.
                 </td>
               </tr>
@@ -3127,12 +3840,12 @@ const handleHapusRequestGame = async (item) => {
         {/* TAB TRANSAKSI */}
         {tabAktif === 'transaksi' && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 grid grid-cols-1 xl:grid-cols-[380px_minmax(0,1fr)] gap-6 items-start">
-            <aside className="2xl:sticky 2xl:top-24 2xl:max-h-[calc(100vh-7rem)] 2xl:overflow-y-auto">
+            <aside className="premium-scrollbar 2xl:sticky 2xl:top-24 2xl:max-h-[calc(100vh-7rem)] 2xl:overflow-y-auto">
                     {/* PUSAT TINDAKAN */}
                     <div className="bg-gray-900 border border-gray-800 rounded-3xl shadow-xl overflow-hidden">
                       <div className="p-6 border-b border-gray-800 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div>
-                          <h2 className="text-xl font-black">🚨 Pusat Tindakan</h2>
+                          <h2 className="text-xl font-black">Pusat Tindakan</h2>
                           <p className="text-xs text-gray-500 mt-1">
                             Order yang perlu dicek admin biar gak nyangkut kelamaan.
                           </p>
@@ -3148,21 +3861,21 @@ const handleHapusRequestGame = async (item) => {
                       </div>
 
                       <div className="grid grid-cols-1 gap-3 p-6">
-                        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4">
+                        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
                           <p className="text-xs text-red-300 font-black uppercase">Top-up Gagal</p>
                           <h3 className="text-3xl font-black text-red-400 mt-1">
                             {alerts?.ringkasan?.topupGagal || 0}
                           </h3>
                         </div>
 
-                        <div className="bg-purple-500/10 border border-purple-500/20 rounded-2xl p-4">
+                        <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4">
                           <p className="text-xs text-purple-300 font-black uppercase">Proses Kelamaan</p>
                           <h3 className="text-3xl font-black text-purple-400 mt-1">
                             {alerts?.ringkasan?.prosesKelamaan || 0}
                           </h3>
                         </div>
 
-                        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl p-4">
+                        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
                           <p className="text-xs text-yellow-300 font-black uppercase">Pending Lama</p>
                           <h3 className="text-3xl font-black text-yellow-400 mt-1">
                             {alerts?.ringkasan?.pendingLama || 0}
@@ -3175,12 +3888,12 @@ const handleHapusRequestGame = async (item) => {
                           {alerts.topupGagal?.length > 0 && (
                             <div>
                               <h3 className="text-sm font-black text-red-400 mb-3">
-                                🚨 Top-up gagal, perlu dicek
+                                Top-up gagal, perlu dicek
                               </h3>
 
                               <div className="space-y-3">
                                 {alerts.topupGagal.map((trx) => (
-                                  <div key={trx.order_id} className="bg-slate-950 border border-gray-800 rounded-2xl p-4 flex flex-col gap-4">
+                                  <div key={trx.order_id} className="bg-slate-950 border border-gray-800 rounded-xl p-4 flex flex-col gap-4">
                                     <div>
                                       <p className="font-mono text-xs text-cyan-400 font-black break-all">
                                         {trx.order_id}
@@ -3201,7 +3914,7 @@ const handleHapusRequestGame = async (item) => {
                                         onClick={() => handleDetailTransaksi(trx)}
                                         className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-white text-xs font-black"
                                       >
-                                        👁️ Detail
+                                        Detail
                                       </button>
 
                                       <button
@@ -3215,14 +3928,14 @@ const handleHapusRequestGame = async (item) => {
                                       >
                                         {loadingAksiTransaksi === `${trx.order_id}-cek-provider`
                                           ? 'Cek...'
-                                          : '🔄 Cek Provider'}
+                                          : 'Cek Provider'}
                                       </button>
 
                                       <button
                                         onClick={() => handleRetryTopup(trx)}
                                         className="px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-black"
                                       >
-                                        🚀 Retry
+                                        Retry
                                       </button>
 
                                       <button
@@ -3252,7 +3965,7 @@ const handleHapusRequestGame = async (item) => {
 
                               <div className="space-y-3">
                                 {alerts.prosesKelamaan.map((trx) => (
-                                  <div key={trx.order_id} className="bg-slate-950 border border-gray-800 rounded-2xl p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                                  <div key={trx.order_id} className="bg-slate-950 border border-gray-800 rounded-xl p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                                     <div>
                                       <p className="font-mono text-xs text-cyan-400 font-black break-all">
                                         {trx.order_id}
@@ -3273,7 +3986,7 @@ const handleHapusRequestGame = async (item) => {
                                         onClick={() => handleDetailTransaksi(trx)}
                                         className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-white text-xs font-black"
                                       >
-                                        👁️ Detail
+                                        Detail
                                       </button>
 
                                       <button
@@ -3287,14 +4000,14 @@ const handleHapusRequestGame = async (item) => {
                                       >
                                         {loadingAksiTransaksi === `${trx.order_id}-cek-provider`
                                           ? 'Cek...'
-                                          : '🔄 Cek Provider'}
+                                          : 'Cek Provider'}
                                       </button>
 
                                       <button
                                         onClick={() => handleRetryTopup(trx)}
                                         className="px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-black"
                                       >
-                                        🚀 Retry
+                                        Retry
                                       </button>
 
                                       <button
@@ -3307,7 +4020,7 @@ const handleHapusRequestGame = async (item) => {
                                         }
                                         className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-red-500 text-white text-xs font-black"
                                       >
-                                        ❌ Gagalkan
+                                        Gagalkan
                                       </button>
                                     </div>
                                   </div>
@@ -3324,7 +4037,7 @@ const handleHapusRequestGame = async (item) => {
 
                               <div className="space-y-3">
                                 {alerts.pendingLama.map((trx) => (
-                                  <div key={trx.order_id} className="bg-slate-950 border border-gray-800 rounded-2xl p-4 flex flex-col gap-4">
+                                  <div key={trx.order_id} className="bg-slate-950 border border-gray-800 rounded-xl p-4 flex flex-col gap-4">
                                     <div>
                                       <p className="font-mono text-xs text-cyan-400 font-black break-all">
                                         {trx.order_id}
@@ -3345,7 +4058,7 @@ const handleHapusRequestGame = async (item) => {
                                         onClick={() => handleDetailTransaksi(trx)}
                                         className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-white text-xs font-black"
                                       >
-                                        👁️ Detail
+                                        Detail
                                       </button>
 
                                       <button
@@ -3369,7 +4082,7 @@ const handleHapusRequestGame = async (item) => {
                         </div>
                       ) : (
                         <div className="px-6 pb-6">
-                          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-5 text-emerald-300 font-bold text-sm">
+                          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-5 text-emerald-300 font-bold text-sm">
                             ✅ Aman bree. Belum ada order yang butuh tindakan.
                           </div>
                         </div>
@@ -3516,11 +4229,22 @@ const handleHapusRequestGame = async (item) => {
                 </div>
              ) : (
   <div className="p-4 space-y-3">
-    {daftarTransaksiPrioritas.map((trx) => (
+    {daftarTransaksiPrioritas.map((trx, index) => {
+      const prioritas = metaPrioritasTransaksi(trx);
+
+      return (
       <div
         key={trx.id}
-        className="lux-card lux-hover rounded-2xl border border-gray-800 p-4 transition-all"
+        className={`lux-card lux-hover shine-card relative overflow-hidden rounded-xl border p-4 transition-all ${prioritas.ring}`}
       >
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-wider ${prioritas.badge}`}>
+            {prioritas.label}
+          </span>
+          <span className="rounded-full border border-purple-300/10 bg-white/5 px-3 py-1 text-[10px] font-black text-slate-400">
+            Queue #{index + 1}
+          </span>
+        </div>
         <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
           
           {/* INFO UTAMA */}
@@ -3613,14 +4337,14 @@ const handleHapusRequestGame = async (item) => {
                 onClick={() => handleDetailTransaksi(trx)}
                 className="px-3 py-2 rounded-xl bg-gray-800 text-gray-200 text-xs font-black hover:bg-gray-700 transition-all"
               >
-                👁️ Detail
+                Detail
               </button>
 
               <button
                 onClick={() => handleEditCatatan(trx)}
                 className="px-3 py-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-black hover:bg-indigo-600 hover:text-white transition-all"
               >
-                📝 Catatan
+                Catatan
               </button>
 
               <button
@@ -3634,7 +4358,7 @@ const handleHapusRequestGame = async (item) => {
               >
                 {loadingAksiTransaksi === `${trx.order_id}-cek-provider`
                   ? 'Cek...'
-                  : '🔄 Cek Provider'}
+                  : 'Cek Provider'}
               </button>
 
               <button
@@ -3646,7 +4370,7 @@ const handleHapusRequestGame = async (item) => {
                 }
                 className="px-3 py-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 text-xs font-black hover:bg-purple-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {loadingAksiTransaksi === `${trx.order_id}-retry` ? 'Retry...' : '🚀 Retry'}
+                {loadingAksiTransaksi === `${trx.order_id}-retry` ? 'Retry...' : 'Retry'}
               </button>
 
               <button
@@ -3660,7 +4384,7 @@ const handleHapusRequestGame = async (item) => {
                 disabled={trx.status_bayar === 'sukses'}
                 className="px-3 py-2 rounded-xl bg-green-500/10 text-green-400 border border-green-500/20 text-xs font-black hover:bg-green-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                💰 Bayar OK
+                Bayar OK
               </button>
 
               <button
@@ -3674,7 +4398,7 @@ const handleHapusRequestGame = async (item) => {
                 disabled={trx.status_topup === 'sukses'}
                 className="px-3 py-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs font-black hover:bg-blue-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                ✅ Topup OK
+                Topup OK
               </button>
 
               <button
@@ -3688,7 +4412,7 @@ const handleHapusRequestGame = async (item) => {
                 disabled={trx.status_topup === 'gagal'}
                 className="px-3 py-2 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-black hover:bg-blue-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                ❌ Gagal
+                Gagal
               </button>
               <button
                 onClick={() => handleHapusTransaksi(trx)}
@@ -3697,13 +4421,14 @@ const handleHapusRequestGame = async (item) => {
               >
                 {loadingAksiTransaksi === `${trx.order_id}-delete`
                   ? 'Hapus...'
-                  : '🗑️ Hapus Riwayat'}
+                  : 'Hapus Riwayat'}
               </button>
             </div>
           </div>
         </div>
       </div>
-    ))}
+      );
+    })}
   </div>
 )}
 
@@ -3740,12 +4465,12 @@ const handleHapusRequestGame = async (item) => {
  
         {/* TAB GAME */}
         {tabAktif === 'game' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 grid grid-cols-1 gap-4 lg:grid-cols-[360px_minmax(0,1fr)] lg:h-[calc(100vh-9rem)] lg:overflow-hidden">
 
-            <div className="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl h-fit lg:sticky lg:top-24">
+            <div className="h-fit rounded-2xl border border-gray-800 bg-gray-900 p-5 shadow-xl lg:h-full lg:overflow-y-auto lg:pr-4 no-scrollbar">
               <div className="flex items-center justify-between mb-6 border-b border-gray-800 pb-4">
                 <h2 className="text-xl font-black">
-                  {modeEditGame ? '✏️ Edit Game' : '🎮 Tambah Game'}
+                  {modeEditGame ? 'Edit Game' : 'Tambah Game'}
                 </h2>
 
                 {modeEditGame && (
@@ -3787,7 +4512,7 @@ const handleHapusRequestGame = async (item) => {
                 <div>
                   <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Upload Gambar</label>
 
-                  <div className="bg-gray-950 border border-gray-700 rounded-2xl p-4">
+                  <div className="bg-gray-950 border border-gray-700 rounded-xl p-4">
                     <input
                       key={fileInputKey}
                       type="file"
@@ -3801,7 +4526,7 @@ const handleHapusRequestGame = async (item) => {
                     </p>
 
                     {previewGambar && (
-                      <div className="mt-4 rounded-2xl overflow-hidden border border-gray-800 bg-gray-900">
+                      <div className="mt-4 rounded-xl overflow-hidden border border-gray-800 bg-gray-900">
                         <img
                           src={previewGambar}
                           alt="Preview game"
@@ -3968,7 +4693,7 @@ const handleHapusRequestGame = async (item) => {
               </form>
             </div>
 
-            <div className="lg:col-span-2 bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl">
+            <div className="min-h-0 rounded-2xl border border-gray-800 bg-gray-900 p-5 shadow-xl lg:h-full lg:overflow-hidden lg:flex lg:flex-col">
               <div className="flex items-center justify-between mb-6 border-b border-gray-800 pb-4">
                 <div>
                   <h2 className="text-xl font-black">🕹️ Library Game</h2>
@@ -3976,14 +4701,14 @@ const handleHapusRequestGame = async (item) => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2">
                 {daftarGame.map((game) => (
                   <div
                     key={game.id}
-                    className="bg-gray-950 border border-gray-800 p-4 rounded-2xl hover:border-purple-500/50 transition-all group"
+                    className="bg-gray-950 border border-gray-800 p-4 rounded-xl hover:border-purple-500/50 transition-all group"
                   >
                     <div className="flex gap-4">
-                      <div className="w-16 h-16 rounded-2xl bg-gray-900 border border-gray-800 overflow-hidden shrink-0 flex items-center justify-center">
+                      <div className="w-16 h-16 rounded-xl bg-gray-900 border border-gray-800 overflow-hidden shrink-0 flex items-center justify-center">
                         {game.gambar ? (
                           <img src={game.gambar} alt={game.nama} className="w-full h-full object-cover" />
                         ) : (
@@ -4063,14 +4788,22 @@ const handleHapusRequestGame = async (item) => {
           </div>
         )}
 
+        {/* TAB VIP SYNC */}
+        {tabAktif === 'vip-sync' && (
+          <AdminVipSyncPanel
+            daftarGame={daftarGame}
+            onPilihProduk={handlePakaiProdukVipKeForm}
+          />
+        )}
+
         {/* TAB PRODUK */}
         {tabAktif === 'produk' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 grid grid-cols-1 gap-4 lg:grid-cols-[360px_minmax(0,1fr)] lg:h-[calc(100vh-9rem)] lg:overflow-hidden">
 
-            <div className="bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl h-fit lg:sticky lg:top-24">
+            <div className="h-fit rounded-2xl border border-gray-800 bg-gray-900 p-5 shadow-xl lg:h-full lg:overflow-y-auto lg:pr-4 no-scrollbar">
               <div className="flex items-center justify-between mb-6 border-b border-gray-800 pb-4">
                 <h2 className="text-xl font-black">
-                  {modeEditProduk ? '✏️ Edit Produk' : '✨ Tambah Produk'}
+                  {modeEditProduk ? 'Edit Produk' : '✨ Tambah Produk'}
                 </h2>
 
                 {modeEditProduk && (
@@ -4234,7 +4967,7 @@ const handleHapusRequestGame = async (item) => {
   onChange={(e) =>
     setFormProduk({ ...formProduk, harga_coret: e.target.value })
   }
-  className="w-full rounded-2xl border border-gray-700 bg-gray-900 px-4 py-3 text-white outline-none focus:border-blue-500"
+  className="w-full rounded-xl border border-gray-700 bg-gray-900 px-4 py-3 text-white outline-none focus:border-blue-500"
 />
                 </div>
 
@@ -4278,7 +5011,7 @@ const handleHapusRequestGame = async (item) => {
               </form>
             </div>
 
-            <div className="lg:col-span-2 bg-gray-900 border border-gray-800 rounded-3xl p-6 shadow-xl">
+            <div className="min-h-0 rounded-2xl border border-gray-800 bg-gray-900 p-5 shadow-xl lg:h-full lg:overflow-hidden lg:flex lg:flex-col">
               <div className="mb-6 border-b border-gray-800 pb-4 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
                   <div>
                     <h2 className="text-xl font-black">📦 Etalase Produk Aktif</h2>
@@ -4307,11 +5040,11 @@ const handleHapusRequestGame = async (item) => {
                   </div>
                 </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2">
                 {produkTerfilter.map((item) => (
                   <div
                     key={item.id}
-                    className="bg-gray-950 border border-gray-800 p-4 rounded-2xl hover:border-cyan-500/50 transition-all group"
+                    className="bg-gray-950 border border-gray-800 p-4 rounded-xl hover:border-cyan-500/50 transition-all group"
                   >
             
                     <div className="flex justify-between items-start gap-4">
@@ -4501,7 +5234,7 @@ const handleHapusRequestGame = async (item) => {
             Banner Promo / Foto Desain
           </label>
 
-          <div className="rounded-2xl border border-gray-800 bg-slate-950 p-4">
+          <div className="rounded-xl border border-gray-800 bg-slate-950 p-4">
             <input
               key={promoFileInputKey}
               type="file"
@@ -4525,7 +5258,7 @@ const handleHapusRequestGame = async (item) => {
             />
 
             {(previewPromo || formPromo.image_url) && (
-              <div className="mt-4 overflow-hidden rounded-2xl border border-gray-800 bg-gray-900">
+              <div className="mt-4 overflow-hidden rounded-xl border border-gray-800 bg-gray-900">
                 <img
                   src={previewPromo || formPromo.image_url}
                   alt="Preview banner promo"
@@ -4581,12 +5314,12 @@ const handleHapusRequestGame = async (item) => {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-gray-800 bg-slate-950 p-4">
+        <div className="rounded-xl border border-gray-800 bg-slate-950 p-4">
           <p className="text-xs font-black text-gray-500 mb-2">
             Preview Mini
           </p>
 
-          <div className={`overflow-hidden rounded-2xl bg-gradient-to-br ${formPromo.gradient}`}>
+          <div className={`overflow-hidden rounded-xl bg-gradient-to-br ${formPromo.gradient}`}>
             {(previewPromo || formPromo.image_url) ? (
               <img
                 src={previewPromo || formPromo.image_url}
@@ -4660,7 +5393,7 @@ const handleHapusRequestGame = async (item) => {
           Ngambil promo...
         </div>
       ) : daftarPromo.length === 0 ? (
-        <div className="rounded-2xl border border-gray-800 bg-slate-950 p-8 text-center text-gray-500 font-bold">
+        <div className="rounded-xl border border-gray-800 bg-slate-950 p-8 text-center text-gray-500 font-bold">
           Belum ada promo bre.
         </div>
       ) : (
@@ -4668,7 +5401,7 @@ const handleHapusRequestGame = async (item) => {
           {daftarPromo.map((promo) => (
             <div
               key={promo.id}
-              className="rounded-2xl border border-gray-800 bg-slate-950 p-4"
+              className="rounded-xl border border-gray-800 bg-slate-950 p-4"
             >
               <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
                 <div className="min-w-0">
@@ -4691,7 +5424,7 @@ const handleHapusRequestGame = async (item) => {
                   </div>
 
                   {promo.image_url && (
-                    <div className="mb-3 overflow-hidden rounded-2xl border border-gray-800 bg-gray-900">
+                    <div className="mb-3 overflow-hidden rounded-xl border border-gray-800 bg-gray-900">
                       <img
                         src={promo.image_url}
                         alt={promo.title}
@@ -4753,7 +5486,7 @@ const handleHapusRequestGame = async (item) => {
                   <p className="text-xs font-black uppercase tracking-[0.24em] text-indigo-300/80">
                     Payment Control
                   </p>
-                  <h2 className="mt-2 text-2xl font-black text-white">💳 Setting Metode Bayar</h2>
+                  <h2 className="mt-2 text-xl font-black text-white">💳 Setting Metode Bayar</h2>
                   <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
                     Atur metode pembayaran tanpa deploy ulang. Status aktif bakal muncul dan bisa dipakai user,
                     sedangkan maintenance/coming soon/nonaktif otomatis dikunci di kasir dan backend checkout.
@@ -4764,7 +5497,7 @@ const handleHapusRequestGame = async (item) => {
                   type="button"
                   onClick={ambilMetodeBayarAdmin}
                   disabled={loadingMetodeBayarAdmin}
-                  className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-black text-slate-200 transition hover:bg-white/10 disabled:opacity-50"
+                  className="rounded-xl border border-purple-300/10 bg-white/[0.04] px-4 py-3 text-sm font-black text-slate-200 transition hover:bg-white/10 disabled:opacity-50"
                 >
                   {loadingMetodeBayarAdmin ? 'Refresh...' : '🔄 Refresh'}
                 </button>
@@ -4780,11 +5513,11 @@ const handleHapusRequestGame = async (item) => {
                 {Object.entries(metodeBayarAdminByGrup).map(([grup, items]) => (
                   <div key={grup} className="space-y-4">
                     <div className="flex items-center gap-3">
-                      <div className="h-px flex-1 bg-slate-800" />
+                      <div className="h-px flex-1 bg-purple-500/20" />
                       <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-400">
                         {grup}
                       </p>
-                      <div className="h-px flex-1 bg-slate-800" />
+                      <div className="h-px flex-1 bg-purple-500/20" />
                     </div>
 
                     <div className="grid gap-4 lg:grid-cols-2">
@@ -4799,7 +5532,7 @@ const handleHapusRequestGame = async (item) => {
                           >
                             <div className="flex items-start justify-between gap-4">
                               <div className="flex items-start gap-3">
-                                <div className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-700 bg-white">
+                                <div className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-700 bg-white">
                                   {item.logo ? (
                                     <img
                                       src={item.logo}
@@ -4853,7 +5586,7 @@ const handleHapusRequestGame = async (item) => {
                                 <select
                                   name="status_metode"
                                   defaultValue={item.status_metode}
-                                  className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm font-bold text-white outline-none focus:border-indigo-400"
+                                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm font-bold text-white outline-none focus:border-indigo-400"
                                 >
                                   <option value="aktif">Aktif</option>
                                   <option value="maintenance">Maintenance</option>
@@ -4867,7 +5600,7 @@ const handleHapusRequestGame = async (item) => {
                                 <select
                                   name="rekomendasi"
                                   defaultValue={item.rekomendasi ? 1 : 0}
-                                  className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm font-bold text-white outline-none focus:border-indigo-400"
+                                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm font-bold text-white outline-none focus:border-indigo-400"
                                 >
                                   <option value="0">Biasa</option>
                                   <option value="1">Rekomendasi</option>
@@ -4881,7 +5614,7 @@ const handleHapusRequestGame = async (item) => {
                                   type="number"
                                   min="0"
                                   defaultValue={item.biaya}
-                                  className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm font-bold text-white outline-none focus:border-indigo-400"
+                                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm font-bold text-white outline-none focus:border-indigo-400"
                                 />
                               </label>
 
@@ -4892,7 +5625,7 @@ const handleHapusRequestGame = async (item) => {
                                   type="number"
                                   min="0"
                                   defaultValue={item.minimal}
-                                  className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm font-bold text-white outline-none focus:border-indigo-400"
+                                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm font-bold text-white outline-none focus:border-indigo-400"
                                 />
                               </label>
 
@@ -4902,7 +5635,7 @@ const handleHapusRequestGame = async (item) => {
                                   name="deskripsi"
                                   defaultValue={item.desc}
                                   maxLength={255}
-                                  className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm font-bold text-white outline-none focus:border-indigo-400"
+                                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm font-bold text-white outline-none focus:border-indigo-400"
                                 />
                               </label>
 
@@ -4913,7 +5646,7 @@ const handleHapusRequestGame = async (item) => {
                                   type="number"
                                   min="0"
                                   defaultValue={item.sort_order}
-                                  className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm font-bold text-white outline-none focus:border-indigo-400"
+                                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm font-bold text-white outline-none focus:border-indigo-400"
                                 />
                               </label>
 
@@ -4921,7 +5654,7 @@ const handleHapusRequestGame = async (item) => {
                                 <button
                                   type="submit"
                                   disabled={sedangLoading}
-                                  className="w-full rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-indigo-950/30 transition hover:-translate-y-0.5 hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                  className="w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-indigo-950/30 transition hover:-translate-y-0.5 hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                   {sedangLoading ? 'Nyimpen...' : '💾 Simpan'}
                                 </button>
@@ -4956,7 +5689,7 @@ const handleHapusRequestGame = async (item) => {
         <p className="text-[11px] font-black uppercase tracking-wider text-gray-500">
           Total
         </p>
-        <h3 className="mt-1 text-2xl font-black text-white">
+        <h3 className="mt-1 text-xl font-black text-white">
           {statsRequestGame?.total || 0}
         </h3>
       </div>
@@ -5019,7 +5752,7 @@ const handleHapusRequestGame = async (item) => {
             }))
           }
           placeholder="Cari nama game, kontak, atau catatan..."
-          className="rounded-2xl border border-gray-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-blue-500"
+          className="rounded-xl border border-gray-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-blue-500"
         />
 
         <select
@@ -5030,7 +5763,7 @@ const handleHapusRequestGame = async (item) => {
               status: e.target.value
             }))
           }
-          className="rounded-2xl border border-gray-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-blue-500"
+          className="rounded-xl border border-gray-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-blue-500"
         >
           <option value="all">Semua Status</option>
           <option value="baru">Baru</option>
@@ -5042,7 +5775,7 @@ const handleHapusRequestGame = async (item) => {
         <button
           type="button"
           onClick={() => ambilRequestGame(filterRequestGame)}
-          className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white transition hover:bg-blue-500"
+          className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-black text-white transition hover:bg-blue-500"
         >
           Filter
         </button>
@@ -5095,7 +5828,7 @@ const handleHapusRequestGame = async (item) => {
                 </h3>
 
                 <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <div className="rounded-2xl border border-gray-800 bg-slate-950/60 p-4">
+                  <div className="rounded-xl border border-gray-800 bg-slate-950/60 p-4">
                     <p className="text-[11px] font-black uppercase tracking-wider text-gray-500">
                       Kontak
                     </p>
@@ -5104,7 +5837,7 @@ const handleHapusRequestGame = async (item) => {
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border border-gray-800 bg-slate-950/60 p-4">
+                  <div className="rounded-xl border border-gray-800 bg-slate-950/60 p-4">
                     <p className="text-[11px] font-black uppercase tracking-wider text-gray-500">
                       Catatan
                     </p>
@@ -5122,7 +5855,7 @@ const handleHapusRequestGame = async (item) => {
                   onChange={(e) =>
                     handleUpdateStatusRequestGame(item, e.target.value)
                   }
-                  className="rounded-2xl border border-gray-700 bg-slate-950 px-4 py-3 text-sm font-bold text-white outline-none focus:border-blue-500 disabled:opacity-60"
+                  className="rounded-xl border border-gray-700 bg-slate-950 px-4 py-3 text-sm font-bold text-white outline-none focus:border-blue-500 disabled:opacity-60"
                 >
                   <option value="baru">Baru</option>
                   <option value="diproses">Diproses</option>
@@ -5137,7 +5870,7 @@ const handleHapusRequestGame = async (item) => {
                     )}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="rounded-2xl bg-green-600 px-4 py-3 text-center text-sm font-black text-white transition hover:bg-green-500"
+                    className="rounded-xl bg-green-600 px-4 py-3 text-center text-sm font-black text-white transition hover:bg-green-500"
                   >
                     Chat User
                   </a>
@@ -5147,7 +5880,7 @@ const handleHapusRequestGame = async (item) => {
                   type="button"
                   disabled={loadingAksiRequestGame === item.id}
                   onClick={() => handleHapusRequestGame(item)}
-                  className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-black text-red-300 transition hover:bg-red-500/20 disabled:opacity-60"
+                  className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-black text-red-300 transition hover:bg-red-500/20 disabled:opacity-60"
                 >
                   Hapus
                 </button>
@@ -5159,6 +5892,15 @@ const handleHapusRequestGame = async (item) => {
     )}
   </div>
 )}
+          </main>
+
+          <AdminMascotDock
+            tabAktif={tabAktif}
+            stats={stats}
+            onOpenOrders={() => setTabAktif('transaksi')}
+            onOpenVipSync={() => setTabAktif('vip-sync')}
+          />
+        </section>
       </div>
     </div>
   );

@@ -161,7 +161,7 @@ export default function NavbarUI({ session }) {
 
   const [open, setOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-
+  if (pathname?.startsWith("/admin")) return null;
   const namaUser = useMemo(() => getNamaUser(session), [session]);
   const inisialUser = useMemo(() => getInisialUser(namaUser), [namaUser]);
   const isCEO = session?.user?.email === EMAIL_CEO;
