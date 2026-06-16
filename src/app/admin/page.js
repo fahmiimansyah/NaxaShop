@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Swal from 'sweetalert2';
-import { FiActivity, FiArrowRight, FiBarChart2, FiBell, FiBox, FiCreditCard, FiGift, FiGrid, FiImage, FiMenu, FiMessageSquare, FiRefreshCw, FiSearch, FiSettings, FiShoppingBag, FiTool, FiX } from 'react-icons/fi';
+import { FiActivity, FiArrowRight, FiBarChart2, FiBell, FiBox, FiCreditCard, FiGift, FiGrid, FiHome, FiImage, FiMenu, FiMessageSquare, FiRefreshCw, FiSearch, FiSettings, FiShoppingBag, FiTool, FiX } from 'react-icons/fi';
 import AdminVoucherPanel from '../components/AdminVoucherPanel';
 import AdminMaintenancePanel from '../components/AdminMaintenancePanel';
 import AdminVipSyncPanel from '../components/AdminVipSyncPanel';
@@ -841,6 +841,15 @@ export default function DashboardAdmin() {
   const [notifPanelOpen, setNotifPanelOpen] = useState(false);
   const [mobileAdminMenuOpen, setMobileAdminMenuOpen] = useState(false);
   const [mobileAdminSearchOpen, setMobileAdminSearchOpen] = useState(false);
+  const [vipSyncState, setVipSyncState] = useState({
+    filterGame: '',
+    filterStatus: 'available',
+    search: '',
+    hasil: null,
+    error: '',
+    loading: false,
+    lastSyncedAt: null
+  });
   
   // State Data
   const [stats, setStats] = useState(null);
@@ -3486,6 +3495,15 @@ const handleHapusRequestGame = async (item) => {
 
   <button
     type="button"
+    onClick={() => router.push('/')}
+    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-slate-200 transition hover:bg-white/10 hover:text-white"
+    aria-label="Kembali ke toko"
+  >
+    <FiHome />
+  </button>
+
+  <button
+    type="button"
     onClick={ambilDataSultan}
     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-slate-200 transition hover:bg-white/10"
     aria-label="Sync dashboard"
@@ -3493,6 +3511,15 @@ const handleHapusRequestGame = async (item) => {
     <FiRefreshCw />
   </button>
 </div>
+
+                <button
+                  type="button"
+                  onClick={() => router.push('/')}
+                  className="hidden h-10 items-center justify-center gap-2 rounded-xl bg-white/[0.07] px-3 text-xs font-black text-slate-200 transition hover:bg-white/10 hover:text-white lg:flex"
+                >
+                  <FiHome />
+                  Toko
+                </button>
 
                 <div className="relative shrink-0">
                   <button
@@ -3629,6 +3656,17 @@ const handleHapusRequestGame = async (item) => {
             aria-label="Tutup menu"
           >
             <FiX />
+          </button>
+        </div>
+
+        <div className="relative px-3 pt-3">
+          <button
+            type="button"
+            onClick={() => router.push('/')}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-purple-300/10 bg-white/[0.06] px-4 py-3 text-xs font-black text-slate-200 transition hover:bg-white/10 hover:text-white"
+          >
+            <FiHome />
+            Kembali ke Toko
           </button>
         </div>
 
@@ -4793,6 +4831,8 @@ const handleHapusRequestGame = async (item) => {
           <AdminVipSyncPanel
             daftarGame={daftarGame}
             onPilihProduk={handlePakaiProdukVipKeForm}
+            vipSyncState={vipSyncState}
+            setVipSyncState={setVipSyncState}
           />
         )}
 

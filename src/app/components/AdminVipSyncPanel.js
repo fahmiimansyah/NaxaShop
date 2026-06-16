@@ -8,8 +8,19 @@ import {
   FiCheckCircle,
   FiRefreshCw,
   FiSearch,
+  FiTrash2,
   FiZap
 } from 'react-icons/fi';
+
+const defaultVipSyncPanelState = {
+  filterGame: '',
+  filterStatus: 'available',
+  search: '',
+  loading: false,
+  hasil: null,
+  error: '',
+  lastSyncedAt: null
+};
 
 function formatRupiah(value) {
   return `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
@@ -56,15 +67,57 @@ function cariGameNaxa(item, daftarGame = []) {
   });
 }
 
-export default function AdminVipSyncPanel({ daftarGame = [], onPilihProduk }) {
-  const [filterGame, setFilterGame] = useState('');
-  const [filterStatus, setFilterStatus] = useState('available');
-  const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [hasil, setHasil] = useState(null);
-  const [error, setError] = useState('');
+function labelWaktuSync(value) {
+  if (!value) return '';
+
+  const selisihMenit = Math.max(0, Math.floor((Date.now() - Number(value)) / 60000));
+
+  if (selisihMenit <= 0) return 'baru aja';
+  if (selisihMenit < 60) return `${selisihMenit} menit lalu`;
+
+  const jam = Math.floor(selisihMenit / 60);
+  return `${jam} jam lalu`;
+}
+
+export default function AdminVipSyncPanel({
+  daftarGame = [],
+  onPilihProduk,
+  vipSyncState,
+  setVipSyncState
+}) {
+  const [localState, setLocalState] = useState(defaultVipSyncPanelState);
+  const isControlled = typeof setVipSyncState === 'function';
+  const state = {
+    ...defaultVipSyncPanelState,
+    ...(isControlled ? vipSyncState : localState)
+  };
+
+  const updateVipSyncState = (patch) => {
+    const updater = (prev) => ({
+      ...defaultVipSyncPanelState,
+      ...(prev || {}),
+      ...(typeof patch === 'function' ? patch(prev || {}) : patch)
+    });
+
+    if (isControlled) {
+      setVipSyncState(updater);
+    } else {
+      setLocalState(updater);
+    }
+  };
+
+  const {
+    filterGame,
+    filterStatus,
+    search,
+    loading,
+    hasil,
+    error,
+    lastSyncedAt
+  } = state;
 
   const produkPreview = hasil?.data || [];
+  const lastSyncedLabel = labelWaktuSync(lastSyncedAt);
 
   const produkTerfilter = useMemo(() => {
     const keyword = normalisasi(search);
@@ -86,8 +139,7 @@ export default function AdminVipSyncPanel({ daftarGame = [], onPilihProduk }) {
 
   async function tarikProdukVip() {
     try {
-      setLoading(true);
-      setError('');
+      updateVipSyncState({ loading: true, error: '' });
 
       const response = await fetch('/api/admin/sync-vipreseller/services', {
         method: 'POST',
@@ -106,12 +158,22 @@ export default function AdminVipSyncPanel({ daftarGame = [], onPilihProduk }) {
         throw new Error(data.pesan || 'Gagal tarik produk VIPReseller.');
       }
 
-      setHasil(data);
+      updateVipSyncState({
+        hasil: data,
+        error: '',
+        loading: false,
+        lastSyncedAt: Date.now()
+      });
     } catch (err) {
-      setError(err.message || 'Gagal tarik produk VIPReseller.');
-    } finally {
-      setLoading(false);
+      updateVipSyncState({
+        error: err.message || 'Gagal tarik produk VIPReseller.',
+        loading: false
+      });
     }
+  }
+
+  function bersihkanPreview() {
+    updateVipSyncState(defaultVipSyncPanelState);
   }
 
   return (
@@ -134,17 +196,37 @@ export default function AdminVipSyncPanel({ daftarGame = [], onPilihProduk }) {
             <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-400">
               Ambil katalog langsung dari API provider, cek dulu di preview, baru pilih produk yang mau dimasukin ke form produk NaXaShop.
             </p>
+
+            {hasil && (
+              <p className="mt-3 inline-flex rounded-full border border-emerald-400/15 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-black text-emerald-200">
+                Preview masih keinget walau pindah tab admin{lastSyncedLabel ? ` • sync ${lastSyncedLabel}` : ''}
+              </p>
+            )}
           </div>
 
-          <button
-            type="button"
-            onClick={tarikProdukVip}
-            disabled={loading}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-purple-950/35 transition hover:-translate-y-0.5 hover:from-purple-500 hover:to-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <FiRefreshCw className={loading ? 'animate-spin' : ''} />
-            {loading ? 'Lagi narik...' : 'Tarik Produk'}
-          </button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            {hasil && (
+              <button
+                type="button"
+                onClick={bersihkanPreview}
+                disabled={loading}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.06] px-5 py-3 text-sm font-black text-slate-200 transition hover:bg-white/[0.10] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <FiTrash2 />
+                Bersihkan
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={tarikProdukVip}
+              disabled={loading}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-purple-950/35 transition hover:-translate-y-0.5 hover:from-purple-500 hover:to-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <FiRefreshCw className={loading ? 'animate-spin' : ''} />
+              {loading ? 'Lagi narik...' : hasil ? 'Refresh Produk' : 'Tarik Produk'}
+            </button>
+          </div>
         </div>
 
         <div className="relative mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_190px]">
@@ -154,7 +236,7 @@ export default function AdminVipSyncPanel({ daftarGame = [], onPilihProduk }) {
             </label>
             <input
               value={filterGame}
-              onChange={(e) => setFilterGame(e.target.value)}
+              onChange={(e) => updateVipSyncState({ filterGame: e.target.value })}
               placeholder="Kosongin dulu / contoh: Mobile Legends"
               className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm font-bold text-white outline-none transition placeholder:text-slate-600 focus:border-purple-400/60 focus:bg-slate-950"
             />
@@ -166,7 +248,7 @@ export default function AdminVipSyncPanel({ daftarGame = [], onPilihProduk }) {
             </label>
             <select
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
+              onChange={(e) => updateVipSyncState({ filterStatus: e.target.value })}
               className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm font-black text-white outline-none transition focus:border-purple-400/60 focus:bg-slate-950"
             >
               <option value="available">Available</option>
@@ -210,7 +292,7 @@ export default function AdminVipSyncPanel({ daftarGame = [], onPilihProduk }) {
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Preview produk</p>
             <h3 className="mt-1 text-xl font-black text-white">Etalase mentah VIP</h3>
             <p className="mt-1 text-xs font-semibold text-slate-500">
-              Klik “Pakai ke Form” buat ngisi form Tambah Produk otomatis.
+              Klik “Pakai ke Form” buat ngisi form Tambah Produk otomatis. Preview ini disimpen di state admin utama, jadi gak ilang pas balik dari tab Produk.
             </p>
           </div>
 
@@ -218,7 +300,7 @@ export default function AdminVipSyncPanel({ daftarGame = [], onPilihProduk }) {
             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
             <input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => updateVipSyncState({ search: e.target.value })}
               placeholder="Cari kode / nama / game..."
               className="w-full rounded-xl border border-white/10 bg-slate-950/70 py-3 pl-10 pr-4 text-sm font-bold text-white outline-none transition placeholder:text-slate-600 focus:border-purple-400/60"
             />
