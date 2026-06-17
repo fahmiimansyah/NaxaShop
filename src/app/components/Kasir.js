@@ -4,6 +4,15 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Swal from 'sweetalert2';
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
 export default function FormKasir({ dataGame }) {
   const router = useRouter();
 
@@ -316,9 +325,11 @@ export default function FormKasir({ dataGame }) {
       : 'background:rgba(234,179,8,0.12); color:#fde047; border:1px solid rgba(234,179,8,0.25);';
 
     const warnaNomor = isAuto ? 'background:#22c55e;' : 'background:#eab308;';
-
+    const titleAman = escapeHtml(panduanGame.title);
+    const badgeAman = escapeHtml(panduanGame.badge);
+    const contohAman = escapeHtml(panduanGame.contoh);
     Swal.fire({
-      title: panduanGame.title,
+      title: titleAman,
       width: 620,
       background: '#111827',
       color: '#fff',
@@ -328,7 +339,7 @@ export default function FormKasir({ dataGame }) {
         <div style="text-align:left;">
           <div style="display:flex; justify-content:center; margin-bottom:14px;">
             <span style="${warnaBadge} display:inline-block; padding:6px 12px; border-radius:999px; font-size:11px; font-weight:900;">
-              ${panduanGame.badge}
+              ${badgeAman}
             </span>
           </div>
 
@@ -341,7 +352,7 @@ export default function FormKasir({ dataGame }) {
                       ${index + 1}
                     </span>
                     <p style="margin:0; color:#d1d5db; font-size:13px; line-height:1.55;">
-                      ${item}
+                      ${escapeHtml(item)}
                     </p>
                   </div>
                 `
@@ -354,7 +365,7 @@ export default function FormKasir({ dataGame }) {
               Contoh
             </p>
             <code style="color:#67e8f9; font-size:13px; font-weight:800;">
-              ${panduanGame.contoh}
+              ${contohAman}
             </code>
           </div>
 
@@ -447,7 +458,7 @@ export default function FormKasir({ dataGame }) {
       setIsCekVoucher(false);
     }
   };
-
+  
   const handleBeli = async () => {
     const alertBase = {
       background: '#1f2937',
@@ -629,20 +640,32 @@ if (orderIdTagihan) {
       if (statusCek === 'FOUND') {
         const username = dataCek.username || dataCek.nickname || '-';
 
+        const usernameAman = escapeHtml(username);
+        const produkAman = escapeHtml(produkDipilih?.nama_produk || '-');
+        const userIdAman = escapeHtml(userIdBersih || '-');
+        const zoneAman = escapeHtml(zoneIdBersih || '-');
+        const metodeAman = escapeHtml(namaMetodeBayar[metodeBayar] || metodeBayar || '-');
+        const biayaAdminAman = escapeHtml(getLabelBiayaAdmin(metodeBayar));
+        const voucherKodeAman = voucherAktif ? escapeHtml(voucherAktif.kode) : '';
+
         const yakin = await Swal.fire({
           ...alertBase,
           title: 'Konfirmasi Pesanan',
           html: `
             <div style="text-align:left; line-height:1.7">
-              <b>Username:</b> ${username}<br/>
-              <b>Produk:</b> ${produkDipilih.nama_produk}<br/>
-              <b>ID:</b> ${userIdBersih}<br/>
-              <b>Server/Zone:</b> ${zoneIdBersih || '-'}<br/>
-              <b>Metode:</b> ${namaMetodeBayar[metodeBayar] || metodeBayar}<br/>
-              ${voucherAktif ? `<b>Voucher:</b> ${voucherAktif.kode} (-${formatRupiah(voucherAktif.diskon)})<br/>` : ''}
+              <b>Username:</b> ${usernameAman}<br/>
+              <b>Produk:</b> ${produkAman}<br/>
+              <b>ID:</b> ${userIdAman}<br/>
+              <b>Server/Zone:</b> ${zoneAman}<br/>
+              <b>Metode:</b> ${metodeAman}<br/>
+              ${
+                voucherAktif
+                  ? `<b>Voucher:</b> ${voucherKodeAman} (-${formatRupiah(voucherAktif.diskon)})<br/>`
+                  : ''
+              }
               <b>Total:</b> ${formatRupiah(getTotalBayar())}<br/>
               <span style="color:#94a3b8; font-size:12px">
-                ${getLabelBiayaAdmin(metodeBayar)}
+                ${biayaAdminAman}
               </span>
               <br/><br/>
               <span style="color:#94a3b8">Kalau datanya sudah benar, lanjut bikin tagihan?</span>
@@ -663,13 +686,17 @@ if (orderIdTagihan) {
       }
 
       if (statusCek === 'UNAVAILABLE') {
+        const pesanCekAman = escapeHtml(
+          dataCek.message || dataCek.pesan || 'Server cek username lagi sibuk.'
+        );
+
         const lanjutManual = await Swal.fire({
           ...alertBase,
           title: 'Cek Username Belum Tersedia',
           html: `
             <div style="text-align:left; line-height:1.7">
               <p style="margin:0 0 10px">
-                ${dataCek.message || dataCek.pesan || 'Server cek username lagi sibuk.'}
+                ${pesanCekAman}
               </p>
               <b>Pastikan ID, Zone, atau Server sudah benar sebelum lanjut.</b>
             </div>

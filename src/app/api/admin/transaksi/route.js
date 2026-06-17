@@ -4,7 +4,6 @@ import { authOptions } from '../../auth/[...nextauth]/route';
 import db from '../../../lib/db';
 import { kirimEmailTopupSukses } from '../../../lib/mailer';
 import { prosesVoucherMakasihOrderPertama } from '../../../lib/voucher';
-
 const EMAIL_CEO = 'fahmiimansyah28@gmail.com';
 
 async function cekAdmin() {
@@ -44,10 +43,17 @@ export async function GET(request) {
     const page = Math.max(Number(searchParams.get('page')) || 1, 1);
     const limit = Math.min(Math.max(Number(searchParams.get('limit')) || 20, 1), 100);
     const offset = (page - 1) * limit;
-
+    const view = bersihinText(searchParams.get('view')).toLowerCase();
     const where = [];
     const values = [];
 
+    if (view === 'deleted') {
+      where.push('t.deleted_at IS NOT NULL');
+    } else if (view === 'all') {
+      // tampilkan semua
+    } else {
+      where.push('t.deleted_at IS NULL');
+    }
     if (search) {
       where.push(`
         (
@@ -108,6 +114,9 @@ export async function GET(request) {
          t.catatan_admin,
          t.created_at,
          t.updated_at,
+         t.deleted_at,
+          t.deleted_by,
+          t.delete_reason,
          COALESCE(p.nama_produk, t.kode_produk) AS nama_produk,
          COALESCE(g.nama, CONCAT('Game ID ', t.game_id)) AS nama_game
        FROM transaksi t
@@ -122,6 +131,7 @@ export async function GET(request) {
     return NextResponse.json({
       sukses: true,
       data: transaksi,
+      view: view || 'aktif',
       pagination: {
         page,
         limit,
@@ -195,6 +205,7 @@ export async function PATCH(request) {
        FROM transaksi t
        LEFT JOIN produk p ON t.produk_id = p.id
        WHERE t.order_id = ?
+        AND t.deleted_at IS NULL
        LIMIT 1`,
       [orderId]
     );
@@ -264,8 +275,9 @@ export async function PATCH(request) {
 
     await db.query(
       `UPDATE transaksi
-       SET ${fields.join(', ')}
-       WHERE order_id = ?`,
+      SET ${fields.join(', ')}
+      WHERE order_id = ?
+        AND deleted_at IS NULL`,
       values
     );
 
@@ -315,6 +327,9 @@ export async function DELETE(request) {
   }
 
   try {
+    const session = await getServerSession(authOptions);
+    const adminEmail = session?.user?.email || EMAIL_CEO;
+
     let body = {};
 
     try {
@@ -325,6 +340,8 @@ export async function DELETE(request) {
 
     const { searchParams } = new URL(request.url);
     const orderId = bersihinText(body.order_id || searchParams.get('order_id'));
+    const action = bersihinText(body.action || searchParams.get('action')).toLowerCase();
+    const alasan = bersihinText(body.reason || body.delete_reason || 'Dihapus dari dashboard admin');
 
     if (!orderId) {
       return NextResponse.json(
@@ -334,7 +351,7 @@ export async function DELETE(request) {
     }
 
     const [cekTrx] = await db.query(
-      `SELECT id, order_id, status_bayar, status_topup
+      `SELECT id, order_id, status_bayar, status_topup, deleted_at
        FROM transaksi
        WHERE order_id = ?
        LIMIT 1`,
@@ -348,8 +365,155 @@ export async function DELETE(request) {
       );
     }
 
+    const trx = cekTrx[0];
+
+    if (action === 'hard_delete') {
+  if (!trx.deleted_at) {
+    return NextResponse.json(
+      {
+        sukses: false,
+        pesan: 'Transaksi harus masuk Sampah dulu sebelum dihapus permanen bre!'
+      },
+      { status: 400 }
+    );
+  }
+
+  await db.query(
+    `DELETE FROM transaksi
+     WHERE order_id = ?
+       AND deleted_at IS NOT NULL
+     LIMIT 1`,
+    [orderId]
+  );
+
+  return NextResponse.json({
+    sukses: true,
+    pesan: 'Transaksi berhasil dihapus permanen dari database.',
+    data: {
+      order_id: orderId,
+      hard_deleted: true,
+    },
+  });
+}
+
+    if (trx.deleted_at) {
+      return NextResponse.json({
+        sukses: true,
+        pesan: 'Transaksi ini sudah pernah dihapus dari tampilan admin.',
+        data: {
+          order_id: orderId,
+          already_deleted: true,
+        },
+      });
+    }
+
     await db.query(
-      `DELETE FROM transaksi
+      `UPDATE transaksi
+       SET deleted_at = NOW(),
+           deleted_by = ?,
+           delete_reason = ?,
+           catatan_admin = CONCAT(
+             IFNULL(catatan_admin, ''),
+             '\nSoft delete admin pada ',
+             NOW(),
+             '. Oleh: ',
+             ?,
+             '. Alasan: ',
+             ?
+           ),
+           updated_at = NOW()
+       WHERE order_id = ?
+         AND deleted_at IS NULL
+       LIMIT 1`,
+      [
+        adminEmail,
+        alasan,
+        adminEmail,
+        alasan,
+        orderId,
+      ]
+    );
+
+    return NextResponse.json({
+      sukses: true,
+      pesan: 'Riwayat transaksi berhasil disembunyikan bre!',
+      data: {
+        order_id: orderId,
+        deleted_at: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error('Gagal soft delete transaksi admin:', error);
+
+    return NextResponse.json(
+      { sukses: false, pesan: 'Dapur hapus transaksi meledak bre!' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(request) {
+  const adminValid = await cekAdmin();
+
+  if (!adminValid) {
+    return NextResponse.json(
+      { sukses: false, pesan: 'Akses ditolak bre! Lu bukan admin.' },
+      { status: 403 }
+    );
+  }
+
+  try {
+    const body = await request.json();
+    const orderId = bersihinText(body.order_id);
+    const action = bersihinText(body.action || 'restore').toLowerCase();
+
+    if (!orderId) {
+      return NextResponse.json(
+        { sukses: false, pesan: 'Order ID wajib dikirim bre!' },
+        { status: 400 }
+      );
+    }
+
+    if (action !== 'restore') {
+      return NextResponse.json(
+        { sukses: false, pesan: 'Action gak valid bre!' },
+        { status: 400 }
+      );
+    }
+
+    const [cekTrx] = await db.query(
+      `SELECT order_id, deleted_at
+       FROM transaksi
+       WHERE order_id = ?
+       LIMIT 1`,
+      [orderId]
+    );
+
+    if (cekTrx.length === 0) {
+      return NextResponse.json(
+        { sukses: false, pesan: 'Transaksi gak ketemu bre!' },
+        { status: 404 }
+      );
+    }
+
+    if (!cekTrx[0].deleted_at) {
+      return NextResponse.json({
+        sukses: true,
+        pesan: 'Transaksi ini belum dihapus, gak perlu restore.',
+        data: {
+          order_id: orderId,
+          already_active: true,
+        },
+      });
+    }
+
+    await db.query(
+      `UPDATE transaksi
+       SET deleted_at = NULL,
+           deleted_by = NULL,
+           delete_reason = NULL,
+           catatan_admin = CONCAT(IFNULL(catatan_admin, ''), '\nRestore soft delete pada ', NOW()),
+           updated_at = NOW()
        WHERE order_id = ?
        LIMIT 1`,
       [orderId]
@@ -357,16 +521,16 @@ export async function DELETE(request) {
 
     return NextResponse.json({
       sukses: true,
-      pesan: 'Riwayat transaksi berhasil dihapus bre!',
+      pesan: 'Transaksi berhasil dibalikin ke list admin bre!',
       data: {
         order_id: orderId,
       },
     });
   } catch (error) {
-    console.error('Gagal hapus transaksi admin:', error);
+    console.error('Gagal restore transaksi:', error);
 
     return NextResponse.json(
-      { sukses: false, pesan: 'Dapur hapus transaksi meledak bre!' },
+      { sukses: false, pesan: 'Dapur restore transaksi meledak bre!' },
       { status: 500 }
     );
   }

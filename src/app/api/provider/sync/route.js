@@ -481,7 +481,7 @@ export async function POST(request) {
   }
 
   try {
-    const limit = rateLimit(request, {
+    const limit = await rateLimit(request, {
       key: 'provider-sync',
       limit: 15,
       windowMs: 60_000

@@ -446,15 +446,17 @@ function responsePunyaInstruksiBayar(responseBayar) {
 
   return true;
 }
-
+function isDev() {
+  return process.env.NODE_ENV !== "production";
+}
 export async function POST(request) {
   let orderId = '';
   let transaksiSudahDicatat = false;
 
   try {
-    const limit = rateLimit(request, {
+    const limit = await rateLimit(request, {
       key: 'beli',
-      limit: 5,
+      limit: 15,
       windowMs: 60_000
     });
 
@@ -462,7 +464,7 @@ export async function POST(request) {
       return NextResponse.json(
         {
           sukses: false,
-          pesan: `Terlalu sering checkout bre. Coba lagi ${limit.retryAfter} detik lagi.`
+          pesan: `checkout kespam bre. Coba lagi ${limit.retryAfter} detik lagi.`
         },
         { status: 429 }
       );
@@ -822,18 +824,18 @@ export async function POST(request) {
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('Midtrans gagal:', data);
+      console.error('PaymentGateaway gagal:', data);
 
       await updateTransaksiGagal(
         orderId,
-        `Midtrans gagal bikin tagihan pada ${new Date().toISOString()}: ${JSON.stringify(data)}`
+        `Payment Gateaway gagal bikin tagihan pada ${new Date().toISOString()}: ${JSON.stringify(data)}`
       );
 
       return NextResponse.json(
         {
           sukses: false,
-          pesan: data.status_message || 'Gagal bikin tagihan Midtrans',
-          data_midtrans: data
+          pesan: data.status_message || 'Gagal bikin tagihan Payment Gateaway',
+          ...(isDev() ? { data_midtrans: data } : {})
         },
         { status: 400 }
       );
@@ -845,14 +847,14 @@ export async function POST(request) {
     ) {
       await updateTransaksiGagal(
         orderId,
-        `Midtrans menolak transaksi pada ${new Date().toISOString()}: ${JSON.stringify(data)}`
+        `Payment Gateaway menolak transaksi pada ${new Date().toISOString()}: ${JSON.stringify(data)}`
       );
 
       return NextResponse.json(
         {
           sukses: false,
-          pesan: data.status_message || 'Transaksi ditolak Midtrans',
-          data_midtrans: data
+          pesan: data.status_message || 'Transaksi ditolak payment Gateaway',
+          ...(isDev() ? { data_midtrans: data } : {})
         },
         { status: 400 }
       );
@@ -873,14 +875,14 @@ export async function POST(request) {
     if (!responsePunyaInstruksiBayar(responseBayar)) {
       await updateTransaksiGagal(
         orderId,
-        `Instruksi bayar dari Midtrans tidak kebaca pada ${new Date().toISOString()}: ${JSON.stringify(data)}`
+        `Instruksi payment Gateaway tidak kebaca pada ${new Date().toISOString()}: ${JSON.stringify(data)}`
       );
 
       return NextResponse.json(
         {
           sukses: false,
-          pesan: 'Instruksi pembayaran dari Midtrans gak kebaca bre!',
-          data_midtrans: data
+          pesan: 'Instruksi pembayaran payment Gateaway gak kebaca bre!',
+          ...(isDev() ? { data_midtrans: data } : {})
         },
         { status: 500 }
       );

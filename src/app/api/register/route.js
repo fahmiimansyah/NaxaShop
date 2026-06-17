@@ -61,7 +61,7 @@ async function cobaKirimEmailVerifikasi({ email, nama, link }) {
 }
 
 export async function POST(request) {
-  const limit = rateLimit(request, {
+  const limit = await rateLimit(request, {
     key: 'register',
     limit: 3,
     windowMs: 60_000,

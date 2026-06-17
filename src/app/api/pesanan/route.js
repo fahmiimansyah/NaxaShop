@@ -13,10 +13,18 @@ function orderIdValid(orderId) {
   // NX-1712345678901-A1B2C3D4
   return /^NX-\d{10,20}(-[A-Z0-9]{8})?$/.test(orderId);
 }
+function maskSensitive(value) {
+  const text = String(value || "").trim();
+
+  if (!text) return "";
+  if (text.length <= 4) return "****";
+
+  return `${text.slice(0, 2)}***${text.slice(-2)}`;
+}
 
 export async function GET(request) {
   try {
-    const limit = rateLimit(request, {
+    const limit = await rateLimit(request, {
   key: 'lacak-order',
   limit: 20,
   windowMs: 60_000
@@ -69,6 +77,7 @@ if (!limit.allowed) {
        FROM transaksi t
        LEFT JOIN produk p ON t.produk_id = p.id
        WHERE t.order_id = ?
+        AND t.deleted_at IS NULL
        LIMIT 1`,
       [orderId]
     );
@@ -91,8 +100,8 @@ if (!limit.allowed) {
     data: {
       order_id: trx.order_id,
       nama_produk: trx.nama_produk,
-      id_player: trx.id_player,
-      zone_player: trx.zone_player || '',
+      id_player: maskSensitive(trx.id_player),
+      zone_player: trx.zone_player ? maskSensitive(trx.zone_player) : "",
       harga: trx.harga_transaksi,
       payment_type: trx.payment_type,
       status_bayar: trx.status_bayar,

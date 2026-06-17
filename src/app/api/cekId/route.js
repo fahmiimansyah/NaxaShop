@@ -415,7 +415,7 @@ async function cekViaEnka({ idPlayer, jenisGame }) {
 
 export async function POST(request) {
   try {
-    const limit = rateLimit(request, {
+    const limit = await rateLimit(request, {
       key: 'cek-nickname',
       limit: 10,
       windowMs: 60_000

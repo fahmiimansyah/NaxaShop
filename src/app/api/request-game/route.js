@@ -8,7 +8,7 @@ function bersihinText(value) {
 
 export async function POST(request) {
   try {
-    const limit = rateLimit(request, {
+    const limit = await rateLimit(request, {
       key: 'request-game',
       limit: 5,
       windowMs: 60_000

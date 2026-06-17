@@ -942,6 +942,7 @@ const [filterRequestGame, setFilterRequestGame] = useState({
     search: '',
     status_bayar: 'all',
     status_topup: 'all',
+    view: 'aktif',
     page: 1,
     limit: 20
   });
@@ -1638,6 +1639,7 @@ const ambilTransaksi = async (filterManual = filterTransaksi) => {
     if (filterManual.search) params.set('search', filterManual.search);
     if (filterManual.status_bayar) params.set('status_bayar', filterManual.status_bayar);
     if (filterManual.status_topup) params.set('status_topup', filterManual.status_topup);
+    if (filterManual.view) params.set('view', filterManual.view);
 
     params.set('page', filterManual.page || 1);
     params.set('limit', filterManual.limit || 20);
@@ -1718,6 +1720,7 @@ const handleDownloadCSVTransaksi = () => {
   if (filterTransaksi.status_topup && filterTransaksi.status_topup !== 'all') {
     params.set('status_topup', filterTransaksi.status_topup);
   }
+  if (filterTransaksi.view) params.set('view', filterTransaksi.view);
 
   params.set('limit', '5000');
 
@@ -1888,19 +1891,19 @@ const handleUpdateTransaksi = async (trx, payload, teksKonfirmasi) => {
 
 const handleHapusTransaksi = async (trx) => {
   const konfirmasi = await Swal.fire({
-    title: 'Hapus transaksi ini?',
+    title: 'Sembunyikan transaksi ini?',
     html: `
       <div style="text-align:left">
         <b>${escapeHtml(trx.order_id)}</b><br/>
         <small>
-          Data transaksi ini bakal dihapus dari database.
-          Kalau ini transaksi real, pastiin dulu lu emang mau bersihin riwayatnya.
+          Transaksi ini cuma disembunyikan dari dashboard aktif.
+          Bukti data tetap aman di database dan bisa dibalikin dari mode Sampah.
         </small>
       </div>
     `,
     icon: 'warning',
     showCancelButton: true,
-    confirmButtonText: 'Iya, hapus!',
+    confirmButtonText: 'Iya, sembunyikan!',
     cancelButtonText: 'Batal',
     background: '#1f2937',
     color: '#fff',
@@ -1924,11 +1927,11 @@ const handleHapusTransaksi = async (trx) => {
     const hasil = await respon.json();
 
     if (!respon.ok || !hasil.sukses) {
-      throw new Error(hasil.pesan || 'Gagal hapus transaksi.');
+      throw new Error(hasil.pesan || 'Gagal sembunyikan transaksi.');
     }
 
     Swal.fire({
-      title: 'Berhasil dihapus ✅',
+      title: 'Berhasil disembunyikan ✅',
       text: hasil.pesan,
       icon: 'success',
       background: '#1f2937',
@@ -1940,8 +1943,149 @@ const handleHapusTransaksi = async (trx) => {
     ambilAlerts();
   } catch (error) {
     Swal.fire({
-      title: 'Gagal hapus ❌',
-      text: error.message || 'Gagal hapus transaksi bre.',
+      title: 'Gagal sembunyikan ❌',
+      text: error.message || 'Gagal sembunyikan transaksi bre.',
+      icon: 'error',
+      background: '#1f2937',
+      color: '#fff',
+    });
+  } finally {
+    setLoadingAksiTransaksi(null);
+  }
+};
+
+
+const handleRestoreTransaksi = async (trx) => {
+  const konfirmasi = await Swal.fire({
+    title: 'Balikin transaksi ini?',
+    html: `
+      <div style="text-align:left">
+        <b>${escapeHtml(trx.order_id)}</b><br/>
+        <small>
+          Transaksi ini bakal muncul lagi di daftar order aktif.
+        </small>
+      </div>
+    `,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Iya, restore!',
+    cancelButtonText: 'Batal',
+    background: '#1f2937',
+    color: '#fff',
+    confirmButtonColor: '#22c55e',
+    cancelButtonColor: '#374151',
+  });
+
+  if (!konfirmasi.isConfirmed) return;
+
+  setLoadingAksiTransaksi(`${trx.order_id}-restore`);
+
+  try {
+    const respon = await fetch('/api/admin/transaksi', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        order_id: trx.order_id,
+        action: 'restore',
+      }),
+    });
+
+    const hasil = await respon.json();
+
+    if (!respon.ok || !hasil.sukses) {
+      throw new Error(hasil.pesan || 'Gagal restore transaksi.');
+    }
+
+    Swal.fire({
+      title: 'Berhasil direstore ✅',
+      text: hasil.pesan,
+      icon: 'success',
+      background: '#1f2937',
+      color: '#fff',
+    });
+
+    ambilDataSultan();
+    ambilTransaksi();
+    ambilAlerts();
+  } catch (error) {
+    Swal.fire({
+      title: 'Gagal restore ❌',
+      text: error.message || 'Gagal restore transaksi bre.',
+      icon: 'error',
+      background: '#1f2937',
+      color: '#fff',
+    });
+  } finally {
+    setLoadingAksiTransaksi(null);
+  }
+};
+const handleHardDeleteTransaksi = async (trx) => {
+  const konfirmasi = await Swal.fire({
+    title: 'Hapus permanen?',
+    html: `
+      <div style="text-align:left">
+        <b>${escapeHtml(trx.order_id)}</b><br/>
+        <small>
+          Ini bakal menghapus transaksi dari database beneran.
+          Data ini tidak bisa direstore lagi.
+        </small>
+      </div>
+    `,
+    input: 'text',
+    inputPlaceholder: 'Ketik HAPUS buat lanjut',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Hapus permanen',
+    cancelButtonText: 'Batal',
+    background: '#1f2937',
+    color: '#fff',
+    confirmButtonColor: '#dc2626',
+    cancelButtonColor: '#374151',
+    preConfirm: (value) => {
+      if (String(value || '').trim().toUpperCase() !== 'HAPUS') {
+        Swal.showValidationMessage('Ketik HAPUS dulu bree biar gak kepencet.');
+        return false;
+      }
+
+      return true;
+    },
+  });
+
+  if (!konfirmasi.isConfirmed) return;
+
+  setLoadingAksiTransaksi(`${trx.order_id}-hard-delete`);
+
+  try {
+    const respon = await fetch('/api/admin/transaksi', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        order_id: trx.order_id,
+        action: 'hard_delete',
+      }),
+    });
+
+    const hasil = await respon.json();
+
+    if (!respon.ok || !hasil.sukses) {
+      throw new Error(hasil.pesan || 'Gagal hapus permanen transaksi.');
+    }
+
+    Swal.fire({
+      title: 'Terhapus permanen ✅',
+      text: hasil.pesan,
+      icon: 'success',
+      background: '#1f2937',
+      color: '#fff',
+    });
+
+    ambilDataSultan();
+    ambilTransaksi();
+    ambilAlerts();
+  } catch (error) {
+    Swal.fire({
+      title: 'Gagal hapus permanen ❌',
+      text: error.message || 'Gagal hapus permanen transaksi bre.',
       icon: 'error',
       background: '#1f2937',
       color: '#fff',
@@ -3890,6 +4034,7 @@ const handleHapusRequestGame = async (item) => {
                         </div>
 
                         <button
+                          type="button"
                           onClick={ambilAlerts}
                           disabled={loadingAlerts}
                           className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-white text-xs font-black disabled:opacity-50"
@@ -3949,6 +4094,7 @@ const handleHapusRequestGame = async (item) => {
 
                                     <div className="flex flex-wrap gap-2">
                                       <button
+                                        type="button"
                                         onClick={() => handleDetailTransaksi(trx)}
                                         className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-white text-xs font-black"
                                       >
@@ -3956,6 +4102,7 @@ const handleHapusRequestGame = async (item) => {
                                       </button>
 
                                       <button
+                                        type="button"
                                         onClick={() => handleCekProvider(trx)}
                                         disabled={
                                           trx.status_bayar !== 'sukses' ||
@@ -3970,6 +4117,7 @@ const handleHapusRequestGame = async (item) => {
                                       </button>
 
                                       <button
+                                        type="button"
                                         onClick={() => handleRetryTopup(trx)}
                                         className="px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-black"
                                       >
@@ -3977,6 +4125,7 @@ const handleHapusRequestGame = async (item) => {
                                       </button>
 
                                       <button
+                                        type="button"
                                         onClick={() =>
                                           handleUpdateTransaksi(
                                             trx,
@@ -4021,6 +4170,7 @@ const handleHapusRequestGame = async (item) => {
 
                                     <div className="flex flex-wrap gap-2">
                                       <button
+                                        type="button"
                                         onClick={() => handleDetailTransaksi(trx)}
                                         className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-white text-xs font-black"
                                       >
@@ -4028,6 +4178,7 @@ const handleHapusRequestGame = async (item) => {
                                       </button>
 
                                       <button
+                                        type="button"
                                         onClick={() => handleCekProvider(trx)}
                                         disabled={
                                           trx.status_bayar !== 'sukses' ||
@@ -4042,6 +4193,7 @@ const handleHapusRequestGame = async (item) => {
                                       </button>
 
                                       <button
+                                        type="button"
                                         onClick={() => handleRetryTopup(trx)}
                                         className="px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-black"
                                       >
@@ -4049,6 +4201,7 @@ const handleHapusRequestGame = async (item) => {
                                       </button>
 
                                       <button
+                                        type="button"
                                         onClick={() =>
                                           handleUpdateTransaksi(
                                             trx,
@@ -4093,6 +4246,7 @@ const handleHapusRequestGame = async (item) => {
 
                                     <div className="grid grid-cols-2 gap-2">
                                       <button
+                                        type="button"
                                         onClick={() => handleDetailTransaksi(trx)}
                                         className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-white text-xs font-black"
                                       >
@@ -4100,6 +4254,7 @@ const handleHapusRequestGame = async (item) => {
                                       </button>
 
                                       <button
+                                        type="button"
                                         onClick={() =>
                                           handleUpdateTransaksi(
                                             trx,
@@ -4172,7 +4327,7 @@ const handleHapusRequestGame = async (item) => {
                 </div>
               </div>
 
-              <form onSubmit={handleCariTransaksi} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <form onSubmit={handleCariTransaksi} className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div className="md:col-span-2">
                   <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">
                     Search
@@ -4219,9 +4374,24 @@ const handleHapusRequestGame = async (item) => {
                   </select>
                 </div>
 
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">
+                    Tampilan
+                  </label>
+                  <select
+                    value={filterTransaksi.view}
+                    onChange={(e) => handleGantiFilterTransaksi('view', e.target.value)}
+                    className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-emerald-500 font-bold"
+                  >
+                    <option value="aktif">Aktif</option>
+                    <option value="deleted">Sampah</option>
+                    <option value="all">Semua</option>
+                  </select>
+                </div>
+
                 <button
                   type="submit"
-                  className="md:col-span-4 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black transition-all"
+                  className="md:col-span-5 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black transition-all"
                 >
                   🔍 Cari Transaksi
                 </button>
@@ -4232,7 +4402,13 @@ const handleHapusRequestGame = async (item) => {
             <div className="bg-gray-900 border border-gray-800 rounded-3xl shadow-xl overflow-hidden">
               <div className="p-6 border-b border-gray-800 flex justify-between items-center gap-4">
                 <div>
-                  <h2 className="text-xl font-black">Daftar Order</h2>
+                  <h2 className="text-xl font-black">
+                    {filterTransaksi.view === 'deleted'
+                      ? 'Daftar Order Sampah'
+                      : filterTransaksi.view === 'all'
+                        ? 'Daftar Semua Order'
+                        : 'Daftar Order'}
+                  </h2>
                   <p className="text-xs text-gray-500 mt-1">
                     Page {paginationTransaksi.page} dari {paginationTransaksi.totalPage || 1}
                   </p>
@@ -4248,6 +4424,7 @@ const handleHapusRequestGame = async (item) => {
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => ambilTransaksi()}
                     disabled={loadingTransaksi}
                     className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-white text-xs font-black disabled:opacity-50"
@@ -4301,8 +4478,14 @@ const handleHapusRequestGame = async (item) => {
               </span>
 
               <span className={`px-2 py-1 rounded-md text-[10px] font-black border ${warnaProvider(trx.provider)}`}>
-  {labelProvider(trx.provider)}
-</span>
+                {labelProvider(trx.provider)}
+              </span>
+
+              {trx.deleted_at && (
+                <span className="px-2 py-1 rounded-md text-[10px] font-black border border-red-500/20 bg-red-500/10 text-red-300">
+                  DI SAMPAH
+                </span>
+              )}
             </div>
 
             <p className="font-mono text-xs text-cyan-400 font-black break-all">
@@ -4372,6 +4555,7 @@ const handleHapusRequestGame = async (item) => {
           <div className="w-full xl:w-[260px] shrink-0">
             <div className="grid grid-cols-2 gap-2">
               <button
+                type="button"
                 onClick={() => handleDetailTransaksi(trx)}
                 className="px-3 py-2 rounded-xl bg-gray-800 text-gray-200 text-xs font-black hover:bg-gray-700 transition-all"
               >
@@ -4379,6 +4563,7 @@ const handleHapusRequestGame = async (item) => {
               </button>
 
               <button
+                type="button"
                 onClick={() => handleEditCatatan(trx)}
                 className="px-3 py-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-black hover:bg-indigo-600 hover:text-white transition-all"
               >
@@ -4386,6 +4571,7 @@ const handleHapusRequestGame = async (item) => {
               </button>
 
               <button
+                type="button"
                 onClick={() => handleCekProvider(trx)}
                 disabled={
                   trx.status_bayar !== 'sukses' ||
@@ -4400,6 +4586,7 @@ const handleHapusRequestGame = async (item) => {
               </button>
 
               <button
+                type="button"
                 onClick={() => handleRetryTopup(trx)}
                 disabled={
                   trx.status_bayar !== 'sukses' ||
@@ -4412,6 +4599,7 @@ const handleHapusRequestGame = async (item) => {
               </button>
 
               <button
+                type="button"
                 onClick={() =>
                   handleUpdateTransaksi(
                     trx,
@@ -4426,6 +4614,7 @@ const handleHapusRequestGame = async (item) => {
               </button>
 
               <button
+                type="button"
                 onClick={() =>
                   handleUpdateTransaksi(
                     trx,
@@ -4440,6 +4629,7 @@ const handleHapusRequestGame = async (item) => {
               </button>
 
               <button
+                type="button"
                 onClick={() =>
                   handleUpdateTransaksi(
                     trx,
@@ -4452,15 +4642,42 @@ const handleHapusRequestGame = async (item) => {
               >
                 Gagal
               </button>
-              <button
-                onClick={() => handleHapusTransaksi(trx)}
-                disabled={loadingAksiTransaksi === `${trx.order_id}-delete`}
-                className="col-span-2 px-3 py-2 rounded-xl bg-red-600/10 text-red-300 border border-red-500/30 text-xs font-black hover:bg-red-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {loadingAksiTransaksi === `${trx.order_id}-delete`
-                  ? 'Hapus...'
-                  : 'Hapus Riwayat'}
-              </button>
+              {trx.deleted_at ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleRestoreTransaksi(trx)}
+                        disabled={loadingAksiTransaksi === `${trx.order_id}-restore`}
+                        className="px-3 py-2 rounded-xl bg-emerald-600/10 text-emerald-300 border border-emerald-500/30 text-xs font-black hover:bg-emerald-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {loadingAksiTransaksi === `${trx.order_id}-restore`
+                          ? 'Restore...'
+                          : 'Restore'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleHardDeleteTransaksi(trx)}
+                        disabled={loadingAksiTransaksi === `${trx.order_id}-hard-delete`}
+                        className="px-3 py-2 rounded-xl bg-red-700/20 text-red-300 border border-red-500/40 text-xs font-black hover:bg-red-700 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {loadingAksiTransaksi === `${trx.order_id}-hard-delete`
+                          ? 'Hapus...'
+                          : 'Hapus Permanen'}
+                      </button>
+                    </>
+                  ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleHapusTransaksi(trx)}
+                    disabled={loadingAksiTransaksi === `${trx.order_id}-delete`}
+                    className="col-span-2 px-3 py-2 rounded-xl bg-red-600/10 text-red-300 border border-red-500/30 text-xs font-black hover:bg-red-600 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {loadingAksiTransaksi === `${trx.order_id}-delete`
+                      ? 'Menyembunyikan...'
+                      : 'Sembunyikan'}
+                  </button>
+                )}
             </div>
           </div>
         </div>
@@ -4478,6 +4695,7 @@ const handleHapusRequestGame = async (item) => {
 
                 <div className="flex gap-2">
                   <button
+                    type="button"
                     onClick={() => handleGantiHalamanTransaksi(Math.max(1, paginationTransaksi.page - 1))}
                     disabled={paginationTransaksi.page <= 1}
                     className="px-4 py-2 rounded-xl bg-gray-800 text-white text-xs font-black hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -4486,6 +4704,7 @@ const handleHapusRequestGame = async (item) => {
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => handleGantiHalamanTransaksi(paginationTransaksi.page + 1)}
                     disabled={paginationTransaksi.page >= paginationTransaksi.totalPage}
                     className="px-4 py-2 rounded-xl bg-gray-800 text-white text-xs font-black hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -4886,12 +5105,12 @@ const handleHapusRequestGame = async (item) => {
   <select
     value={formProduk.provider}
     onChange={(e) =>
-      setFormProduk({
-        ...formProduk,
+      setFormProduk((prev) => ({
+        ...prev,
         provider: e.target.value,
         kode_produk_provider:
-          formProduk.kode_produk_provider || formProduk.kode_produk
-      })
+          prev.kode_produk_provider || prev.kode_produk
+      }))
     }
     className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-cyan-500 font-bold"
   >

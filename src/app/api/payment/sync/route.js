@@ -7,6 +7,10 @@ import { kirimEmailAdmin, kirimEmailTopupSukses } from '../../../lib/mailer';
 import { prosesVoucherMakasihOrderPertama } from '../../../lib/voucher';
 import { transaksiDigiflazz } from '../../../lib/digiflazz';
 
+function isDev() {
+  return process.env.NODE_ENV !== "production";
+}
+
 function bersihinText(value) {
   return String(value || '').trim();
 }
@@ -399,7 +403,7 @@ async function tembakProvider(trx) {
 
 export async function POST(request) {
   try {
-    const limit = rateLimit(request, {
+    const limit = await rateLimit(request, {
       key: 'payment-sync',
       limit: 10,
       windowMs: 60_000
@@ -482,8 +486,8 @@ export async function POST(request) {
           sukses: false,
           pesan:
             statusMidtrans.data?.status_message ||
-            'Status Midtrans belum kebaca bre.',
-          data_midtrans: statusMidtrans.data
+            'Status Payment Gateaway belum kebaca bre.',
+          ...(isDev() ? { data_midtrans: statusMidtrans.data } : {})
         },
         { status: 400 }
       );

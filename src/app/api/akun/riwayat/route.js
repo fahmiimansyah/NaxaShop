@@ -50,6 +50,7 @@ export async function GET() {
           LOWER(TRIM(COALESCE(t.user_email, ''))) = ?
           OR LOWER(TRIM(COALESCE(t.customer_email, ''))) = ?
        )
+       AND t.deleted_at IS NULL
        ORDER BY t.created_at DESC
        LIMIT 100`,
       [emailLogin, emailLogin]

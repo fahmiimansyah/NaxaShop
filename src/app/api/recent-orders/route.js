@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/route';
 import db from '../../lib/db';
-
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
@@ -61,6 +60,7 @@ export async function GET() {
           'complete',
           'berhasil'
        )
+        AND t.deleted_at IS NULL
        ORDER BY t.created_at DESC
        LIMIT 4`,
       [emailLogin, emailLogin]

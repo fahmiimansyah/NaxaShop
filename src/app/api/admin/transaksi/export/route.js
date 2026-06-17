@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../auth/[...nextauth]/route';
 import db from '../../../../lib/db';
-
 const EMAIL_CEO = 'fahmiimansyah28@gmail.com';
 
 async function cekAdmin() {
@@ -71,7 +70,7 @@ export async function GET(request) {
     const statusTopup = bersihinText(searchParams.get('status_topup'));
     const limit = Math.min(Math.max(Number(searchParams.get('limit')) || 5000, 1), 10000);
 
-    const where = [];
+    const where = ['t.deleted_at IS NULL'];
     const values = [];
 
     if (search) {
