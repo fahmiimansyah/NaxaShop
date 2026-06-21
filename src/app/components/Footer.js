@@ -159,7 +159,11 @@ export default function Footer() {
               )}
             </div>
 
-            <div className="mt-5 flex items-center gap-2">
+
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-200/35 mt-5">
+                Ikuti Kami
+              </p>
+            <div className="mt-5 flex gap-2">
               {instagramUrl && (
                 <a
                   href={instagramUrl}

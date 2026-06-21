@@ -5,7 +5,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Swal from 'sweetalert2';
-import { FiActivity, FiArrowRight, FiBarChart2, FiBell, FiBox, FiCreditCard, FiGift, FiGrid, FiHome, FiImage, FiMenu, FiMessageSquare, FiRefreshCw, FiSearch, FiSettings, FiShoppingBag, FiTool, FiX } from 'react-icons/fi';
+import { FiActivity, FiArrowRight, FiBarChart2, FiBell, FiBox, FiCreditCard, FiGift, FiGrid, FiHome, FiImage, FiMenu, FiMessageSquare, FiRefreshCw, FiSearch, FiSettings, FiShoppingBag, FiTool, FiX, FiZap } from 'react-icons/fi';
+import AdminGrowthPanel from '../components/AdminGrowthPanel';
 import AdminVoucherPanel from '../components/AdminVoucherPanel';
 import AdminMaintenancePanel from '../components/AdminMaintenancePanel';
 import AdminVipSyncPanel from '../components/AdminVipSyncPanel';
@@ -3240,6 +3241,7 @@ const handleHapusRequestGame = async (item) => {
     { id: 'metode-bayar', label: 'Payment', desc: 'Metode bayar', Icon: FiCreditCard },
     { id: 'voucher', label: 'Voucher', desc: 'Kupon user', Icon: FiGift },
     { id: 'maintenance', label: 'Control', desc: 'Maintenance', Icon: FiTool },
+    { id: 'ai-growth', label: 'AI Growth', desc: 'Goreng Konten', Icon: FiZap },
     { id: 'request-game', label: 'Requests', desc: 'Masukan user', Icon: FiMessageSquare, badge: Number(statsRequestGame?.baru || 0) }
   ];
 
@@ -5939,6 +5941,10 @@ const handleHapusRequestGame = async (item) => {
 
         {tabAktif === 'maintenance' && (
           <AdminMaintenancePanel />
+        )}
+
+        {tabAktif === 'ai-growth' && (
+          <AdminGrowthPanel />
         )}
 
         {tabAktif === 'request-game' && (
