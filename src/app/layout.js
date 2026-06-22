@@ -5,7 +5,7 @@ import Footer from '../app/components/Footer';
 import AuthProvider from '../app/components/Authprovider';
 import FloatingSupport from '../app/components/FloatingSupport';
 import MaintenanceBanner from '../app/components/MaintenanceBanner';
-
+import { Analytics } from "@vercel/analytics/next"
 const siteUrl = 'https://naxashop.id';
 
 const jakarta = Plus_Jakarta_Sans({
@@ -161,6 +161,7 @@ export default function RootLayout({ children }) {
         </AuthProvider>
 
         <FloatingSupport />
+        <Analytics />
       </body>
     </html>
   );
