@@ -857,12 +857,16 @@ export default function DashboardAdmin() {
   const [daftarProduk, setDaftarProduk] = useState([]);
   const [daftarGame, setDaftarGame] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [fileProduk, setFileProduk] = useState(null);
+const [previewProduk, setPreviewProduk] = useState('');
+const [produkFileInputKey, setProdukFileInputKey] = useState(Date.now()); 
 
   // State Form Produk
   const [formProduk, setFormProduk] = useState({
     game_id: '',
     kode_produk: '',
     nama_produk: '',
+    gambar_produk: '',
     harga: '',
     harga_coret: '',
     harga_modal: '',
@@ -1256,6 +1260,9 @@ const labelKategoriGame = (kategori) => {
 
     setModeEditProduk(false);
     setProdukEditId(null);
+    setFileProduk(null);
+    setPreviewProduk('');
+    setProdukFileInputKey(Date.now());
   };
 
   const gradientPromoOptions = [
@@ -2830,7 +2837,43 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
       setLoadingHapusGame(null);
     }
   };
+  const handlePilihGambarProduk = (e) => {
+  const file = e.target.files?.[0];
 
+  if (!file) return;
+
+  setFileProduk(file);
+  setPreviewProduk(URL.createObjectURL(file));
+};
+
+  const uploadGambarProdukKalauAda = async () => {
+  if (!fileProduk) {
+    return formProduk.gambar_produk;
+  }
+
+  const formData = new FormData();
+
+  formData.append('gambar', fileProduk);
+
+  const responUpload = await fetch(
+    '/api/admin/upload',
+    {
+      method: 'POST',
+      body: formData
+    }
+  );
+
+  const hasilUpload = await responUpload.json();
+
+  if (!responUpload.ok) {
+    throw new Error(
+      hasilUpload.pesan ||
+      'Upload gambar produk gagal bre!'
+    );
+  }
+
+  return hasilUpload.url;
+};
   // --- FUNGSI SUBMIT PRODUK: TAMBAH / EDIT ---
   const handleSubmitProduk = async (e) => {
     e.preventDefault();
@@ -2850,12 +2893,15 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
     }
 
     try {
+      const gambarProduk =
+    await uploadGambarProdukKalauAda();
       const respon = await fetch('/api/admin/produk', {
         method: modeEditProduk ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formProduk,
           id: produkEditId,
+          gambar_produk: gambarProduk,
           harga: parseInt(formProduk.harga),
           harga_coret: parseInt(formProduk.harga_coret || 0),
           harga_modal: parseInt(formProduk.harga_modal || 0)
@@ -2907,6 +2953,7 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
       game_id: String(item.game_id || ''),
       kode_produk: item.kode_produk || '',
       nama_produk: item.nama_produk || '',
+      gambar_produk: item.gambar_produk || '',
       harga: String(item.harga || ''),
       harga_coret: item.harga_coret || '',
       harga_modal: String(item.harga_modal || ''),
@@ -2914,7 +2961,7 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
       provider: item.provider || 'apigames',
       kode_produk_provider: item.kode_produk_provider || item.kode_produk || ''
     });
-
+    setPreviewProduk(item.gambar_produk || '');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -5209,7 +5256,48 @@ const handleHapusRequestGame = async (item) => {
                     className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-cyan-500"
                   />
                 </div>
+               <div>
+                  <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Upload Gambar produk</label>
 
+                  <div className="bg-gray-950 border border-gray-700 rounded-xl p-4">
+                    <input
+                      key={produkFileInputKey}
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePilihGambarProduk}
+                      className="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-purple-600 file:text-white file:font-bold hover:file:bg-purple-500"
+                    />
+
+                    <p className="text-[11px] text-gray-500 mt-2">
+                      Format: JPG, PNG, WEBP, GIF. Maksimal 2MB.
+                    </p>
+
+                    {previewGambar && (
+                      <div className="mt-4 rounded-xl overflow-hidden border border-gray-800 bg-gray-900">
+                        <img
+                          src={previewGambar}
+                          alt="Preview gambar produk"
+                          className="w-full h-40 object-cover"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">
+                    Atau Path/URL Gambar
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="iconproduk.webp atau https://..."
+                    value={formGame.gambar}
+                    onChange={(e) => {
+                      setFormGame({ ...formGame, gambar: e.target.value });
+                      if (!fileGambar) setPreviewGambar(e.target.value);
+                    }}
+                    className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-purple-500"
+                  />
+                </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">Harga Jual (Rp)</label>
                   

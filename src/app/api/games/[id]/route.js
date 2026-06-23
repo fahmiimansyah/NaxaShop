@@ -26,9 +26,7 @@ export async function GET(request, { params }) {
       );
     }
 
-    // Support dua versi URL:
-    // - Lama: /topup/1
-    // - SEO:  /topup/mobile-legends
+  
     const cariPakaiId = paramAdalahId(gameParam);
 
     const [gameResult] = await db.query(
@@ -59,6 +57,7 @@ export async function GET(request, { params }) {
          game_id,
          kode_produk,
          nama_produk,
+         gambar_produk,
          harga,
          harga_coret,
          status_produk

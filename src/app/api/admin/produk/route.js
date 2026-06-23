@@ -64,6 +64,7 @@ function payloadProdukDariBody(body) {
     game_id: body.game_id,
     kode_produk,
     nama_produk: bersihinText(body.nama_produk),
+    gambar_produk: bersihinText(body.gambar_produk),
     harga: validasiHarga(body.harga),
     harga_coret: validasiHargaCoret(body.harga_coret),
     harga_modal: validasiHargaModal(body.harga_modal),
@@ -130,6 +131,7 @@ export async function GET() {
          id,
          kode_produk,
          nama_produk,
+         gambar_produk,
          harga,
          harga_modal,
          harga_coret,
@@ -203,6 +205,7 @@ export async function POST(request) {
        (
          kode_produk,
          nama_produk,
+         gambar_produk,
          harga,
          harga_coret,
          harga_modal,
@@ -211,10 +214,11 @@ export async function POST(request) {
          provider,
          kode_produk_provider
        )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         produk.kode_produk,
         produk.nama_produk,
+        produk.gambar_produk,
         produk.harga,
         produk.harga_coret,
         produk.harga_modal,
@@ -305,6 +309,7 @@ export async function PATCH(request) {
       `UPDATE produk
        SET kode_produk = ?,
            nama_produk = ?,
+           gambar_produk = ?,
            harga = ?,
            harga_coret = ?,
            harga_modal = ?,
@@ -316,6 +321,7 @@ export async function PATCH(request) {
       [
         produk.kode_produk,
         produk.nama_produk,
+        produk.gambar_produk,
         produk.harga,
         produk.harga_coret,
         produk.harga_modal,

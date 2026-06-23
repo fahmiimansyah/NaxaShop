@@ -809,18 +809,18 @@ if (orderIdTagihan) {
                     setMetodeBayar('');
                   }
                 }}
-                className={`relative overflow-hidden p-3 sm:p-5 rounded-2xl border-2 transition-all duration-300 flex flex-col justify-between min-h-28 ${
+                className={`group relative overflow-hidden rounded-2xl border-2 transition-all duration-300 flex flex-col h-full ${
                   produkTerkunci
                     ? produkGangguan
                       ? 'cursor-not-allowed bg-slate-950/80 border-slate-500/20 opacity-75 grayscale-[30%]'
                       : 'cursor-not-allowed bg-gray-950/80 border-yellow-500/20 opacity-75'
                     : produkAktif
-                      ? 'cursor-pointer bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)]'
-                      : 'cursor-pointer bg-gray-900 border-gray-700 hover:border-blue-400'
+                      ? 'cursor-pointer bg-gray-900 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)] -translate-y-1'
+                      : 'cursor-pointer bg-gray-900 border-gray-700 hover:border-blue-400 hover:-translate-y-1'
                 }`}
               >
                 {produkTerkunci && (
-                  <div className="mb-2 flex justify-end">
+                  <div className="absolute top-2 left-2 z-10">
                     <span
                       className={`rounded-full border px-2 py-1 text-[10px] font-black ${
                         produkGangguan
@@ -833,38 +833,56 @@ if (orderIdTagihan) {
                   </div>
                 )}
 
-                <p
-                  className={`font-black text-sm sm:text-base leading-tight ${
-                    produkGangguan ? 'text-slate-300' : 'text-white'
-                  }`}
-                >
-                  {item.nama_produk}
-                </p>
+                <div className={`p-5 flex-1 flex flex-col items-center justify-center text-center gap-3 transition-colors ${
+                  produkAktif ? 'bg-blue-600/10' : ''
+                }`}>
+                  <p
+                    className={`font-black text-sm sm:text-base leading-snug ${
+                      produkGangguan ? 'text-slate-400' : produkAktif ? 'text-blue-300' : 'text-white'
+                    }`}
+                  >
+                    {item.nama_produk}
+                  </p>
 
-                <div className="mt-3 space-y-1">
+                  {item.gambar_produk && (
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center mt-1">
+                      <img
+                        src={item.gambar_produk}
+                        alt={item.nama_produk}
+                        className={`max-w-full max-h-full object-contain drop-shadow-[0_4px_12px_rgba(59,130,246,0.3)] transition-transform duration-300 group-hover:scale-110 ${
+                          produkGangguan ? 'grayscale opacity-50' : ''
+                        }`}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className={`p-4 w-full text-center flex flex-col justify-center transition-colors ${
+                  produkAktif 
+                    ? 'bg-blue-950/40' 
+                    : 'bg-black/20'
+                }`}>
                   {Number(item.harga_coret || 0) > Number(item.harga || 0) && (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-[11px] font-bold text-gray-400">
-                        Dari
-                      </p>
-
-                      <p className="text-xs font-bold text-gray-500 line-through">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <p className="text-[10px] font-bold text-gray-500">Dari</p>
+                      <p className="text-[11px] sm:text-xs font-bold text-gray-500 line-through">
                         {formatRupiah(item.harga_coret)}
                       </p>
-
                       {hitungDiskon(item.harga_coret, item.harga) && (
-                        <span className="rounded-full border border-green-500/20 bg-green-500/10 px-2 py-0.5 text-[10px] font-black text-green-400">
+                        <span className="rounded-md border border-green-500/20 bg-green-500/10 px-1.5 py-0.5 text-[10px] font-black text-green-400">
                           -{hitungDiskon(item.harga_coret, item.harga)}%
                         </span>
                       )}
                     </div>
                   )}
-
-                  <p className="text-sm sm:text-base font-black text-blue-400">
+                  <p className={`text-sm sm:text-base font-black ${
+                    produkAktif ? 'text-blue-400' : 'text-gray-100'
+                  }`}>
                     {formatRupiah(item.harga)}
                   </p>
                 </div>
               </div>
+              
               );
             })}
           </div>
