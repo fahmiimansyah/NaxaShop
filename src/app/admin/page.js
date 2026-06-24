@@ -5,12 +5,14 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Swal from 'sweetalert2';
-import { FiActivity, FiArrowRight, FiBarChart2, FiBell, FiBox, FiCreditCard, FiGift, FiGrid, FiHome, FiImage, FiMenu, FiMessageSquare, FiRefreshCw, FiSearch, FiSettings, FiShoppingBag, FiTool, FiX, FiZap } from 'react-icons/fi';
+import { FiActivity, FiArrowRight, FiBarChart2, FiBell, FiBox, FiCreditCard, FiGift, FiGrid, FiHome, FiImage, FiMenu, FiMessageSquare, FiRefreshCw, FiSearch, FiShoppingBag, FiTool, FiX, FiZap } from 'react-icons/fi';
 import AdminGrowthPanel from '../components/AdminGrowthPanel';
 import AdminVoucherPanel from '../components/AdminVoucherPanel';
 import AdminMaintenancePanel from '../components/AdminMaintenancePanel';
 import AdminVipSyncPanel from '../components/AdminVipSyncPanel';
 import { GAME_CATEGORIES, getGameCategoryMeta } from '../lib/game-categories';
+import FakeChatHSRDynamic from '../components/FakeChat';
+import { FaComments } from 'react-icons/fa';
 function angkaDashboard(value) {
   return Number(value || 0);
 }
@@ -1250,6 +1252,7 @@ const labelKategoriGame = (kategori) => {
       game_id: daftarGame[0]?.id ? String(daftarGame[0].id) : '',
       kode_produk: '',
       nama_produk: '',
+      gambar_produk: '',
       harga: '',
       harga_coret: '',
       harga_modal: '',
@@ -2839,8 +2842,14 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
   };
   const handlePilihGambarProduk = (e) => {
   const file = e.target.files?.[0];
-
-  if (!file) return;
+    if (!file.type.startsWith('image/')) {
+  Swal.fire({ title: 'File salah', text: 'Harus gambar bre!' });
+  return;
+}
+if (file.size > 2 * 1024 * 1024) {
+  Swal.fire({ title: 'File kegedean', text: 'Maksimal 2MB' });
+  return;
+}
 
   setFileProduk(file);
   setPreviewProduk(URL.createObjectURL(file));
@@ -2878,6 +2887,7 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
   const handleSubmitProduk = async (e) => {
     e.preventDefault();
     setLoadingForm(true);
+    
 
     if (!formProduk.game_id) {
       Swal.fire({
@@ -2918,7 +2928,6 @@ const handleStatusCepatMetodeBayar = async (item, statusBaru) => {
           background: '#1f2937',
           color: '#fff'
         });
-
         resetFormProduk();
         ambilDataSultan();
       } else {
@@ -3289,6 +3298,7 @@ const handleHapusRequestGame = async (item) => {
     { id: 'voucher', label: 'Voucher', desc: 'Kupon user', Icon: FiGift },
     { id: 'maintenance', label: 'Control', desc: 'Maintenance', Icon: FiTool },
     { id: 'ai-growth', label: 'AI Growth', desc: 'Goreng Konten', Icon: FiZap },
+    { id: 'FakeChat', label: 'Fake Chat', desc: 'settingan Chat', Icon: FaComments },
     { id: 'request-game', label: 'Requests', desc: 'Masukan user', Icon: FiMessageSquare, badge: Number(statsRequestGame?.baru || 0) }
   ];
 
@@ -5272,10 +5282,10 @@ const handleHapusRequestGame = async (item) => {
                       Format: JPG, PNG, WEBP, GIF. Maksimal 2MB.
                     </p>
 
-                    {previewGambar && (
+                    {previewProduk && (
                       <div className="mt-4 rounded-xl overflow-hidden border border-gray-800 bg-gray-900">
                         <img
-                          src={previewGambar}
+                          src={previewProduk}
                           alt="Preview gambar produk"
                           className="w-full h-40 object-cover"
                         />
@@ -5290,10 +5300,10 @@ const handleHapusRequestGame = async (item) => {
                   <input
                     type="text"
                     placeholder="iconproduk.webp atau https://..."
-                    value={formGame.gambar}
+                    value={formProduk.gambar_produk}
                     onChange={(e) => {
-                      setFormGame({ ...formGame, gambar: e.target.value });
-                      if (!fileGambar) setPreviewGambar(e.target.value);
+                      setFormProduk({ ...formProduk, gambar_produk: e.target.value });
+                      if (!fileProduk) setPreviewProduk(e.target.value);
                     }}
                     className="w-full bg-gray-950 text-white px-4 py-3 rounded-xl border border-gray-700 outline-none focus:border-purple-500"
                   />
@@ -6033,6 +6043,9 @@ const handleHapusRequestGame = async (item) => {
 
         {tabAktif === 'ai-growth' && (
           <AdminGrowthPanel />
+        )}
+        {tabAktif === 'FakeChat' && (
+          <FakeChatHSRDynamic />
         )}
 
         {tabAktif === 'request-game' && (
