@@ -60,3 +60,13 @@ body {
 .animate-naxaLine {
   animation: naxaLine 2s ease-in-out infinite;
 }
+
+/* Menyembunyikan scrollbar buat Chrome, Safari, dan Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+/* Menyembunyikan scrollbar buat IE, Edge, dan Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}

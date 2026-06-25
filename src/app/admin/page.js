@@ -3298,7 +3298,6 @@ const handleHapusRequestGame = async (item) => {
     { id: 'voucher', label: 'Voucher', desc: 'Kupon user', Icon: FiGift },
     { id: 'maintenance', label: 'Control', desc: 'Maintenance', Icon: FiTool },
     { id: 'ai-growth', label: 'AI Growth', desc: 'Goreng Konten', Icon: FiZap },
-    { id: 'FakeChat', label: 'Fake Chat', desc: 'settingan Chat', Icon: FaComments },
     { id: 'request-game', label: 'Requests', desc: 'Masukan user', Icon: FiMessageSquare, badge: Number(statsRequestGame?.baru || 0) }
   ];
 
@@ -6043,9 +6042,6 @@ const handleHapusRequestGame = async (item) => {
 
         {tabAktif === 'ai-growth' && (
           <AdminGrowthPanel />
-        )}
-        {tabAktif === 'FakeChat' && (
-          <FakeChatHSRDynamic />
         )}
 
         {tabAktif === 'request-game' && (

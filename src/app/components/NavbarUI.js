@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { FaRobot } from "react-icons/fa";
 import Swal from "sweetalert2";
 import { signOut } from "next-auth/react";
 import {
@@ -162,6 +163,7 @@ export default function NavbarUI({ session }) {
   const [open, setOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   if (pathname?.startsWith("/admin")) return null;
+  if (pathname?.startsWith("/fakechat")) return null;
   const namaUser = useMemo(() => getNamaUser(session), [session]);
   const inisialUser = useMemo(() => getInisialUser(namaUser), [namaUser]);
   const isCEO = session?.user?.email === EMAIL_CEO;
@@ -266,13 +268,23 @@ export default function NavbarUI({ session }) {
                   </Link>
 
                   {isCEO && (
-                    <Link
-                      href="/admin"
-                      className="hidden items-center gap-2 rounded-3xl border border-blue-400/25 bg-blue-600 px-4 py-2.5 text-xs font-black text-white shadow-lg shadow-blue-950/30 transition hover:-translate-y-0.5 hover:bg-blue-500 sm:flex"
-                    >
-                      <FaShieldAlt />
-                      Admin
-                    </Link>
+                    <>
+                      <Link
+                        href="/admin"
+                        className="hidden items-center gap-2 rounded-3xl border border-blue-400/25 bg-blue-600 px-4 py-2.5 text-xs font-black text-white shadow-lg shadow-blue-950/30 transition hover:-translate-y-0.5 hover:bg-blue-500 sm:flex"
+                      >
+                        <FaShieldAlt />
+                        Admin
+                      </Link>
+
+                      <Link
+                        href="/fakechat"
+                        className="hidden items-center gap-2 rounded-3xl border border-purple-400/25 bg-purple-600 px-4 py-2.5 text-xs font-black text-white shadow-lg transition hover:bg-purple-500 sm:flex"
+                      >
+                        <FaRobot />
+                        FakeChat
+                      </Link>
+                    </>
                   )}
 
                   <button
@@ -362,7 +374,8 @@ export default function NavbarUI({ session }) {
                         Riwayat
                       </DrawerActionLink>
 
-                      {isCEO ? (
+                     {isCEO ? (
+                      <>
                         <DrawerActionLink
                           href="/admin"
                           onClick={closeMenu}
@@ -370,15 +383,24 @@ export default function NavbarUI({ session }) {
                         >
                           Admin
                         </DrawerActionLink>
-                      ) : (
+
                         <DrawerActionLink
-                          href="/lacak"
+                          href="/fakechat"
                           onClick={closeMenu}
-                          icon={FaReceipt}
+                          icon={FaRobot}
                         >
-                          Lacak
+                          FakeChat
                         </DrawerActionLink>
-                      )}
+                      </>
+                    ) : (
+                      <DrawerActionLink
+                        href="/lacak"
+                        onClick={closeMenu}
+                        icon={FaReceipt}
+                      >
+                        Lacak
+                      </DrawerActionLink>
+                    )}
                     </div>
                   </div>
                 ) : (

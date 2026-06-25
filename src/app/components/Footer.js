@@ -21,6 +21,7 @@ const hideFooterRoutes = [
   "/privacy",
   "/refund",
   "/terms",
+  "/fakechat"
 ];
 
 const quickLinks = [
