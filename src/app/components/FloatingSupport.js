@@ -204,7 +204,8 @@ export default function FloatingSupport() {
     pathname?.startsWith('/lacak') ||
     pathname?.startsWith('/admin') ||
     pathname?.startsWith('/login') ||
-    pathname?.startsWith('/register');
+    pathname?.startsWith('/register') ||
+    pathname?.startsWith('/fakechat');
 
   useEffect(() => {
     let isMounted = true;

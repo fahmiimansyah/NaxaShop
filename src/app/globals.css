@@ -19,10 +19,151 @@
   }
 }
 
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* FakeChat fullscreen scope.
+   Dibikin scoped ke .chat-root biar Tailwind/global app lu gak ikut rusak. */
+.chat-root {
+  width: 100%;
+  max-width: 100vw;
+  min-width: 0;
+  height: 100dvh;
+  min-height: 100dvh;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.chat-header {
+  width: 100%;
+  padding: calc(9px + env(safe-area-inset-top)) clamp(12px, 2.2vw, 28px) 9px !important;
+  min-width: 0;
+}
+
+.chat-header > div:first-child {
+  min-width: 0;
+}
+
+.messages-area {
+  width: 100%;
+  min-width: 0;
+  padding: clamp(12px, 2vw, 28px) clamp(12px, 3vw, 42px) 16px;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}
+
+.chat-input-area {
+  width: 100%;
+  min-width: 0;
+  padding-left: clamp(10px, 2.4vw, 28px) !important;
+  padding-right: clamp(10px, 2.4vw, 28px) !important;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+}
+
+.tabs-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.tabs-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Small global polish */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(80, 60, 40, 0.22);
+  border-radius: 999px;
+}
+
+input[type="range"] {
+  accent-color: #c9a574;
+}
+
+input[type="color"] {
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+input[type="color"]::-webkit-color-swatch {
+  border: 0;
+  border-radius: 6px;
+}
+
+select option {
+  background: #1e1208;
+  color: #e8e3d8;
+}
+
+textarea {
+  field-sizing: content;
+}
+
+@media (max-width: 640px) {
+  .chat-header {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  .messages-area {
+    padding-left: 12px;
+    padding-right: 12px;
+    gap: 13px !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .messages-area {
+    padding-left: clamp(34px, 5vw, 76px);
+    padding-right: clamp(34px, 5vw, 76px);
+  }
 }
 
 @keyframes shimmer {
@@ -65,8 +206,9 @@ body {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
 /* Menyembunyikan scrollbar buat IE, Edge, dan Firefox */
 .no-scrollbar {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
