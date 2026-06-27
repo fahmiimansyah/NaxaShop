@@ -3,9 +3,9 @@
 import { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Check, FileText, Image as ImageIcon, MessageCircle, Minus, Music, Palette,
-  Paperclip, PencilLine, Plus, Search, SendHorizontal, Settings, Smile,
-  Sparkles, Trash2, Upload, UserRound, Video, X
+  Check, FileText, Image as ImageIcon, Maximize2, MessageCircle, Minus, Music, Palette,
+  MoreVertical, Paperclip, Pause, PencilLine, Play, Plus, Search, SendHorizontal, Settings,
+  Sparkles, Trash2, Upload, UserRound, Video, Volume2, VolumeX, X
 } from 'lucide-react'
 
 /* ── Avatar ── */
@@ -46,10 +46,16 @@ function Avatar({ name, src, size = 46 }) {
 function ChatHeader({ settings, onToggleSettings, onClearChat }) {
   const { header, appearance } = settings
   const font = `'${appearance.fontFamily}', sans-serif`
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  const closeAnd = (fn) => {
+    setMenuOpen(false)
+    fn?.()
+  }
 
   return (
     <div
-      className="chat-header"
+      className="shrink-0 flex items-center"
       style={{
         background: header.followChatBackground !== false ? appearance.chatBackground : (header.background || appearance.chatBackground),
         borderBottom: `${header.borderWidth}px solid ${header.borderColor}`,
@@ -58,16 +64,20 @@ function ChatHeader({ settings, onToggleSettings, onClearChat }) {
         gap: 12,
         flexShrink: 0,
         zIndex: 30,
-        minHeight: 'clamp(64px, 9dvh, 76px)',
+        minHeight: 70,
+        paddingTop: 10,
+        paddingBottom: 10,
+        paddingLeft: 'max(12px, env(safe-area-inset-left))',
+        paddingRight: 'max(12px, env(safe-area-inset-right))',
+        position: 'relative',
       }}
     >
-      {/* Title area — avatar huruf "S" di header dihilangin */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
             color: header.textColor,
             fontWeight: 800,
-            fontSize: 'clamp(18px, 4.2vw, 22px)',
+            fontSize: 'clamp(18px, 5vw, 22px)',
             letterSpacing: '0.01em',
             fontFamily: font,
             lineHeight: 1.18,
@@ -82,7 +92,7 @@ function ChatHeader({ settings, onToggleSettings, onClearChat }) {
           <div
             style={{
               color: header.subtitleColor,
-              fontSize: 'clamp(9px, 2.25vw, 10px)',
+              fontSize: 10,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
               marginTop: 3,
@@ -97,42 +107,83 @@ function ChatHeader({ settings, onToggleSettings, onClearChat }) {
       </div>
 
       <motion.button
-        whileTap={{ scale: 0.9 }}
-        onClick={onClearChat}
-        title="Hapus chat"
-        aria-label="Hapus chat"
-        style={btnStyle(header.textColor)}
+        whileTap={{ scale: 0.92 }}
+        onClick={() => setMenuOpen(v => !v)}
+        title="Menu"
+        aria-label="Buka menu chat"
+        style={stealthMenuButton(header.textColor)}
       >
-        <Trash2 size={18} strokeWidth={2.2} />
+        <MoreVertical size={20} strokeWidth={2.35} />
       </motion.button>
-      <motion.button
-        whileTap={{ scale: 0.9 }}
-        onClick={onToggleSettings}
-        title="Pengaturan"
-        aria-label="Buka atau tutup pengaturan"
-        style={btnStyle(header.textColor)}
-      >
-        <Settings size={19} strokeWidth={2.2} />
-      </motion.button>
+
+      <AnimatePresence>
+        {menuOpen && (
+          <motion.div
+            key="header-stealth-menu"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.16 }}
+            style={{
+              position: 'absolute',
+              right: 'max(10px, env(safe-area-inset-right))',
+              top: 60,
+              zIndex: 50,
+              width: 174,
+              background: 'rgba(255,255,255,0.92)',
+              border: '1px solid rgba(70,45,20,0.10)',
+              borderRadius: 18,
+              boxShadow: '0 18px 42px rgba(70,45,20,0.18)',
+              padding: 7,
+              backdropFilter: 'blur(14px)',
+              fontFamily: font,
+            }}
+          >
+            <button type="button" onClick={() => closeAnd(onToggleSettings)} style={stealthMenuItem(header.textColor)}>
+              <Settings size={16} strokeWidth={2.3} /> Pengaturan
+            </button>
+            <button type="button" onClick={() => closeAnd(onClearChat)} style={{ ...stealthMenuItem('#9b3b31'), color: '#9b3b31' }}>
+              <Trash2 size={16} strokeWidth={2.3} /> Hapus chat
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
 
-const btnStyle = (color) => ({
-  background: 'rgba(255,255,255,0.34)',
-  border: '1px solid rgba(70,45,20,0.09)',
-  borderRadius: 13,
-  color,
-  width: 40,
-  height: 40,
+const stealthMenuButton = (color) => ({
+  background: 'rgba(255,255,255,0.10)',
+  border: '1px solid rgba(70,45,20,0.035)',
+  borderRadius: 14,
+  color: `${color}aa`,
+  width: 38,
+  height: 38,
   cursor: 'pointer',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   flexShrink: 0,
   padding: 0,
-  boxShadow: '0 2px 10px rgba(70,45,20,0.06)',
-  transition: 'background 0.15s, transform 0.15s',
+  boxShadow: 'none',
+  transition: 'background 0.15s, opacity 0.15s',
+  opacity: 0.58,
+})
+
+const stealthMenuItem = (color) => ({
+  width: '100%',
+  background: 'transparent',
+  border: 'none',
+  borderRadius: 12,
+  color,
+  padding: '10px 11px',
+  fontSize: 13,
+  fontWeight: 760,
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 9,
+  textAlign: 'left',
 })
 
 
@@ -143,7 +194,6 @@ const fadeVariants = {
   exit: { opacity: 0, transition: { duration: 0.18, ease: 'easeIn' } },
 }
 
-const STICKER_PRESETS = ['✨', '🥺', '😭', '😂', '👍', '💫', '🌟', '💤', '😳', '❤️', '🫡', '🎉']
 
 function isLikelyMediaSrc(value) {
   return typeof value === 'string' && /^(data:|blob:|https?:\/\/|\/)/i.test(value)
@@ -164,6 +214,679 @@ function getMediaDisplayName(message, fallback = 'Audio / Musik') {
     return fallback
   }
 }
+
+function formatMediaTime(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) return '0:00'
+  const total = Math.floor(seconds)
+  const mins = Math.floor(total / 60)
+  const secs = total % 60
+  return `${mins}:${String(secs).padStart(2, '0')}`
+}
+
+function mediaIconButtonStyle(color, size = 34) {
+  return {
+    width: size,
+    height: size,
+    borderRadius: '50%',
+    border: 'none',
+    background: 'rgba(255,255,255,0.22)',
+    color,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    flexShrink: 0,
+    padding: 0,
+    WebkitTapHighlightColor: 'transparent',
+  }
+}
+
+function CustomAudioPlayer({ src, bubbleBg, textColor, font, isUser, maxWidth }) {
+  const audioRef = useRef(null)
+  const [playing, setPlaying] = useState(false)
+  const [duration, setDuration] = useState(0)
+  const [current, setCurrent] = useState(0)
+  const [muted, setMuted] = useState(false)
+
+  const togglePlay = async () => {
+    const el = audioRef.current
+    if (!el) return
+    el.muted = false
+    el.volume = 1
+    if (el.paused) {
+      try { await el.play() } catch (_) {}
+    } else {
+      el.pause()
+    }
+  }
+
+  const toggleMute = () => {
+    const el = audioRef.current
+    if (!el) return
+    el.muted = !el.muted
+    setMuted(el.muted)
+  }
+
+  const seekFromEvent = (e) => {
+    const el = audioRef.current
+    if (!el || !duration) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+    el.currentTime = ratio * duration
+    setCurrent(el.currentTime)
+  }
+
+  const progress = duration ? Math.max(0, Math.min(100, (current / duration) * 100)) : 0
+
+  return (
+    <div
+      style={{
+        background: bubbleBg,
+        color: textColor,
+        borderRadius: isUser ? '18px 7px 18px 18px' : '7px 18px 18px 18px',
+        padding: '10px 12px',
+        width: 'min(310px, 68vw)',
+        maxWidth,
+        boxShadow: '0 2px 10px rgba(0,0,0,0.09)',
+        fontFamily: font,
+        display: 'grid',
+        gridTemplateColumns: '34px 1fr 30px',
+        alignItems: 'center',
+        gap: 10,
+      }}
+    >
+      <audio
+        ref={audioRef}
+        src={src}
+        preload="metadata"
+        onLoadedMetadata={(e) => {
+          e.currentTarget.muted = false
+          e.currentTarget.defaultMuted = false
+          e.currentTarget.volume = 1
+          setDuration(e.currentTarget.duration || 0)
+        }}
+        onTimeUpdate={(e) => setCurrent(e.currentTarget.currentTime || 0)}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => setPlaying(false)}
+      />
+
+      <button type="button" onClick={togglePlay} aria-label={playing ? 'Pause audio' : 'Play audio'} style={mediaIconButtonStyle(textColor, 34)}>
+        {playing ? <Pause size={17} fill="currentColor" strokeWidth={2.4} /> : <Play size={17} fill="currentColor" strokeWidth={2.4} style={{ marginLeft: 2 }} />}
+      </button>
+
+      <div style={{ minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+          <span style={{ fontSize: 12, fontWeight: 750, opacity: 0.88 }}>Audio</span>
+          <span style={{ fontSize: 11, fontVariantNumeric: 'tabular-nums', opacity: 0.74 }}>
+            {formatMediaTime(current)} / {formatMediaTime(duration)}
+          </span>
+        </div>
+        <div
+          onClick={seekFromEvent}
+          role="slider"
+          aria-label="Seek audio"
+          aria-valuemin={0}
+          aria-valuemax={Math.floor(duration || 0)}
+          aria-valuenow={Math.floor(current || 0)}
+          style={{
+            height: 8,
+            borderRadius: 999,
+            background: 'rgba(255,255,255,0.28)',
+            cursor: 'pointer',
+            overflow: 'hidden',
+          }}
+        >
+          <div style={{ width: `${progress}%`, height: '100%', borderRadius: 999, background: textColor, opacity: 0.86 }} />
+        </div>
+      </div>
+
+      <button type="button" onClick={toggleMute} aria-label={muted ? 'Unmute audio' : 'Mute audio'} style={mediaIconButtonStyle(textColor, 30)}>
+        {muted ? <VolumeX size={16} strokeWidth={2.3} /> : <Volume2 size={16} strokeWidth={2.3} />}
+      </button>
+    </div>
+  )
+}
+
+function CustomVideoPlayer({ src, radius, maxWidth, initialMuted = false }) {
+  const videoRef = useRef(null)
+  const hideTimerRef = useRef(null)
+  const viewerSnapshotRef = useRef(null)
+  const [playing, setPlaying] = useState(false)
+  const [duration, setDuration] = useState(0)
+  const [current, setCurrent] = useState(0)
+  const [muted, setMuted] = useState(!!initialMuted)
+  const [controlsVisible, setControlsVisible] = useState(true)
+  const [viewerOpen, setViewerOpen] = useState(false)
+
+  const clearHideTimer = () => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current)
+      hideTimerRef.current = null
+    }
+  }
+
+  const revealControls = (autoHide = true) => {
+    setControlsVisible(true)
+    clearHideTimer()
+    if (autoHide && playing) {
+      hideTimerRef.current = setTimeout(() => setControlsVisible(false), 1350)
+    }
+  }
+
+  useEffect(() => {
+    if (playing) revealControls(true)
+    else {
+      clearHideTimer()
+      setControlsVisible(true)
+    }
+    return clearHideTimer
+  }, [playing])
+
+  const togglePlay = async () => {
+    const el = videoRef.current
+    if (!el) return
+    el.muted = false
+    el.volume = 1
+    if (el.paused) {
+      try { await el.play() } catch (_) {}
+    } else {
+      el.pause()
+    }
+  }
+
+  const toggleMute = (e) => {
+    e?.stopPropagation?.()
+    const el = videoRef.current
+    if (!el) return
+    el.muted = !el.muted
+    setMuted(el.muted)
+    revealControls(true)
+  }
+
+  const seekFromEvent = (e) => {
+    e.stopPropagation()
+    const el = videoRef.current
+    if (!el || !duration) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+    el.currentTime = ratio * duration
+    setCurrent(el.currentTime)
+    revealControls(true)
+  }
+
+  const openViewer = (e) => {
+    e.stopPropagation()
+    const el = videoRef.current
+    const wasPlaying = !!el && !el.paused
+    viewerSnapshotRef.current = {
+      wasPlaying,
+      wasMuted: !!el?.muted,
+      currentTime: el?.currentTime || current || 0,
+    }
+
+    // V38: jangan biarin preview bubble + viewer jalan barengan.
+    // Yang main cuma modal fullscreen; preview disync lagi pas modal ditutup.
+    if (el && wasPlaying) {
+      try { el.pause() } catch (_) {}
+    }
+
+    revealControls(true)
+    setViewerOpen(true)
+  }
+
+  const progress = duration ? Math.max(0, Math.min(100, (current / duration) * 100)) : 0
+  const shouldShowControls = !playing || controlsVisible
+
+  return (
+    <>
+      <div
+        onPointerMove={() => revealControls(true)}
+        onMouseEnter={() => revealControls(false)}
+        onMouseLeave={() => { if (playing) setControlsVisible(false) }}
+        style={{
+          position: 'relative',
+          background: '#000',
+          borderRadius: radius,
+          overflow: 'hidden',
+          width: '100%',
+          maxWidth,
+          boxShadow: '0 2px 10px rgba(0,0,0,0.10)',
+          border: '1px solid rgba(255,255,255,0.035)',
+        }}
+      >
+        <video
+          ref={videoRef}
+          src={src}
+          playsInline
+          loop
+          preload="metadata"
+          onClick={() => {
+            if (playing && !controlsVisible) revealControls(true)
+            else togglePlay()
+          }}
+          onLoadedMetadata={(e) => {
+            e.currentTarget.muted = false
+            e.currentTarget.defaultMuted = false
+            e.currentTarget.volume = 1
+            setDuration(e.currentTarget.duration || 0)
+          }}
+          onTimeUpdate={(e) => setCurrent(e.currentTarget.currentTime || 0)}
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onEnded={() => { setPlaying(false); setControlsVisible(true) }}
+          style={{
+            width: '100%',
+            maxHeight: 260,
+            display: 'block',
+            background: '#000',
+            cursor: 'pointer',
+          }}
+        />
+
+        <motion.button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); togglePlay() }}
+          aria-label={playing ? 'Pause video' : 'Play video'}
+          animate={{ opacity: (!playing || controlsVisible) ? 1 : 0 }}
+          transition={{ duration: 0.18 }}
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 46,
+            height: 46,
+            borderRadius: '50%',
+            border: '1px solid rgba(255,255,255,0.34)',
+            background: 'rgba(0,0,0,0.36)',
+            color: '#fff',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: (!playing || controlsVisible) ? 'pointer' : 'default',
+            pointerEvents: (!playing || controlsVisible) ? 'auto' : 'none',
+            backdropFilter: 'blur(7px)',
+          }}
+        >
+          {playing
+            ? <Pause size={21} fill="currentColor" strokeWidth={2.4} />
+            : <Play size={22} fill="currentColor" strokeWidth={2.4} />
+          }
+        </motion.button>
+
+        <motion.div
+          onClick={(e) => e.stopPropagation()}
+          animate={{ opacity: shouldShowControls ? 1 : 0 }}
+          transition={{ duration: 0.18 }}
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            padding: '18px 9px 8px',
+            background: 'linear-gradient(to top, rgba(0,0,0,0.68), rgba(0,0,0,0.22), transparent)',
+            color: '#fff',
+            pointerEvents: shouldShowControls ? 'auto' : 'none',
+          }}
+        >
+          <div onClick={seekFromEvent} style={{ height: 7, borderRadius: 999, background: 'rgba(255,255,255,0.28)', cursor: 'pointer', overflow: 'hidden', marginBottom: 7 }}>
+            <div style={{ width: `${progress}%`, height: '100%', borderRadius: 999, background: '#fff' }} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button type="button" onClick={togglePlay} aria-label={playing ? 'Pause video' : 'Play video'} style={mediaIconButtonStyle('#fff', 29)}>
+              {playing ? <Pause size={15} fill="currentColor" strokeWidth={2.4} /> : <Play size={15} fill="currentColor" strokeWidth={2.4} style={{ marginLeft: 2 }} />}
+            </button>
+            <span style={{ fontSize: 11, lineHeight: 1, fontVariantNumeric: 'tabular-nums', minWidth: 72, opacity: 0.92 }}>
+              {formatMediaTime(current)} / {formatMediaTime(duration)}
+            </span>
+            <div style={{ flex: 1 }} />
+            <button type="button" onClick={toggleMute} aria-label={muted ? 'Unmute video' : 'Mute video'} style={mediaIconButtonStyle('#fff', 29)}>
+              {muted ? <VolumeX size={15} strokeWidth={2.3} /> : <Volume2 size={15} strokeWidth={2.3} />}
+            </button>
+            <button type="button" onClick={openViewer} aria-label="Buka video" style={mediaIconButtonStyle('#fff', 29)}>
+              <Maximize2 size={14} strokeWidth={2.4} />
+            </button>
+          </div>
+        </motion.div>
+      </div>
+
+      <AnimatePresence>
+        {viewerOpen && (
+          <VideoModal
+            key="video-viewer"
+            src={src}
+            startTime={viewerSnapshotRef.current?.currentTime ?? current}
+            autoPlay={viewerSnapshotRef.current?.wasPlaying ?? playing}
+            initialMuted={viewerSnapshotRef.current?.wasMuted ?? muted}
+            onClose={(state) => {
+              const el = videoRef.current
+              setViewerOpen(false)
+              viewerSnapshotRef.current = null
+              if (!el || !state) return
+              try { el.currentTime = state.currentTime || 0 } catch (_) {}
+              el.muted = !!state.muted
+              setMuted(el.muted)
+              setCurrent(el.currentTime || state.currentTime || 0)
+              if (state.playing) {
+                el.muted = !!state.muted
+                el.volume = 1
+                setTimeout(() => { el.play().catch(() => {}) }, 30)
+              } else {
+                el.pause()
+              }
+            }}
+          />
+        )}
+      </AnimatePresence>
+    </>
+  )
+}
+
+function VideoModal({ src, startTime = 0, autoPlay = false, initialMuted = false, onClose }) {
+  // V39: fullscreen controls bisa disembunyiin total saat video jalan.
+  // Tap video/area viewer buat show-hide, bukan selalu nampilin tombol.
+  const videoRef = useRef(null)
+  const hideTimerRef = useRef(null)
+  const [playing, setPlaying] = useState(false)
+  const [duration, setDuration] = useState(0)
+  const [current, setCurrent] = useState(startTime || 0)
+  const [muted, setMuted] = useState(false)
+  const [controlsVisible, setControlsVisible] = useState(true)
+
+  const clearHideTimer = () => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current)
+      hideTimerRef.current = null
+    }
+  }
+
+  const revealControls = (autoHide = true) => {
+    setControlsVisible(true)
+    clearHideTimer()
+    if (autoHide && playing) {
+      hideTimerRef.current = setTimeout(() => setControlsVisible(false), 950)
+    }
+  }
+
+  const closeWithState = () => {
+    const el = videoRef.current
+    onClose?.({
+      currentTime: el?.currentTime || current || 0,
+      playing: !!el && !el.paused,
+      muted: !!el?.muted,
+    })
+  }
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') closeWithState() }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      clearHideTimer()
+    }
+  }, [onClose, current, playing, muted])
+
+  useEffect(() => {
+    const el = videoRef.current
+    if (!el) return
+    if (startTime > 0) {
+      const applyStart = () => {
+        try { el.currentTime = Math.min(startTime, el.duration || startTime) } catch (_) {}
+        setCurrent(el.currentTime || startTime)
+      }
+      if (Number.isFinite(el.duration) && el.duration > 0) applyStart()
+      else el.addEventListener('loadedmetadata', applyStart, { once: true })
+    }
+
+    el.loop = true
+    el.muted = !!initialMuted
+    el.defaultMuted = !!initialMuted
+    if (!initialMuted) el.volume = 1
+
+    if (autoPlay) {
+      const playAfterSync = () => {
+        try { el.currentTime = Math.min(startTime || 0, el.duration || startTime || 0) } catch (_) {}
+        el.play().catch(() => {})
+      }
+      if (Number.isFinite(el.duration) && el.duration > 0) {
+        setTimeout(playAfterSync, 30)
+      } else {
+        el.addEventListener('loadedmetadata', playAfterSync, { once: true })
+      }
+    }
+  }, [startTime, autoPlay, initialMuted])
+
+  useEffect(() => {
+    if (playing) revealControls(true)
+    else {
+      clearHideTimer()
+      setControlsVisible(true)
+    }
+    return clearHideTimer
+  }, [playing])
+
+  const togglePlay = async () => {
+    const el = videoRef.current
+    if (!el) return
+    el.muted = false
+    el.volume = 1
+    if (el.paused) {
+      try { await el.play() } catch (_) {}
+    } else {
+      el.pause()
+    }
+  }
+
+  const toggleMute = (e) => {
+    e?.stopPropagation?.()
+    const el = videoRef.current
+    if (!el) return
+    el.muted = !el.muted
+    setMuted(el.muted)
+    revealControls(true)
+  }
+
+  const seekFromEvent = (e) => {
+    e.stopPropagation()
+    const el = videoRef.current
+    if (!el || !duration) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+    el.currentTime = ratio * duration
+    setCurrent(el.currentTime)
+    revealControls(true)
+  }
+
+  const progress = duration ? Math.max(0, Math.min(100, (current / duration) * 100)) : 0
+  const shouldShowControls = !playing || controlsVisible
+
+  return (
+    <motion.div
+      key="video-modal-backdrop"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      onClick={() => {
+        if (playing) {
+          if (controlsVisible) {
+            clearHideTimer()
+            setControlsVisible(false)
+          } else {
+            revealControls(true)
+          }
+        } else {
+          revealControls(false)
+        }
+      }}
+      onPointerMove={() => {
+        if (!controlsVisible) revealControls(true)
+      }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.94)',
+        zIndex: 350,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+      }}
+    >
+      <motion.button
+        initial={{ opacity: 0 }}
+        animate={{ opacity: shouldShowControls ? 1 : 0 }}
+        transition={{ duration: 0.16 }}
+        onClick={(e) => { e.stopPropagation(); closeWithState() }}
+        aria-label="Tutup video"
+        style={{
+          position: 'absolute',
+          top: 'max(18px, env(safe-area-inset-top))',
+          right: 'max(18px, env(safe-area-inset-right))',
+          background: 'rgba(255,255,255,0.14)',
+          backdropFilter: 'blur(8px)',
+          border: '1px solid rgba(255,255,255,0.18)',
+          borderRadius: '50%',
+          width: 42,
+          height: 42,
+          color: '#fff',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2,
+          pointerEvents: shouldShowControls ? 'auto' : 'none',
+        }}
+      >
+        <X size={22} />
+      </motion.button>
+
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.22, ease: 'easeOut' }}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: 'relative',
+          width: 'min(100%, 980px)',
+          maxHeight: '92dvh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 14,
+          overflow: 'hidden',
+          background: '#000',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.65)',
+        }}
+      >
+        <video
+          ref={videoRef}
+          src={src}
+          playsInline
+          loop
+          preload="metadata"
+          onClick={() => {
+            if (playing) {
+              if (controlsVisible) {
+                clearHideTimer()
+                setControlsVisible(false)
+              } else {
+                revealControls(true)
+              }
+              return
+            }
+            togglePlay()
+          }}
+          onLoadedMetadata={(e) => {
+            e.currentTarget.muted = !!initialMuted
+            e.currentTarget.defaultMuted = !!initialMuted
+            if (!initialMuted) e.currentTarget.volume = 1
+            setMuted(e.currentTarget.muted)
+            setDuration(e.currentTarget.duration || 0)
+          }}
+          onTimeUpdate={(e) => setCurrent(e.currentTarget.currentTime || 0)}
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onEnded={() => { setPlaying(false); setControlsVisible(true) }}
+          style={{
+            width: '100%',
+            maxHeight: '92dvh',
+            objectFit: 'contain',
+            display: 'block',
+            background: '#000',
+            cursor: 'pointer',
+          }}
+        />
+
+        <motion.button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); togglePlay() }}
+          aria-label={playing ? 'Pause video' : 'Play video'}
+          animate={{ opacity: !playing ? 1 : 0 }}
+          transition={{ duration: 0.18 }}
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 58,
+            height: 58,
+            borderRadius: '50%',
+            border: '1px solid rgba(255,255,255,0.34)',
+            background: 'rgba(0,0,0,0.36)',
+            color: '#fff',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: !playing ? 'pointer' : 'default',
+            pointerEvents: !playing ? 'auto' : 'none',
+            backdropFilter: 'blur(8px)',
+          }}
+        >
+          {playing
+            ? <Pause size={25} fill="currentColor" strokeWidth={2.4} />
+            : <Play size={27} fill="currentColor" strokeWidth={2.4} />
+          }
+        </motion.button>
+
+        <motion.div
+          onClick={(e) => e.stopPropagation()}
+          animate={{ opacity: shouldShowControls ? 1 : 0 }}
+          transition={{ duration: 0.18 }}
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            padding: '34px 14px max(14px, env(safe-area-inset-bottom))',
+            background: 'linear-gradient(to top, rgba(0,0,0,0.72), rgba(0,0,0,0.28), transparent)',
+            color: '#fff',
+            pointerEvents: shouldShowControls ? 'auto' : 'none',
+          }}
+        >
+          <div onClick={seekFromEvent} style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.26)', cursor: 'pointer', overflow: 'hidden', marginBottom: 9 }}>
+            <div style={{ width: `${progress}%`, height: '100%', borderRadius: 999, background: '#fff' }} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+            <button type="button" onClick={togglePlay} aria-label={playing ? 'Pause video' : 'Play video'} style={mediaIconButtonStyle('#fff', 34)}>
+              {playing ? <Pause size={17} fill="currentColor" strokeWidth={2.4} /> : <Play size={17} fill="currentColor" strokeWidth={2.4} style={{ marginLeft: 2 }} />}
+            </button>
+            <span style={{ fontSize: 12, lineHeight: 1, fontVariantNumeric: 'tabular-nums', minWidth: 82, opacity: 0.92 }}>
+              {formatMediaTime(current)} / {formatMediaTime(duration)}
+            </span>
+            <div style={{ flex: 1 }} />
+            <button type="button" onClick={toggleMute} aria-label={muted ? 'Unmute video' : 'Mute video'} style={mediaIconButtonStyle('#fff', 34)}>
+              {muted ? <VolumeX size={17} strokeWidth={2.3} /> : <Volume2 size={17} strokeWidth={2.3} />}
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 
 function MessageBubble({ message, settings, onImageClick, onEditRequest }) {
   const isUser = message.type === 'user'
@@ -367,89 +1090,23 @@ function MessageBubble({ message, settings, onImageClick, onEditRequest }) {
 
     if (isVideo) {
       return (
-        <motion.div variants={fadeVariants} initial="initial" animate="animate" exit="exit">
-          <div style={{
-            background: bubbleBg,
-            color: textColor,
-            borderRadius: mediaRadius,
-            padding: 5,
-            maxWidth: mediaBoxMaxWidth,
-            boxShadow: '0 2px 12px rgba(0,0,0,0.12)',
-            overflow: 'hidden',
-          }}>
-            <video
-              src={message.content}
-              controls
-              playsInline
-              style={{ width: '100%', maxHeight: 260, display: 'block', borderRadius: 14, background: '#000' }}
-            />
-            {message.fileName && (
-              <div style={{ fontSize: 10, opacity: 0.62, padding: '6px 7px 2px', fontFamily: font }}>
-                {message.fileName}
-              </div>
-            )}
-          </div>
+        <motion.div variants={fadeVariants} initial="initial" animate="animate" exit="exit" style={{ width: mediaBoxMaxWidth }}>
+          <CustomVideoPlayer src={message.content} radius={mediaRadius} maxWidth={mediaBoxMaxWidth} />
         </motion.div>
       )
     }
 
     if (isAudio) {
-      const audioName = getMediaDisplayName(message, 'Audio / Musik')
       return (
         <motion.div variants={fadeVariants} initial="initial" animate="animate" exit="exit">
-          <div style={{
-            background: bubbleBg,
-            color: textColor,
-            borderRadius: mediaRadius,
-            padding: '10px 11px 11px',
-            minWidth: 'min(245px, 62vw)',
-            maxWidth: mediaBoxMaxWidth,
-            boxShadow: '0 2px 10px rgba(0,0,0,0.09)',
-            fontFamily: font,
-          }}>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '34px 1fr',
-              gap: 9,
-              alignItems: 'center',
-              marginBottom: 9,
-              minWidth: 0,
-            }}>
-              <span style={{
-                width: 34,
-                height: 34,
-                borderRadius: '50%',
-                background: isUser ? 'rgba(255,255,255,0.18)' : 'rgba(201,165,116,0.18)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}>
-                <Music size={17} strokeWidth={2.3} />
-              </span>
-              <div style={{ minWidth: 0 }}>
-                <div style={{
-                  fontSize: 13,
-                  lineHeight: 1.2,
-                  fontWeight: 800,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                }}>
-                  {audioName}
-                </div>
-                <div style={{ fontSize: 10, lineHeight: 1.2, opacity: 0.56, marginTop: 2 }}>
-                  Musik / audio
-                </div>
-              </div>
-            </div>
-            <audio
-              src={message.content}
-              controls
-              title={audioName}
-              style={{ width: '100%', height: 34, display: 'block' }}
-            />
-          </div>
+          <CustomAudioPlayer
+            src={message.content}
+            bubbleBg={bubbleBg}
+            textColor={textColor}
+            font={font}
+            isUser={isUser}
+            maxWidth={mediaBoxMaxWidth}
+          />
         </motion.div>
       )
     }
@@ -677,11 +1334,11 @@ function ChatInput({
 }) {
   const [value, setValue] = useState('')
   const [attachOpen, setAttachOpen] = useState(false)
-  const [stickerOpen, setStickerOpen] = useState(false)
   const textRef = useRef(null)
   const imageInputRef = useRef(null)
   const videoInputRef = useRef(null)
   const audioInputRef = useRef(null)
+  const stickerInputRef = useRef(null)
   const { chatMode, appearance, header } = settings
   const scriptedChoices = settings.scriptedChoices || []
   const font = `'${appearance.fontFamily}', sans-serif`
@@ -691,7 +1348,6 @@ function ChatInput({
     if (!editingMessage) return
     setValue(editingMessage.content || '')
     setAttachOpen(false)
-    setStickerOpen(false)
     requestAnimationFrame(() => {
       if (!textRef.current) return
       textRef.current.focus()
@@ -718,14 +1374,12 @@ function ChatInput({
     onSend(trimmed)
     resetTextarea()
     setAttachOpen(false)
-    setStickerOpen(false)
   }
 
   const handleCancel = () => {
     onCancelEdit?.()
     resetTextarea()
     setAttachOpen(false)
-    setStickerOpen(false)
   }
 
   const handleKey = (e) => {
@@ -750,7 +1404,6 @@ function ChatInput({
     if (!content) return
     onSend({ contentType, content, fileName })
     setAttachOpen(false)
-    setStickerOpen(false)
     resetTextarea()
   }
 
@@ -814,76 +1467,97 @@ function ChatInput({
   }
 
   if (chatMode === 'scripted' && !isEditing) {
+    const hasScriptedChoices = scriptedChoices.length > 0
+    const visibleScriptedCount = Math.min(scriptedChoices.length, 2)
+    const slotHeight = visibleScriptedCount > 1 ? 92 : 44
+    const scriptedAreaStyle = {
+      ...baseInputArea,
+      borderTop: '0 solid transparent',
+      padding: 0,
+    }
+    const scriptedPanelStyle = {
+      borderTop: baseInputArea.borderTop,
+      paddingTop: 8,
+      paddingBottom: 'max(8px, env(safe-area-inset-bottom))',
+      paddingLeft: 'max(14px, env(safe-area-inset-left))',
+      paddingRight: 'max(14px, env(safe-area-inset-right))',
+    }
+
     return (
-      <div className="chat-input-area" style={{ ...baseInputArea, padding: '12px 14px' }}>
-        <AnimatePresence>
-          {scriptedChoices.length === 0 ? (
+      <div className="shrink-0" style={scriptedAreaStyle}>
+        <AnimatePresence initial={false}>
+          {hasScriptedChoices && (
             <motion.div
-              key="script-empty"
+              key={`scripted-choice-panel-${scriptedChoices.map(choice => choice.id).join('-')}`}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              style={{
-                color: 'rgba(50,35,20,0.42)',
-                fontSize: 12,
-                fontFamily: font,
-                textAlign: 'center',
-                padding: '12px 0',
-                width: '100%',
-              }}
+              transition={{ duration: 0.24, ease: 'easeOut' }}
+              style={scriptedPanelStyle}
             >
-              Pilihan cerita udah habis. Hapus chat buat reset run, atau tambah pilihan di Pengaturan → Chat.
-            </motion.div>
-          ) : (
-            <motion.div
-              key="script-list"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.22 }}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr',
-                gap: 8,
-                width: '100%',
-              }}
-            >
-              {scriptedChoices.map((choice, i) => (
-                <motion.button
-                  key={choice.id}
+              <div
+                style={{
+                  position: 'relative',
+                  minHeight: slotHeight,
+                  overflow: 'hidden',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <motion.div
+                  key={`script-list-${scriptedChoices.map(choice => choice.id).join('-')}`}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.24, delay: i * 0.025 }}
-                  whileTap={{ scale: 0.985 }}
-                  onClick={() => onScriptedChoice(choice)}
+                  transition={{ duration: 0.24, ease: 'easeOut' }}
                   style={{
-                    width: '100%',
-                    minHeight: 46,
-                    background: appearance.userBubbleColor,
-                    color: appearance.userTextColor,
-                    border: '1px solid rgba(255,255,255,0.22)',
-                    borderRadius: 16,
-                    padding: '12px 15px',
-                    fontSize: 13,
-                    cursor: 'pointer',
-                    fontFamily: font,
-                    fontWeight: 700,
-                    lineHeight: 1.35,
-                    textAlign: 'left',
-                    boxShadow: '0 3px 14px rgba(0,0,0,0.14)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 12,
+                    display: 'grid',
+                    gridTemplateColumns: '1fr',
+                    gap: 9,
+                    width: 'clamp(250px, 58vw, 330px)',
+                    margin: '0 auto',
                   }}
                 >
-                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {choice.userText || `Pilihan ${i + 1}`}
-                  </span>
-                  <SendHorizontal size={16} strokeWidth={2.4} style={{ flexShrink: 0, opacity: 0.88 }} />
-                </motion.button>
-              ))}
+                  {scriptedChoices.slice(0, 2).map((choice, i) => (
+                    <motion.button
+                      key={choice.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.22, delay: i * 0.035, ease: 'easeOut' }}
+                      whileTap={{ opacity: 0.74, scale: 0.985 }}
+                      onClick={() => onScriptedChoice(choice)}
+                      style={{
+                        position: 'relative',
+                        overflow: 'hidden',
+                        width: '100%',
+                        minHeight: 39,
+                        background: 'linear-gradient(180deg, rgba(255,255,255,0.99), rgba(249,247,243,0.965))',
+                        color: '#352A1D',
+                        border: '1px solid rgba(70,45,20,0.055)',
+                        borderRadius: 999,
+                        padding: '9px 18px',
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        fontFamily: font,
+                        fontWeight: 850,
+                        lineHeight: 1.26,
+                        textAlign: 'center',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 6px 16px rgba(70,45,20,0.075), inset 0 1px 0 rgba(255,255,255,0.9)',
+                        WebkitTapHighlightColor: 'transparent',
+                      }}
+                    >
+                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', position: 'relative', zIndex: 1 }}>
+                        {choice.buttonText || choice.userText || `Pilihan ${i + 1}`}
+                      </span>
+                    </motion.button>
+                  ))}
+                </motion.div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -892,7 +1566,7 @@ function ChatInput({
   }
 
   return (
-    <div className="chat-input-area" style={{ ...baseInputArea, padding: '10px 12px' }}>
+    <div className="shrink-0" style={{ ...baseInputArea, paddingTop: 10, paddingBottom: 'max(10px, env(safe-area-inset-bottom))', paddingLeft: 'max(12px, env(safe-area-inset-left))', paddingRight: 'max(12px, env(safe-area-inset-right))' }}>
       <AnimatePresence>
         {isEditing && (
           <motion.div
@@ -972,47 +1646,8 @@ function ChatInput({
                 {mediaButton('Gambar', ImageIcon, () => imageInputRef.current?.click(), '#8B9ED4')}
                 {mediaButton('Video', Video, () => videoInputRef.current?.click(), '#D4A5C4')}
                 {mediaButton('Musik', Music, () => audioInputRef.current?.click(), '#85C9A5')}
-                {mediaButton('Sticker', Smile, () => setStickerOpen(v => !v), '#C9A574')}
+                {mediaButton('Sticker', Sparkles, () => stickerInputRef.current?.click(), '#C9A574')}
               </div>
-
-              <AnimatePresence>
-                {stickerOpen && (
-                  <motion.div
-                    key="sticker-tray"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.16 }}
-                    style={{
-                      marginTop: 10,
-                      paddingTop: 10,
-                      borderTop: '1px solid rgba(70,45,20,0.09)',
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(6, 1fr)',
-                      gap: 7,
-                    }}
-                  >
-                    {STICKER_PRESETS.map((sticker) => (
-                      <button
-                        key={sticker}
-                        type="button"
-                        onClick={() => sendMedia('sticker', sticker)}
-                        style={{
-                          height: 38,
-                          borderRadius: 14,
-                          border: '1px solid rgba(70,45,20,0.08)',
-                          background: 'rgba(255,255,255,0.62)',
-                          fontSize: 22,
-                          cursor: 'pointer',
-                          boxShadow: '0 5px 14px rgba(70,45,20,0.06)',
-                        }}
-                      >
-                        {sticker}
-                      </button>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
             </motion.div>
           )}
         </AnimatePresence>
@@ -1105,6 +1740,7 @@ function ChatInput({
       <input ref={imageInputRef} type="file" accept="image/*" onChange={(e) => handleMediaFile('image', e)} style={{ display: 'none' }} />
       <input ref={videoInputRef} type="file" accept="video/*" onChange={(e) => handleMediaFile('video', e)} style={{ display: 'none' }} />
       <input ref={audioInputRef} type="file" accept="audio/*" onChange={(e) => handleMediaFile('audio', e)} style={{ display: 'none' }} />
+      <input ref={stickerInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => handleMediaFile('sticker', e)} style={{ display: 'none' }} />
     </div>
   )
 }
@@ -1118,6 +1754,16 @@ const FONTS = [
   { value: 'Georgia', label: 'Georgia (Serif)' },
   { value: 'monospace', label: 'Monospace' },
 ]
+
+const FRAME_MODES = [
+  { id: 'full', label: 'Full', desc: 'Full layar', aspect: null },
+  { id: 'square11', label: '1:1', desc: 'Square post', aspect: 1 },
+  { id: 'portrait34', label: '3:4', desc: 'Portrait record', aspect: 0.75 },
+  { id: 'landscape43', label: '4:3', desc: 'Landscape crop', aspect: 4 / 3 },
+  { id: 'vertical916', label: '9:16', desc: 'Shorts/Reels', aspect: 9 / 16 },
+]
+
+const getFrameModeConfig = (mode) => FRAME_MODES.find(item => item.id === mode) || FRAME_MODES[0]
 
 const TABS = [
   { id: 'tampilan', label: 'Tampilan', Icon: Palette },
@@ -1240,7 +1886,7 @@ function AvatarUpload({ name, src, onChange }) {
   )
 }
 
-function ReplyEditor({ reply, onChange, label, bots = [] }) {
+function ReplyEditor({ reply, onChange, label, bots = [], textPlaceholder = 'Ketik balasan bot di sini...' }) {
   const fileRef = useRef()
   const botOptions = bots.length ? bots : [normalizeBot(DEFAULT_SETTINGS.bot, 'Stelle')]
   const firstBotId = botOptions[0]?.id || MAIN_BOT_ID
@@ -1252,7 +1898,7 @@ function ReplyEditor({ reply, onChange, label, bots = [] }) {
     : r.type === 'audio'
       ? 'Tempel URL audio/musik, atau upload...'
       : r.type === 'sticker'
-        ? 'Tempel URL sticker/gambar, upload, atau pilih emoji...'
+        ? 'Tempel URL sticker .webp/.gif/.png, atau upload sticker...'
         : 'Tempel URL gambar, atau upload...'
 
   const handleFile = (e) => {
@@ -1338,7 +1984,7 @@ function ReplyEditor({ reply, onChange, label, bots = [] }) {
 
       {r.type === 'text' ? (
         <textarea value={r.content} onChange={e => onChange({ ...r, content: e.target.value })}
-          placeholder="Ketik balasan bot di sini..." rows={2}
+          placeholder={textPlaceholder} rows={2}
           style={{
             width: '100%', background: 'rgba(255,255,255,0.06)',
             border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
@@ -1360,27 +2006,6 @@ function ReplyEditor({ reply, onChange, label, bots = [] }) {
             </button>
           </div>
 
-          {r.type === 'sticker' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 5, marginTop: 8 }}>
-              {STICKER_PRESETS.map(sticker => (
-                <button
-                  key={sticker}
-                  onClick={() => onChange({ ...r, content: sticker, fileName: undefined })}
-                  style={{
-                    height: 30,
-                    borderRadius: 9,
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    background: r.content === sticker ? 'rgba(201,165,116,0.34)' : 'rgba(255,255,255,0.06)',
-                    fontSize: 18,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {sticker}
-                </button>
-              ))}
-            </div>
-          )}
-
           {renderMediaPreview()}
           <input ref={fileRef} type="file" accept={mediaAccept} onChange={handleFile} style={{ display: 'none' }} />
         </div>
@@ -1389,26 +2014,206 @@ function ReplyEditor({ reply, onChange, label, bots = [] }) {
   )
 }
 
+function getReplyList(container) {
+  const raw = Array.isArray(container?.replies) && container.replies.length
+    ? container.replies
+    : [container?.reply1, container?.reply2].filter(Boolean)
+  return raw.map((reply) => ({
+    id: reply?.id || uid(),
+    botId: reply?.botId,
+    type: reply?.type || 'text',
+    content: typeof reply?.content === 'string' ? reply.content : '',
+    fileName: reply?.fileName,
+  }))
+}
+
+function makeEmptyReply(botId) {
+  return { id: uid(), botId: botId || MAIN_BOT_ID, type: 'text', content: '' }
+}
+
+function withReplyList(container, replies) {
+  const cleanReplies = (replies || []).map((reply) => ({
+    id: reply?.id || uid(),
+    botId: reply?.botId,
+    type: reply?.type || 'text',
+    content: typeof reply?.content === 'string' ? reply.content : '',
+    fileName: reply?.fileName,
+  }))
+  return {
+    ...container,
+    replies: cleanReplies,
+    reply1: cleanReplies[0] || null,
+    reply2: cleanReplies[1] || null,
+  }
+}
+
+function makeEmptyUserScriptMessage() {
+  return { id: uid(), type: 'text', content: '' }
+}
+
+function normalizeUserScriptMessage(message) {
+  return {
+    id: message?.id || uid(),
+    type: message?.type || message?.contentType || 'text',
+    content: typeof message?.content === 'string' ? message.content : '',
+    fileName: message?.fileName,
+  }
+}
+
+function getScriptedUserMessageList(choice) {
+  const fromList = Array.isArray(choice?.userMessages) && choice.userMessages.length
+    ? choice.userMessages
+    : null
+
+  const fallback = []
+  if (typeof choice?.userText === 'string' && choice.userText.trim()) {
+    fallback.push({ id: `${choice.id || 'choice'}-old-user-1`, type: 'text', content: choice.userText })
+  }
+  if (typeof choice?.userText2 === 'string' && choice.userText2.trim()) {
+    fallback.push({ id: `${choice.id || 'choice'}-old-user-2`, type: 'text', content: choice.userText2 })
+  }
+
+  return (fromList || fallback).map(normalizeUserScriptMessage)
+}
+
+function withUserScriptMessageList(choice, messages) {
+  const cleanMessages = (messages || []).map(normalizeUserScriptMessage)
+  return {
+    ...choice,
+    userMessages: cleanMessages,
+  }
+}
+
+function getChoiceButtonText(choice, index = 0) {
+  const raw = choice?.buttonText || choice?.userText || `Pilihan ${index + 1}`
+  return typeof raw === 'string' && raw.trim() ? raw.trim() : `Pilihan ${index + 1}`
+}
+
+function UserScriptMessageListEditor({ choice, onUpdate }) {
+  const messages = getScriptedUserMessageList(choice)
+  const visibleMessages = messages.length ? messages : [makeEmptyUserScriptMessage()]
+
+  const commit = (nextMessages) => onUpdate(withUserScriptMessageList(choice, nextMessages))
+  const updateMessage = (idx, message) => commit(visibleMessages.map((old, i) => i === idx ? normalizeUserScriptMessage({ ...message, id: old.id || message.id || uid() }) : old))
+  const addMessage = () => commit([...visibleMessages, makeEmptyUserScriptMessage()])
+  const deleteMessage = (idx) => {
+    if (visibleMessages.length <= 1) {
+      commit([makeEmptyUserScriptMessage()])
+      return
+    }
+    commit(visibleMessages.filter((_, i) => i !== idx))
+  }
+
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ color: 'rgba(217,210,200,0.5)', fontSize: 10, marginBottom: 7, letterSpacing: '0.05em' }}>
+        PESAN USER OTOMATIS (tidak tampil di tombol template):
+      </div>
+      {visibleMessages.map((message, idx) => (
+        <div key={message.id || idx} style={{
+          borderRadius: 11,
+          padding: 10,
+          marginBottom: 10,
+          background: 'rgba(255,255,255,0.035)',
+          border: '1px solid rgba(255,255,255,0.065)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+            <span style={{ color: 'rgba(217,210,200,0.58)', fontSize: 10, fontWeight: 750, letterSpacing: '0.07em', textTransform: 'uppercase' }}>
+              User kirim otomatis #{idx + 1}
+            </span>
+            <button onClick={() => deleteMessage(idx)} style={smBtn('#ff9999', 'rgba(255,80,80,0.10)', 9)}>
+              <Trash2 size={12} /> Hapus
+            </button>
+          </div>
+          <ReplyEditor
+            reply={message}
+            label={`Isi pesan user #${idx + 1}`}
+            bots={[]}
+            textPlaceholder="Ketik pesan user otomatis..."
+            onChange={r => updateMessage(idx, r)}
+          />
+        </div>
+      ))}
+      <button onClick={addMessage} style={{
+        ...smBtn('#C9A574', 'rgba(201,165,116,0.14)', 10),
+        width: '100%',
+        padding: '8px 12px',
+        fontWeight: 750,
+      }}>
+        <Plus size={13} /> Tambah Pesan User Otomatis
+      </button>
+    </div>
+  )
+}
+
+function BotReplyListEditor({ item, onUpdate, bots = [], titlePrefix = 'Pesan Bot' }) {
+  const firstBotId = bots[0]?.id || MAIN_BOT_ID
+  const replies = getReplyList(item)
+  const visibleReplies = replies.length ? replies : [makeEmptyReply(firstBotId)]
+
+  const commit = (nextReplies) => onUpdate(withReplyList(item, nextReplies))
+  const updateReply = (idx, reply) => commit(visibleReplies.map((old, i) => i === idx ? { ...reply, id: old.id || reply.id || uid() } : old))
+  const addReply = () => commit([...visibleReplies, makeEmptyReply(firstBotId)])
+  const deleteReply = (idx) => {
+    if (visibleReplies.length <= 1) {
+      commit([makeEmptyReply(firstBotId)])
+      return
+    }
+    commit(visibleReplies.filter((_, i) => i !== idx))
+  }
+
+  return (
+    <div>
+      {visibleReplies.map((reply, idx) => (
+        <div key={reply.id || idx} style={{
+          borderRadius: 11,
+          padding: 10,
+          marginBottom: 10,
+          background: 'rgba(255,255,255,0.035)',
+          border: '1px solid rgba(255,255,255,0.065)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+            <span style={{ color: 'rgba(217,210,200,0.58)', fontSize: 10, fontWeight: 750, letterSpacing: '0.07em', textTransform: 'uppercase' }}>
+              {titlePrefix} #{idx + 1}
+            </span>
+            <button onClick={() => deleteReply(idx)} style={smBtn('#ff9999', 'rgba(255,80,80,0.10)', 9)}>
+              <Trash2 size={12} /> Hapus
+            </button>
+          </div>
+          <ReplyEditor
+            reply={reply}
+            label={`Isi balasan #${idx + 1}`}
+            bots={bots}
+            onChange={r => updateReply(idx, r)}
+          />
+        </div>
+      ))}
+
+      <button onClick={addReply} style={{
+        ...smBtn('#C9A574', 'rgba(201,165,116,0.14)', 10),
+        width: '100%',
+        padding: '8px 12px',
+        fontWeight: 750,
+      }}>
+        <Plus size={13} /> Tambah Pesan Bot
+      </button>
+    </div>
+  )
+}
+
 function ResponseCard({ response, onUpdate, onDelete, index, bots = [] }) {
-  const [showSecond, setShowSecond] = useState(!!(response.reply2 && response.reply2.content))
   return (
     <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 11, padding: 12, marginBottom: 10, border: '1px solid rgba(255,255,255,0.07)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <span style={{ color: '#C9A574', fontSize: 12, fontWeight: 700 }}>Balasan #{index + 1}</span>
+        <div>
+          <span style={{ color: '#C9A574', fontSize: 12, fontWeight: 800 }}>Siklus Balasan #{index + 1}</span>
+          <div style={{ color: 'rgba(217,210,200,0.38)', fontSize: 10, marginTop: 2 }}>
+            Isi pesan bot sebanyak apa pun; bot bakal ngirim berurutan.
+          </div>
+        </div>
         <button onClick={onDelete} style={smBtn('#ff9999', 'rgba(255,80,80,0.12)', 10)}><Trash2 size={12} /> Hapus</button>
       </div>
-      <ReplyEditor reply={response.reply1} label="Pesan Pertama Bot" bots={bots}
-        onChange={r => onUpdate({ ...response, reply1: r })} />
-      <button onClick={() => setShowSecond(s => !s)} style={{
-        ...smBtn(showSecond ? '#90ee90' : 'rgba(217,210,200,0.5)', showSecond ? 'rgba(100,200,100,0.12)' : 'rgba(255,255,255,0.06)', 8),
-        marginTop: 4, marginBottom: showSecond ? 10 : 0,
-      }}>
-        {showSecond ? <><Minus size={12} /> Hapus Pesan Kedua</> : <><Plus size={12} /> Tambah Pesan Kedua</>}
-      </button>
-      {showSecond && (
-        <ReplyEditor reply={response.reply2 || { type: 'text', content: '' }} label="Pesan Kedua Bot (opsional)" bots={bots}
-          onChange={r => onUpdate({ ...response, reply2: r })} />
-      )}
+      <BotReplyListEditor item={response} onUpdate={onUpdate} bots={bots} titlePrefix="Balasan Bot" />
     </div>
   )
 }
@@ -1431,35 +2236,30 @@ function StarterMessageCard({ message, onUpdate, onDelete, index, bots = [] }) {
 }
 
 function ChoiceCard({ choice, onUpdate, onDelete, index, bots = [] }) {
-  const [showSecond, setShowSecond] = useState(!!(choice.reply2 && choice.reply2.content))
+  const buttonText = choice.buttonText ?? choice.userText ?? ''
   return (
     <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 11, padding: 12, marginBottom: 10, border: '1px solid rgba(255,255,255,0.07)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <span style={{ color: '#C9A574', fontSize: 12, fontWeight: 700 }}>Pilihan #{index + 1}</span>
+        <div>
+          <span style={{ color: '#C9A574', fontSize: 12, fontWeight: 700 }}>Template #{index + 1}</span>
+          <div style={{ color: 'rgba(217,210,200,0.38)', fontSize: 10, marginTop: 2 }}>
+            Label tombol boleh beda dari pesan user yang dikirim otomatis.
+          </div>
+        </div>
         <button onClick={onDelete} style={smBtn('#ff9999', 'rgba(255,80,80,0.12)', 10)}><Trash2 size={12} /> Hapus</button>
       </div>
-      <div style={{ marginBottom: 10 }}>
-        <div style={{ color: 'rgba(217,210,200,0.5)', fontSize: 10, marginBottom: 5, letterSpacing: '0.05em' }}>TEKS TOMBOL (User mengirim ini):</div>
-        <input type="text" value={choice.userText} onChange={e => onUpdate({ ...choice, userText: e.target.value })}
-          placeholder='Contoh: "Apa kabar?"'
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ color: 'rgba(217,210,200,0.5)', fontSize: 10, marginBottom: 5, letterSpacing: '0.05em' }}>LABEL TOMBOL TEMPLATE (yang tampil di UI):</div>
+        <input type="text" value={buttonText} onChange={e => onUpdate({ ...choice, buttonText: e.target.value })}
+          placeholder='Contoh: "Balas March" / "Pilihan 1"'
           style={{
-            width: '100%', background: 'rgba(201,165,116,0.08)',
-            border: '1px solid rgba(201,165,116,0.25)', borderRadius: 8,
+            width: '100%', background: 'rgba(255,255,255,0.07)',
+            border: '1px solid rgba(255,255,255,0.13)', borderRadius: 8,
             padding: '8px 12px', color: '#f0ebe3', fontSize: 13, outline: 'none',
           }} />
       </div>
-      <ReplyEditor reply={choice.reply1} label="Balasan Bot – Pesan Pertama" bots={bots}
-        onChange={r => onUpdate({ ...choice, reply1: r })} />
-      <button onClick={() => setShowSecond(s => !s)} style={{
-        ...smBtn(showSecond ? '#90ee90' : 'rgba(217,210,200,0.5)', showSecond ? 'rgba(100,200,100,0.12)' : 'rgba(255,255,255,0.06)', 8),
-        marginTop: 4, marginBottom: showSecond ? 10 : 0,
-      }}>
-        {showSecond ? <><Minus size={12} /> Hapus Pesan Kedua Bot</> : <><Plus size={12} /> Tambah Pesan Kedua Bot</>}
-      </button>
-      {showSecond && (
-        <ReplyEditor reply={choice.reply2 || { type: 'text', content: '' }} label="Balasan Bot – Pesan Kedua (opsional)" bots={bots}
-          onChange={r => onUpdate({ ...choice, reply2: r })} />
-      )}
+      <UserScriptMessageListEditor choice={choice} onUpdate={onUpdate} />
+      <BotReplyListEditor item={choice} onUpdate={onUpdate} bots={bots} titlePrefix="Balasan Script" />
     </div>
   )
 }
@@ -1538,7 +2338,7 @@ function SettingsPanel({ settings, onUpdate, onClose, onClearChat }) {
     const firstBotId = getFirstBotId(p)
     return {
       ...p,
-      botResponses: [...p.botResponses, { id: uid(), reply1: { botId: firstBotId, type: 'text', content: '' }, reply2: null }]
+      botResponses: [...p.botResponses, withReplyList({ id: uid() }, [makeEmptyReply(firstBotId)])]
     }
   })
   const updateResponse = (id, upd) => setLocal(p => ({ ...p, botResponses: p.botResponses.map(r => r.id === id ? upd : r) }))
@@ -1558,7 +2358,7 @@ function SettingsPanel({ settings, onUpdate, onClose, onClearChat }) {
     const firstBotId = getFirstBotId(p)
     return {
       ...p,
-      scriptedChoices: [...p.scriptedChoices, { id: uid(), userText: '', reply1: { botId: firstBotId, type: 'text', content: '' }, reply2: null }]
+      scriptedChoices: [...p.scriptedChoices, withReplyList({ id: uid(), buttonText: '', userText: '', userMessages: [makeEmptyUserScriptMessage()] }, [makeEmptyReply(firstBotId)])]
     }
   })
   const updateChoice = (id, upd) => setLocal(p => ({ ...p, scriptedChoices: p.scriptedChoices.map(c => c.id === id ? upd : c) }))
@@ -1587,8 +2387,8 @@ function SettingsPanel({ settings, onUpdate, onClose, onClearChat }) {
       bot: nextBots[0],
       groupChat: nextBots.length > 1,
       starterMessages: (p.starterMessages || []).map(fixReply),
-      botResponses: (p.botResponses || []).map(r => ({ ...r, reply1: fixReply(r.reply1), reply2: fixReply(r.reply2) })),
-      scriptedChoices: (p.scriptedChoices || []).map(c => ({ ...c, reply1: fixReply(c.reply1), reply2: fixReply(c.reply2) })),
+      botResponses: (p.botResponses || []).map(r => withReplyList(r, getReplyList(r).map(fixReply).filter(Boolean))),
+      scriptedChoices: (p.scriptedChoices || []).map(c => withReplyList(c, getReplyList(c).map(fixReply).filter(Boolean))),
     }
   })
 
@@ -1696,6 +2496,32 @@ function SettingsPanel({ settings, onUpdate, onClose, onClearChat }) {
                 <span style={{ color: '#C9A574', fontSize: 13, fontWeight: 700, minWidth: 42 }}>
                   {local.appearance.avatarSize || 52}px
                 </span>
+              </div>
+
+              <SectionTitle>Frame Rekam</SectionTitle>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 10 }}>
+                {FRAME_MODES.map(mode => (
+                  <button
+                    key={mode.id}
+                    type="button"
+                    onClick={() => update('appearance.frameMode', mode.id)}
+                    style={{
+                      padding: '9px 8px',
+                      borderRadius: 12,
+                      border: `1px solid ${local.appearance.frameMode === mode.id ? '#C9A574' : 'rgba(255,255,255,0.10)'}`,
+                      background: local.appearance.frameMode === mode.id ? 'rgba(201,165,116,0.16)' : 'rgba(255,255,255,0.045)',
+                      color: local.appearance.frameMode === mode.id ? '#C9A574' : '#d9d2c8',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <div style={{ fontSize: 13, fontWeight: 850, lineHeight: 1.2 }}>{mode.label}</div>
+                    <div style={{ fontSize: 10, opacity: 0.58, marginTop: 2 }}>{mode.desc}</div>
+                  </button>
+                ))}
+              </div>
+              <div style={{ color: 'rgba(217,210,200,0.45)', fontSize: 11, lineHeight: 1.45, marginBottom: 6 }}>
+                Buat record konten, pilih 1:1 / 3:4 / 4:3 / 9:16 biar fakechat ada frame dan nggak full layar.
               </div>
 
               <SectionTitle>Suara</SectionTitle>
@@ -1820,6 +2646,38 @@ function SettingsPanel({ settings, onUpdate, onClose, onClearChat }) {
                 </div>
               )}
 
+              {local.chatMode === 'free' && (
+                <div style={{
+                  marginBottom: 16,
+                  padding: '10px 12px',
+                  borderRadius: 10,
+                  background: 'rgba(255,255,255,0.045)',
+                  border: '1px solid rgba(255,255,255,0.085)',
+                }}>
+                  <div style={{ color: 'rgba(217,210,200,0.72)', fontSize: 11, lineHeight: 1.45, marginBottom: 10 }}>
+                    Free mode sekarang bot wajib nunggu minimal 2 pesan user dulu. Setelah pesan kedua, bot baru boleh mulai reply sesuai jeda.
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                    <span style={{ color: 'rgba(217,210,200,0.62)', fontSize: 12, minWidth: 110 }}>Batas pesan user</span>
+                    <input type="range" min={2} max={6} value={Math.max(2, local.freeModeUserBurstMax || 2)}
+                      onChange={e => update('freeModeUserBurstMax', parseInt(e.target.value))}
+                      style={{ flex: 1 }} />
+                    <span style={{ color: '#C9A574', fontSize: 13, fontWeight: 800, minWidth: 24 }}>
+                      {Math.max(2, local.freeModeUserBurstMax || 2)}x
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ color: 'rgba(217,210,200,0.62)', fontSize: 12, minWidth: 110 }}>Jeda nunggu user</span>
+                    <input type="range" min={500} max={2200} step={100} value={local.freeModeUserBurstDelay || 1150}
+                      onChange={e => update('freeModeUserBurstDelay', parseInt(e.target.value))}
+                      style={{ flex: 1 }} />
+                    <span style={{ color: '#C9A574', fontSize: 13, fontWeight: 800, minWidth: 46 }}>
+                      {((local.freeModeUserBurstDelay || 1150) / 1000).toFixed(1)}s
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {local.chatMode === 'scripted' && (
                 <div style={{
                   marginBottom: 16,
@@ -1831,7 +2689,7 @@ function SettingsPanel({ settings, onUpdate, onClose, onClearChat }) {
                   fontSize: 11,
                   lineHeight: 1.45,
                 }}>
-                  Di scripted mode, tombol pilihan tampil full-width di bawah. Setelah dipilih, tombol itu hilang dari run sekarang biar chat-nya kerasa maju kayak cerita. Hapus chat buat reset pilihan.
+                  Di scripted mode, template tampil maksimal 2 tombol, putih elegan, dan murni fade. Pesan user otomatis bisa banyak, bisa teks/gambar/video/audio/sticker, tapi isi pesan itu tidak tampil di tombol template.
                 </div>
               )}
 
@@ -1843,7 +2701,7 @@ function SettingsPanel({ settings, onUpdate, onClose, onClearChat }) {
                       <span style={{ color: '#C9A574', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
                         Balasan Bot (Siklus Berurutan)
                       </span>
-                      <div style={{ color: 'rgba(217,210,200,0.4)', fontSize: 10, marginTop: 2 }}>Bot jawab berurutan: teks, gambar, video, musik, atau sticker</div>
+                      <div style={{ color: 'rgba(217,210,200,0.4)', fontSize: 10, marginTop: 2 }}>Satu siklus bisa isi banyak pesan bot bebas: teks, gambar, video, musik, atau sticker</div>
                     </div>
                     <button onClick={addResponse} style={smBtn('#C9A574', 'rgba(201,165,116,0.15)')}><Plus size={13} /> Tambah</button>
                   </div>
@@ -1870,7 +2728,7 @@ function SettingsPanel({ settings, onUpdate, onClose, onClearChat }) {
                       <span style={{ color: '#C9A574', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
                         Pilihan Script
                       </span>
-                      <div style={{ color: 'rgba(217,210,200,0.4)', fontSize: 10, marginTop: 2 }}>Tampil sebagai tombol, user gak bisa ngetik</div>
+                      <div style={{ color: 'rgba(217,210,200,0.4)', fontSize: 10, marginTop: 2 }}>Template maksimal 2 tombol, muncul setelah bot chat, tombolnya putih elegan compact</div>
                     </div>
                     <button onClick={addChoice} style={smBtn('#C9A574', 'rgba(201,165,116,0.15)')}><Plus size={13} /> Tambah</button>
                   </div>
@@ -1977,7 +2835,7 @@ function normalizeSettings(settings, rawOverride = null) {
   const bots = sourceBots.map((bot, i) => normalizeBot(bot, i === 0 ? 'Stelle' : `Bot ${i + 1}`))
   const firstBotId = bots[0]?.id || MAIN_BOT_ID
   const appearance = { ...DEFAULT_SETTINGS.appearance, ...(merged.appearance || {}) }
-  if (rawOverride && rawOverride.settingsVersion !== 8 && (!rawOverride.appearance || !rawOverride.appearance.avatarSize || rawOverride.appearance.avatarSize <= 46)) {
+  if (rawOverride && rawOverride.settingsVersion !== 13 && (!rawOverride.appearance || !rawOverride.appearance.avatarSize || rawOverride.appearance.avatarSize <= 46)) {
     appearance.avatarSize = 52
   }
 
@@ -1994,8 +2852,8 @@ function normalizeSettings(settings, rawOverride = null) {
     bot: bots[0],
     groupChat: merged.groupChat || bots.length > 1,
     starterMessages: (merged.starterMessages || []).map(fixReply),
-    botResponses: (merged.botResponses || []).map(r => ({ ...r, reply1: fixReply(r.reply1), reply2: fixReply(r.reply2) })),
-    scriptedChoices: (merged.scriptedChoices || []).map(c => ({ ...c, reply1: fixReply(c.reply1), reply2: fixReply(c.reply2) })),
+    botResponses: (merged.botResponses || []).map(r => withReplyList(r, getReplyList(r).map(fixReply).filter(Boolean))),
+    scriptedChoices: (merged.scriptedChoices || []).map(c => withUserScriptMessageList(withReplyList(c, getReplyList(c).map(fixReply).filter(Boolean)), getScriptedUserMessageList(c))),
   }
 }
 
@@ -2076,7 +2934,7 @@ function ImageModal({ src, onClose }) {
 
 /* ── Default Settings ── */
 const DEFAULT_SETTINGS = {
-  settingsVersion: 11,
+  settingsVersion: 13,
   appearance: {
     chatBackground: '#E8E3D8',
     userBubbleColor: '#C9A574',
@@ -2086,6 +2944,7 @@ const DEFAULT_SETTINGS = {
     fontFamily: 'Inter',
     avatarSize: 52,
     storyLayout: false,
+    frameMode: 'full',
   },
   header: {
     title: 'Astral Express Family',
@@ -2121,6 +2980,8 @@ const DEFAULT_SETTINGS = {
   ],
   groupChat: false,
   chatMode: 'free',
+  freeModeUserBurstMax: 2,
+  freeModeUserBurstDelay: 1150,
   botStarts: false,
   sound: true,
   starterMessages: [
@@ -2170,11 +3031,15 @@ export default function Home() {
   const [lightboxImage, setLightboxImage] = useState(null)
   const [editingMessage, setEditingMessage] = useState(null)
   const [usedScriptedChoiceIds, setUsedScriptedChoiceIds] = useState([])
+  const [scriptedChoicesReady, setScriptedChoicesReady] = useState(true)
+  const [viewport, setViewport] = useState({ height: null, offsetTop: 0 })
 
   const messagesEndRef = useRef(null)
   const messagesAreaRef = useRef(null)
   const suppressNextScrollRef = useRef(false)
   const botIndexRef = useRef(0)
+  const freeBurstCountRef = useRef(0)
+  const freeReplyTimerRef = useRef(null)
   const isBusyRef = useRef(false)
   const isMountedRef = useRef(true)
   const settingsRef = useRef(settings)
@@ -2183,6 +3048,42 @@ export default function Home() {
   const typingSkipResolverRef = useRef(null)
 
   useEffect(() => { settingsRef.current = settings }, [settings])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    let raf = null
+    const updateViewport = () => {
+      if (raf) window.cancelAnimationFrame(raf)
+      raf = window.requestAnimationFrame(() => {
+        const vv = window.visualViewport
+        const innerHeight = Math.round(window.innerHeight || document.documentElement?.clientHeight || 0)
+        const visualHeight = Math.round(vv?.height || innerHeight || 0)
+        const visualOffsetTop = Math.round(vv?.offsetTop || 0)
+        const keyboardGap = Math.max(0, innerHeight - visualHeight - visualOffsetTop)
+        const keyboardOpen = keyboardGap > 80 || visualHeight < innerHeight * 0.78
+
+        // Desktop kadang visualViewport bisa kebaca aneh kalau page/zoom berubah.
+        // Jadi visualViewport cuma dipakai saat keyboard HP beneran kebuka.
+        setViewport({
+          height: keyboardOpen ? visualHeight : innerHeight,
+          offsetTop: keyboardOpen ? visualOffsetTop : 0,
+          keyboardOpen,
+        })
+      })
+    }
+
+    updateViewport()
+    window.addEventListener('resize', updateViewport)
+    window.visualViewport?.addEventListener('resize', updateViewport)
+    window.visualViewport?.addEventListener('scroll', updateViewport)
+    return () => {
+      if (raf) window.cancelAnimationFrame(raf)
+      window.removeEventListener('resize', updateViewport)
+      window.visualViewport?.removeEventListener('resize', updateViewport)
+      window.visualViewport?.removeEventListener('scroll', updateViewport)
+    }
+  }, [])
+
   useEffect(() => {
     isMountedRef.current = true
     return () => {
@@ -2190,6 +3091,10 @@ export default function Home() {
       if (typingSkipResolverRef.current) {
         typingSkipResolverRef.current()
         typingSkipResolverRef.current = null
+      }
+      if (freeReplyTimerRef.current) {
+        clearTimeout(freeReplyTimerRef.current)
+        freeReplyTimerRef.current = null
       }
     }
   }, [])
@@ -2204,6 +3109,16 @@ export default function Home() {
       }
     } catch (_) {}
   }, [])
+
+  useEffect(() => {
+    if (settings.chatMode !== 'scripted') {
+      setScriptedChoicesReady(true)
+      return
+    }
+    if (settings.botStarts && messages.length === 0 && !starterRunRef.current) {
+      setScriptedChoicesReady(false)
+    }
+  }, [settings.chatMode, settings.botStarts, messages.length])
 
   /* Auto-scroll to bottom */
   const scrollToBottom = useCallback(() => {
@@ -2280,7 +3195,11 @@ export default function Home() {
   /* Send bot replies (1 atau beberapa pesan bot secara berurutan) */
   const sendBotReplies = useCallback(async (replies) => {
     const valid = (replies || []).filter(r => r && typeof r.content === 'string' && r.content.trim())
-    if (!valid.length) { isBusyRef.current = false; return }
+    if (!valid.length) {
+      if (settingsRef.current.chatMode === 'scripted') setScriptedChoicesReady(true)
+      isBusyRef.current = false
+      return
+    }
 
     let previousBotId = null
 
@@ -2343,6 +3262,7 @@ export default function Home() {
       if (settingsRef.current.sound) { await sleep(80); playBlub() }
     }
     setIsTyping(false)
+    if (settingsRef.current.chatMode === 'scripted') setScriptedChoicesReady(true)
     isBusyRef.current = false
   }, [addMessage, updateMessage, waitForTypingOrSkip])
 
@@ -2358,12 +3278,54 @@ export default function Home() {
     if (!starters.length) return
 
     starterRunRef.current = true
+    if (settings.chatMode === 'scripted') setScriptedChoicesReady(false)
     isBusyRef.current = true
     sendBotReplies(starters)
   }, [settings.botStarts, settings.starterMessages, messages.length, isTyping, sendBotReplies])
 
   /* Handle user sending a message/media (free mode) */
+  const triggerFreeBotReply = useCallback(async () => {
+    if (freeReplyTimerRef.current) {
+      clearTimeout(freeReplyTimerRef.current)
+      freeReplyTimerRef.current = null
+    }
+    freeBurstCountRef.current = 0
+    if (isBusyRef.current) return
+
+    const { botResponses } = settingsRef.current
+    if (!botResponses?.length) return
+
+    isBusyRef.current = true
+    const idx = botIndexRef.current % botResponses.length
+    botIndexRef.current++
+    const resp = botResponses[idx]
+    await sendBotReplies(getReplyList(resp))
+  }, [sendBotReplies])
+
+  const scheduleFreeBotReply = useCallback(() => {
+    if (freeReplyTimerRef.current) clearTimeout(freeReplyTimerRef.current)
+
+    const active = settingsRef.current
+    const minBeforeReply = 2
+    const maxBurst = Math.max(minBeforeReply, Math.min(6, Number(active.freeModeUserBurstMax || 2)))
+    const delay = Math.max(250, Math.min(3000, Number(active.freeModeUserBurstDelay || 1150)))
+
+    // V25: free mode nggak boleh bot jawab sebelum user benar-benar kirim pesan ke-2.
+    if (freeBurstCountRef.current < minBeforeReply) return
+
+    if (freeBurstCountRef.current >= maxBurst) {
+      triggerFreeBotReply()
+      return
+    }
+
+    freeReplyTimerRef.current = setTimeout(() => {
+      triggerFreeBotReply()
+    }, delay)
+  }, [triggerFreeBotReply])
+
   const handleUserSend = useCallback(async (payload) => {
+    // Kalau bot sudah benar-benar ngetik, jangan masukin pesan baru dulu.
+    // Tapi saat masih di jeda burst, user tetap boleh kirim pesan kedua/ketiga.
     if (isBusyRef.current) return
 
     const msg = typeof payload === 'string'
@@ -2377,27 +3339,87 @@ export default function Home() {
     if (!msg.content?.trim()) return
 
     addMessage({ type: 'user', ...msg })
-    const { botResponses } = settingsRef.current
-    if (botResponses?.length > 0) {
-      isBusyRef.current = true
-      const idx = botIndexRef.current % botResponses.length
-      botIndexRef.current++
-      const resp = botResponses[idx]
-      await sendBotReplies([resp?.reply1, resp?.reply2].filter(Boolean))
+
+    const active = settingsRef.current
+    const { botResponses } = active
+    if (active.chatMode !== 'free' || !botResponses?.length) return
+
+    // V24: free mode juga bisa user kirim beberapa bubble dulu sebelum bot jawab.
+    // Defaultnya 2 bubble. Kalau user diem sebentar, bot tetap mulai jawab otomatis.
+    freeBurstCountRef.current += 1
+    scheduleFreeBotReply()
+  }, [addMessage, scheduleFreeBotReply])
+
+  const sendScriptedUserMessages = useCallback(async (userMessages) => {
+    const valid = (userMessages || []).filter(message => message && typeof message.content === 'string' && message.content.trim())
+
+    for (let i = 0; i < valid.length; i++) {
+      if (!isMountedRef.current) break
+
+      const userMessage = valid[i]
+      const contentType = userMessage.type || 'text'
+      const content = userMessage.content.trim()
+      const isMedia = contentType !== 'text'
+
+      // Scripted user sekarang juga punya fase "ngetik/ngirim" dulu, biar gak pop mendadak.
+      const beforeTypingDelay = i === 0 ? 240 : (isMedia ? 780 : 640)
+      await sleep(beforeTypingDelay)
+      if (!isMountedRef.current) break
+
+      skipTypingRef.current = false
+      const typingMessageId = addMessage({
+        type: 'user',
+        senderId: 'user',
+        contentType: 'typing',
+        content: '',
+        isTypingPlaceholder: true,
+      })
+      await waitForPaint()
+      if (!isMountedRef.current) break
+
+      const baseDelay = i === 0 ? 1150 : 1450
+      const mediaExtraDelay = isMedia ? 360 : 0
+      const lengthExtraDelay = contentType === 'text' ? Math.min(520, Math.max(0, content.length - 22) * 10) : 0
+      await waitForTypingOrSkip(baseDelay + mediaExtraDelay + lengthExtraDelay)
+      if (!isMountedRef.current) break
+
+      suppressNextScrollRef.current = true
+      updateMessage(typingMessageId, {
+        type: 'user',
+        senderId: 'user',
+        contentType,
+        content,
+        fileName: userMessage.fileName,
+        isTypingPlaceholder: false,
+        revealedAt: Date.now(),
+      })
+      await waitForPaint()
     }
-  }, [addMessage, sendBotReplies])
+  }, [addMessage, updateMessage, waitForTypingOrSkip])
 
   /* Handle scripted choice click */
   const handleScriptedChoice = useCallback(async (choice) => {
     if (isBusyRef.current || !choice) return
+    isBusyRef.current = true
+    setScriptedChoicesReady(false)
     setUsedScriptedChoiceIds(prev => prev.includes(choice.id) ? prev : [...prev, choice.id])
-    addMessage({ type: 'user', contentType: 'text', content: choice.userText || '...' })
-    const replies = [choice?.reply1, choice?.reply2].filter(Boolean)
+
+    const scriptedUserMessages = getScriptedUserMessageList(choice)
+    const fallbackText = getChoiceButtonText(choice).trim() || '...'
+    const userMessages = scriptedUserMessages.length
+      ? scriptedUserMessages
+      : [{ id: uid(), type: 'text', content: fallbackText }]
+
+    await sendScriptedUserMessages(userMessages)
+
+    const replies = getReplyList(choice)
     if (replies.length > 0) {
-      isBusyRef.current = true
       await sendBotReplies(replies)
+    } else {
+      setScriptedChoicesReady(true)
+      isBusyRef.current = false
     }
-  }, [addMessage, sendBotReplies])
+  }, [sendBotReplies, sendScriptedUserMessages])
 
   /* Clear chat */
   const handleClearChat = useCallback(() => {
@@ -2407,8 +3429,14 @@ export default function Home() {
     setTypingTurnId(v => v + 1)
     setEditingMessage(null)
     setUsedScriptedChoiceIds([])
+    setScriptedChoicesReady(!(settingsRef.current.chatMode === 'scripted' && settingsRef.current.botStarts))
     starterRunRef.current = false
     botIndexRef.current = 0
+    freeBurstCountRef.current = 0
+    if (freeReplyTimerRef.current) {
+      clearTimeout(freeReplyTimerRef.current)
+      freeReplyTimerRef.current = null
+    }
     isBusyRef.current = false
   }, [])
 
@@ -2440,21 +3468,64 @@ export default function Home() {
     try { localStorage.setItem('fakechat_v2', JSON.stringify(normalized)) } catch (_) {}
   }, [])
 
-  const activeScriptedChoices = (settings.scriptedChoices || []).filter(choice => !usedScriptedChoiceIds.includes(choice.id))
-  const inputSettings = { ...settings, scriptedChoices: activeScriptedChoices }
+  const hasTypingPlaceholder = messages.some(msg => msg.contentType === 'typing')
+  const canShowScriptedChoices = settings.chatMode === 'scripted' && scriptedChoicesReady && !hasTypingPlaceholder
+  const activeScriptedChoices = canShowScriptedChoices
+    ? (settings.scriptedChoices || []).filter(choice => !usedScriptedChoiceIds.includes(choice.id)).slice(0, 2)
+    : []
+  const inputSettings = { ...settings, scriptedChoices: activeScriptedChoices, scriptedWaitingForBot: settings.chatMode === 'scripted' && !canShowScriptedChoices }
+  const frameMode = settings.appearance.frameMode || 'full'
+  const frameConfig = getFrameModeConfig(frameMode)
+  const isFramed = frameMode !== 'full'
+  const frameAspect = frameConfig.aspect || 1
+  const viewportHeightCss = viewport.height ? `${viewport.height}px` : '100dvh'
 
   return (
     <div
-      className="chat-root"
       style={{
-        background: settings.appearance.chatBackground,
-        fontFamily: `'${settings.appearance.fontFamily}', sans-serif`,
+        // Critical layout sengaja tetap inline juga, biar gak bergantung global.css
+        // dan tetap aman kalau Tailwind class belum ke-load di route tertentu.
+        position: 'fixed',
+        left: 0,
+        right: 0,
+        top: viewport.offsetTop ? `${viewport.offsetTop}px` : 0,
+        bottom: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        overscrollBehavior: 'none',
+        background: isFramed ? '#14100B' : settings.appearance.chatBackground,
         width: '100%',
         maxWidth: '100vw',
         minWidth: 0,
-        minHeight: '100dvh',
+        height: viewportHeightCss,
+        boxSizing: 'border-box',
+        padding: isFramed ? 14 : 0,
+        '--fakechat-vh': viewportHeightCss,
       }}
     >
+      <div
+        className="flex flex-col overflow-hidden overscroll-none"
+        style={{
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          overscrollBehavior: 'none',
+          background: settings.appearance.chatBackground,
+          fontFamily: `'${settings.appearance.fontFamily}', sans-serif`,
+          width: isFramed ? `min(calc(100vw - 28px), calc((var(--fakechat-vh) - 28px) * ${frameAspect}))` : '100%',
+          height: isFramed ? `min(calc(var(--fakechat-vh) - 28px), calc((100vw - 28px) / ${frameAspect}))` : '100%',
+          maxWidth: '100vw',
+          maxHeight: viewportHeightCss,
+          minWidth: 0,
+          boxSizing: 'border-box',
+          borderRadius: isFramed ? 22 : 0,
+          boxShadow: isFramed ? '0 24px 90px rgba(0,0,0,0.38)' : 'none',
+          border: isFramed ? '1px solid rgba(255,255,255,0.08)' : 'none',
+        }}
+      >
       <ChatHeader
         settings={settings}
         onToggleSettings={() => setShowSettings(open => !open)}
@@ -2464,9 +3535,9 @@ export default function Home() {
       {/* Messages area */}
       <div
         ref={messagesAreaRef}
-        className="messages-area"
+        className="flex-1 min-h-0 overflow-y-auto overscroll-contain"
         onPointerDown={requestSkipTyping}
-        style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'stretch', gap: 14, overflowAnchor: 'none' }}
+        style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'stretch', gap: 14, overflowAnchor: 'none', paddingTop: 14, paddingBottom: 14, paddingLeft: 'max(12px, env(safe-area-inset-left))', paddingRight: 'max(12px, env(safe-area-inset-right))' }}
       >
         {/* Empty state */}
         {messages.length === 0 && !isTyping && (
@@ -2528,6 +3599,7 @@ export default function Home() {
           <ImageModal key="lightbox" src={lightboxImage} onClose={() => setLightboxImage(null)} />
         )}
       </AnimatePresence>
+      </div>
     </div>
   )
 }
