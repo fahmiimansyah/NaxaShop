@@ -11,7 +11,6 @@ import AdminVoucherPanel from '../components/AdminVoucherPanel';
 import AdminMaintenancePanel from '../components/AdminMaintenancePanel';
 import AdminVipSyncPanel from '../components/AdminVipSyncPanel';
 import { GAME_CATEGORIES, getGameCategoryMeta } from '../lib/game-categories';
-import FakeChatHSRDynamic from '../components/FakeChat';
 import { FaComments } from 'react-icons/fa';
 function angkaDashboard(value) {
   return Number(value || 0);
