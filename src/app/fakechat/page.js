@@ -1879,6 +1879,7 @@ const FRAME_MODES = [
   { id: 'square11', label: '1:1', desc: 'Square post', aspect: 1 },
   { id: 'portrait34', label: '3:4', desc: 'Portrait record', aspect: 0.75 },
   { id: 'landscape43', label: '4:3', desc: 'Landscape crop', aspect: 4 / 3 },
+  { id: 'landscape169', label: '16:9', desc: 'YouTube / landscape', aspect: 16 / 9 },
   { id: 'vertical916', label: '9:16', desc: 'Shorts/Reels', aspect: 9 / 16 },
 ]
 
@@ -2666,7 +2667,7 @@ function SettingsPanel({ settings, onUpdate, onClose, onClearChat }) {
                 ))}
               </div>
               <div style={{ color: 'rgba(217,210,200,0.45)', fontSize: 11, lineHeight: 1.45, marginBottom: 6 }}>
-                Buat record konten, pilih 1:1 / 3:4 / 4:3 / 9:16 biar fakechat ada frame dan nggak full layar.
+                Buat record konten, pilih 1:1 / 3:4 / 4:3 / 16:9 / 9:16 biar fakechat ada frame dan nggak full layar.
               </div>
 
               <SectionTitle>Suara</SectionTitle>
@@ -3827,9 +3828,10 @@ export default function Home() {
           maxHeight: viewportHeightCss,
           minWidth: 0,
           boxSizing: 'border-box',
-          borderRadius: isFramed ? 22 : 0,
-          boxShadow: isFramed ? '0 24px 90px rgba(0,0,0,0.38)' : 'none',
-          border: isFramed ? '1px solid rgba(255,255,255,0.08)' : 'none',
+          // Frame record dibuat flat tanpa rounded corner biar rasanya sama seperti full layar.
+          borderRadius: 0,
+          boxShadow: 'none',
+          border: 'none',
         }}
       >
       <ChatHeader
