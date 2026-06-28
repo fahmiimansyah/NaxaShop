@@ -3,8 +3,8 @@
 import { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Check, FileText, Image as ImageIcon, Maximize2, MessageCircle, Minus, Music, Palette,
-  MoreVertical, Paperclip, Pause, PencilLine, Play, Plus, Search, SendHorizontal, Settings,
+  Check, CheckCheck, FileText, Image as ImageIcon, Maximize2, MessageCircle, Minus, Music, Palette,
+  MoreVertical, Paperclip, Pause, PencilLine, PhoneMissed, Play, Plus, Search, SendHorizontal, Settings,
   Sparkles, Trash2, TriangleAlert, Upload, UserRound, Video, Volume2, VolumeX, X
 } from 'lucide-react'
 
@@ -50,6 +50,8 @@ function ChatHeader({ settings, onToggleSettings, onClearChat }) {
   const headerPadY = Math.max(6, Math.round(headerHeight * 0.13))
   const titleMax = Math.max(18, Math.min(22, Math.round(headerHeight * 0.34)))
   const subtitleSize = headerHeight <= 54 ? 8.5 : 9.5
+  const headerAlign = header.align === 'center' ? 'center' : 'left'
+  const centerCompensation = headerAlign === 'center' ? 50 : 0
   const [menuOpen, setMenuOpen] = useState(false)
 
   const closeAnd = (fn) => {
@@ -76,7 +78,7 @@ function ChatHeader({ settings, onToggleSettings, onClearChat }) {
         position: 'relative',
       }}
     >
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ flex: 1, minWidth: 0, textAlign: headerAlign, paddingLeft: centerCompensation }}>
         <div
           style={{
             color: header.textColor,
@@ -892,6 +894,93 @@ function VideoModal({ src, startTime = 0, autoPlay = false, initialMuted = false
 }
 
 
+function formatChatTimestamp(value, format = '24h') {
+  const date = value ? new Date(value) : new Date()
+  if (Number.isNaN(date.getTime())) return ''
+  const hours24 = date.getHours()
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+
+  if (format === '12h') {
+    const suffix = hours24 >= 12 ? 'PM' : 'AM'
+    const hours12 = hours24 % 12 || 12
+    return `${hours12}:${minutes} ${suffix}`
+  }
+
+  return `${String(hours24).padStart(2, '0')}:${minutes}`
+}
+
+function getTimeInputValue(value) {
+  const date = value ? new Date(value) : new Date()
+  if (Number.isNaN(date.getTime())) return ''
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
+function applyClockToDate(baseValue, clockValue) {
+  const base = baseValue ? new Date(baseValue) : new Date()
+  if (Number.isNaN(base.getTime())) return new Date()
+  if (!clockValue || !/^\d{2}:\d{2}$/.test(clockValue)) return base
+  const [hours, minutes] = clockValue.split(':').map(Number)
+  const next = new Date(base)
+  next.setHours(Number.isFinite(hours) ? hours : next.getHours(), Number.isFinite(minutes) ? minutes : next.getMinutes(), 0, 0)
+  return next
+}
+
+function parseMissedCallContent(content, fallbackTitle = 'Telepon suara tak terjawab', fallbackSubtitle = 'Ketuk untuk menelepon balik') {
+  const raw = typeof content === 'string' ? content : ''
+  const parts = raw.split(/\r?\n/).map(part => part.trim()).filter(Boolean)
+  return {
+    title: parts[0] || fallbackTitle,
+    subtitle: parts[1] || fallbackSubtitle,
+  }
+}
+
+const RECEIPT_STYLES = [
+  { id: 'sent', label: 'Terkirim', short: 'Terkirim' },
+  { id: 'read', label: 'Dibaca', short: 'Dibaca' },
+  { id: 'check', label: 'Centang satu', short: '' },
+  { id: 'double_check', label: 'Centang dua biru', short: '' },
+]
+
+function getReceiptStyle(value) {
+  return RECEIPT_STYLES.some(item => item.id === value) ? value : 'read'
+}
+
+function ChatCheckIcon({ type = 'single', size = 14, color = 'currentColor' }) {
+  if (type === 'double') {
+    return (
+      <svg
+        width={size + 6}
+        height={size}
+        viewBox="0 0 22 14"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+        style={{ display: 'block', overflow: 'visible', flexShrink: 0 }}
+      >
+        <path d="M1.6 7.45L5.05 10.85L12.25 3.65" stroke={color} strokeWidth="2.05" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M8.35 7.45L11.8 10.85L19.25 3.65" stroke={color} strokeWidth="2.05" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    )
+  }
+
+  return (
+    <svg
+      width={size + 2}
+      height={size}
+      viewBox="0 0 16 14"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+      style={{ display: 'block', overflow: 'visible', flexShrink: 0 }}
+    >
+      <path d="M2 7.35L5.5 10.85L13.7 2.65" stroke={color} strokeWidth="2.05" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+
 function MessageBubble({ message, settings, onImageClick, onEditRequest }) {
   const isSystem = message.type === 'system' || message.contentType === 'system'
   const isUser = message.type === 'user'
@@ -903,6 +992,13 @@ function MessageBubble({ message, settings, onImageClick, onEditRequest }) {
   const bubbleBg = isUser ? appearance.userBubbleColor : appearance.botBubbleColor
   const textColor = isUser ? appearance.userTextColor : appearance.botTextColor
   const font = `'${appearance.fontFamily}', sans-serif`
+  const chatFontSize = Math.max(11, Math.min(24, Number(appearance.chatFontSize || 14)))
+  const messageMeta = settings.messageMeta || {}
+  const showTimestamp = !!messageMeta.showTimestamp
+  const showReadReceipt = !!messageMeta.showReadReceipt && isUser && message.contentType !== 'missed_call' && message.contentType !== 'missedCall'
+  const timestampText = showTimestamp ? formatChatTimestamp(message.timestamp, messageMeta.timeFormat || '24h') : ''
+  const receiptStyle = getReceiptStyle(messageMeta.receiptStyle || 'read')
+  const shouldShowMeta = !isSystem && message.contentType !== 'typing' && (timestampText || showReadReceipt)
 
   if (isSystem) {
     return (
@@ -964,7 +1060,8 @@ function MessageBubble({ message, settings, onImageClick, onEditRequest }) {
   const isImage = message.contentType === 'image'
   const isVideo = message.contentType === 'video'
   const isAudio = message.contentType === 'audio'
-  const isEditable = message.contentType === 'text'
+  const isMissedCall = message.contentType === 'missed_call' || message.contentType === 'missedCall'
+  const isEditable = message.contentType === 'text' || isMissedCall
   // Bot tetap kiri ala HSR/group chat, user balik kanan ala chat normal.
   // Tail/corner bubble tetap dari pojok atas, cuma arahnya dibedain kanan/kiri.
   const leftBubble = !isUser
@@ -979,17 +1076,86 @@ function MessageBubble({ message, settings, onImageClick, onEditRequest }) {
   // supaya nggak jadi banner. Teks panjang dipaksa turun ke bawah, bukan melebar.
   const textContent = typeof message.content === 'string' ? message.content : ''
   const hasLongToken = textContent.split(/\s+/).some(part => part.length > 16)
-  const isLongText = message.contentType === 'text' && (textContent.length > 42 || hasLongToken || textContent.includes('\n'))
-  const rowMaxWidth = isUser ? 'min(96%, 760px)' : 'min(96%, 800px)'
-  // V19: long bubble user DAN bot sama-sama dikompakin.
-  // Chat pendek tetap natural, tapi begitu teks panjang bubble dipaksa turun ke bawah.
+  const isLongText = message.contentType === 'text' && (textContent.length > 34 || hasLongToken || textContent.includes('\n'))
+  const rowMaxWidth = isUser ? 'min(96%, 720px)' : 'min(96%, 740px)'
+  // V55: bubble panjang dikompakin lagi biar nggak jadi banner.
+  // Chat pendek tetap natural, tapi teks panjang lebih cepat turun ke bawah.
   const bubbleMaxWidth = isUser
-    ? (isLongText ? 'min(56vw, 340px)' : 'min(70vw, 500px)')
-    : (isLongText ? 'min(56vw, 340px)' : 'min(72vw, 540px)')
+    ? (isLongText ? 'min(50vw, 310px)' : 'min(64vw, 440px)')
+    : (isLongText ? 'min(50vw, 310px)' : 'min(66vw, 460px)')
   const mediaBoxMaxWidth = isUser ? 'min(64vw, 330px)' : 'min(72vw, 350px)'
   const avatarTopOffset = 0
   const textBubblePadding = isLongText ? '10px 15px' : '9px 14px'
   const textLineHeight = isLongText ? 1.48 : 1.55
+  // Meta jam/centang dibuat absolute di pojok kanan bawah.
+  // Buat chat pendek, jangan tambah padding bawah supaya bubble nggak jadi tinggi aneh.
+  // Buat chat panjang/multiline, baru kasih ruang bawah biar teks nggak nabrak meta.
+  const compactMetaPadding = isLongText
+    ? (showReadReceipt ? '10px 15px 22px 15px' : '10px 14px 19px 15px')
+    : textBubblePadding
+  const textBubblePaddingWithMeta = shouldShowMeta ? compactMetaPadding : textBubblePadding
+  const callBubblePaddingWithMeta = shouldShowMeta ? '10px 58px 10px 12px' : '10px 12px'
+  // Kalau cuma jam doang (bot / missed call), ruang metanya lebih kecil.
+  // Kalau user pakai centang/status, baru reserve lebih lebar.
+  const metaReserveWidth = shouldShowMeta
+    ? (showReadReceipt ? Math.max(56, Math.round(chatFontSize * 4.35)) : Math.max(34, Math.round(chatFontSize * 2.65)))
+    : 0
+  const inlineMetaSpacerWidth = shouldShowMeta
+    ? (showReadReceipt ? Math.max(58, Math.round(chatFontSize * 4.45)) : Math.max(36, Math.round(chatFontSize * 2.75)))
+    : 0
+  const metaFontSize = Math.max(9, Math.round(chatFontSize * 0.68))
+  const metaColor = isUser ? 'rgba(80,60,40,0.50)' : 'rgba(80,60,40,0.43)'
+  const readCheckBlue = '#34B7F1'
+  const missedCallParts = isMissedCall ? parseMissedCallContent(message.content, settings.missedCallText || 'Telepon suara tak terjawab', settings.missedCallSubtext || 'Ketuk untuk menelepon balik') : null
+
+  const renderInlineMeta = () => {
+    if (!shouldShowMeta) return null
+
+    return (
+      <span
+        aria-label="metadata pesan"
+        style={{
+          position: 'absolute',
+          right: 9,
+          bottom: 6,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: 4,
+          color: metaColor,
+          fontSize: metaFontSize,
+          lineHeight: 1,
+          fontFamily: font,
+          fontWeight: 700,
+          letterSpacing: '-0.01em',
+          whiteSpace: 'nowrap',
+          userSelect: 'none',
+          pointerEvents: 'none',
+          verticalAlign: 'baseline',
+        }}
+      >
+        {timestampText && <span>{timestampText}</span>}
+        {showReadReceipt && (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: receiptStyle === 'double_check' ? readCheckBlue : metaColor,
+              transform: 'translateY(0.5px)',
+              overflow: 'visible',
+            }}
+          >
+            {receiptStyle === 'check' && <ChatCheckIcon type="single" size={Math.max(12, Math.round(chatFontSize * 0.78))} color={metaColor} />}
+            {receiptStyle === 'double_check' && <ChatCheckIcon type="double" size={Math.max(12, Math.round(chatFontSize * 0.80))} color={readCheckBlue} />}
+            {(receiptStyle === 'sent' || receiptStyle === 'read') && (
+              <span>{receiptStyle === 'sent' ? 'Terkirim' : 'Dibaca'}</span>
+            )}
+          </span>
+        )}
+      </span>
+    )
+  }
 
   const clearPressTimer = () => {
     if (pressTimerRef.current) {
@@ -1169,6 +1335,93 @@ function MessageBubble({ message, settings, onImageClick, onEditRequest }) {
       )
     }
 
+    if (isMissedCall) {
+      return (
+        <motion.div
+          variants={fadeVariants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          style={{
+            background: bubbleBg,
+            color: '#D84A42',
+            padding: callBubblePaddingWithMeta,
+            borderRadius: bubbleRadius,
+            position: 'relative',
+            maxWidth: isUser ? 'min(76vw, 400px)' : 'min(74vw, 390px)',
+            width: 'fit-content',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 10,
+            fontFamily: font,
+            fontSize: chatFontSize,
+            lineHeight: 1.35,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+            overflowWrap: 'anywhere',
+          }}
+        >
+          <span
+            style={{
+              width: Math.max(38, Math.round(chatFontSize * 2.65)),
+              height: Math.max(38, Math.round(chatFontSize * 2.65)),
+              borderRadius: '50%',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(216,74,66,0.14)',
+              border: '1px solid rgba(216,74,66,0.20)',
+              flexShrink: 0,
+            }}
+          >
+            <PhoneMissed size={Math.max(21, Math.round(chatFontSize * 1.45))} strokeWidth={2.65} />
+          </span>
+          <span
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+              justifyContent: 'center',
+              minWidth: 0,
+              maxWidth: '100%',
+              paddingRight: Math.max(42, metaReserveWidth - 10),
+            }}
+          >
+            <span
+              style={{
+                minWidth: 0,
+                display: 'inline-block',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                lineHeight: 1.2,
+                fontWeight: 850,
+              }}
+            >
+              {missedCallParts?.title || 'Telepon suara tak terjawab'}
+            </span>
+            <span
+              style={{
+                minWidth: 0,
+                display: 'inline-block',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                lineHeight: 1.2,
+                fontSize: Math.max(10, Math.round(chatFontSize * 0.76)),
+                color: 'rgba(216,74,66,0.88)',
+                fontWeight: 650,
+                marginTop: 3,
+                opacity: 0.95,
+              }}
+            >
+              {missedCallParts?.subtitle || 'Ketuk untuk menelepon balik'}
+            </span>
+          </span>
+          {renderInlineMeta()}
+        </motion.div>
+      )
+    }
+
     return (
       <motion.div
         key={`text-${message.id}-${message.revealedAt || ''}`}
@@ -1186,9 +1439,10 @@ function MessageBubble({ message, settings, onImageClick, onEditRequest }) {
         style={{
           background: bubbleBg,
           color: textColor,
-          padding: textBubblePadding,
+          padding: textBubblePaddingWithMeta,
           borderRadius: bubbleRadius,
-          fontSize: 14,
+          position: 'relative',
+          fontSize: chatFontSize,
           lineHeight: textLineHeight,
           maxWidth: bubbleMaxWidth,
           width: 'fit-content',
@@ -1202,7 +1456,21 @@ function MessageBubble({ message, settings, onImageClick, onEditRequest }) {
           userSelect: 'text',
         }}
       >
-        {message.content}
+        <span>{message.content}</span>
+        {shouldShowMeta && (
+          <span
+            aria-hidden="true"
+            style={{
+              display: 'inline-block',
+              width: inlineMetaSpacerWidth,
+              height: 1,
+              visibility: 'hidden',
+              verticalAlign: 'baseline',
+              userSelect: 'none',
+            }}
+          />
+        )}
+        {renderInlineMeta()}
       </motion.div>
     )
   }
@@ -1271,6 +1539,7 @@ function MessageBubble({ message, settings, onImageClick, onEditRequest }) {
               color: 'rgba(80,60,40,0.43)',
               fontFamily: font,
               paddingInline: 3,
+              clear: 'both',
               userSelect: 'none',
             }}
           >
@@ -1392,6 +1661,7 @@ function ChatInput({
   onSendSystemNotice,
 }) {
   const [value, setValue] = useState('')
+  const [editClock, setEditClock] = useState('')
   const [attachOpen, setAttachOpen] = useState(false)
   const [statusOpen, setStatusOpen] = useState(false)
   const textRef = useRef(null)
@@ -1407,6 +1677,7 @@ function ChatInput({
   useEffect(() => {
     if (!editingMessage) return
     setValue(editingMessage.content || '')
+    setEditClock(getTimeInputValue(editingMessage.timestamp))
     setAttachOpen(false)
     setStatusOpen(false)
     requestAnimationFrame(() => {
@@ -1419,6 +1690,7 @@ function ChatInput({
 
   const resetTextarea = () => {
     setValue('')
+    setEditClock('')
     if (textRef.current) textRef.current.style.height = 'auto'
   }
 
@@ -1427,7 +1699,7 @@ function ChatInput({
     if (!trimmed) return
 
     if (isEditing) {
-      onSaveEdit(editingMessage.id, trimmed)
+      onSaveEdit(editingMessage.id, trimmed, editClock)
       resetTextarea()
       return
     }
@@ -1478,6 +1750,12 @@ function ChatInput({
     setAttachOpen(false)
     setStatusOpen(false)
     resetTextarea()
+  }
+
+  const sendMissedCall = () => {
+    const title = (settings.missedCallText || 'Telepon suara tak terjawab').trim()
+    const sub = (settings.missedCallSubtext || 'Ketuk untuk menelepon balik').trim()
+    sendMedia('missed_call', sub ? `${title}\n${sub}` : title)
   }
 
   const handleMediaFile = (contentType, e) => {
@@ -1693,6 +1971,43 @@ function ChatInput({
         )}
       </AnimatePresence>
 
+      {isEditing && editingMessage && editingMessage.contentType !== 'typing' && editingMessage.contentType !== 'system' && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 10,
+            marginBottom: 8,
+            padding: '9px 12px',
+            borderRadius: 14,
+            background: 'rgba(255,255,255,0.34)',
+            border: '1px solid rgba(70,45,20,0.10)',
+            color: '#6d563d',
+            fontFamily: font,
+            fontSize: 12,
+          }}
+        >
+          <span style={{ fontWeight: 700 }}>Jam pesan</span>
+          <input
+            type="time"
+            value={editClock}
+            onChange={e => setEditClock(e.target.value)}
+            style={{
+              background: 'rgba(255,255,255,0.72)',
+              border: '1px solid rgba(70,45,20,0.12)',
+              borderRadius: 10,
+              padding: '7px 10px',
+              color: '#2f2418',
+              fontSize: 12,
+              fontFamily: font,
+              outline: 'none',
+              minWidth: 104,
+            }}
+          />
+        </div>
+      )}
+
       <div style={{ position: 'relative' }}>
         <AnimatePresence>
           {attachOpen && !isEditing && (
@@ -1722,6 +2037,7 @@ function ChatInput({
                 {mediaButton('Musik', Music, () => audioInputRef.current?.click(), '#85C9A5')}
                 {mediaButton('Sticker', Sparkles, () => stickerInputRef.current?.click(), '#C9A574')}
                 {mediaButton('Teks Tengah', FileText, () => setStatusOpen(v => !v), '#9B8D7B')}
+                {mediaButton('Telepon', PhoneMissed, sendMissedCall, '#D84A42')}
               </div>
               <AnimatePresence>
                 {statusOpen && (
@@ -1885,6 +2201,15 @@ const FRAME_MODES = [
 
 const getFrameModeConfig = (mode) => FRAME_MODES.find(item => item.id === mode) || FRAME_MODES[0]
 
+const SOUND_STYLES = [
+  { id: 'hsr', label: 'HSR soft', desc: 'ding lembut cinematic' },
+  { id: 'chat', label: 'Chat pop', desc: 'pop cepat ala messenger' },
+  { id: 'blub', label: 'Blub lama', desc: 'suara bubble versi awal' },
+  { id: 'chime', label: 'Chime', desc: 'ring kecil terang' },
+]
+
+const getSoundStyle = (style) => SOUND_STYLES.some(item => item.id === style) ? style : 'hsr'
+
 const TABS = [
   { id: 'tampilan', label: 'Tampilan', Icon: Palette },
   { id: 'header', label: 'Header', Icon: FileText },
@@ -1895,6 +2220,7 @@ const TABS = [
 const REPLY_TYPES = [
   { type: 'text', label: 'Teks', Icon: MessageCircle },
   { type: 'system', label: 'Teks Tengah', Icon: FileText },
+  { type: 'missed_call', label: 'Panggilan', Icon: PhoneMissed },
   { type: 'image', label: 'Gambar', Icon: ImageIcon },
   { type: 'video', label: 'Video', Icon: Video },
   { type: 'audio', label: 'Musik', Icon: Music },
@@ -2014,6 +2340,7 @@ function ReplyEditor({ reply, onChange, label, bots = [], textPlaceholder = 'Ket
   const r = { botId: firstBotId, type: 'text', content: '', ...(reply || {}) }
 
   const mediaAccept = r.type === 'video' ? 'video/*' : r.type === 'audio' ? 'audio/*' : 'image/*'
+  const missedCallPlaceholder = 'Telepon suara tak terjawab\nKetuk untuk menelepon balik'
   const mediaPlaceholder = r.type === 'video'
     ? 'Tempel URL video, atau upload...'
     : r.type === 'audio'
@@ -2103,13 +2430,13 @@ function ReplyEditor({ reply, onChange, label, bots = [], textPlaceholder = 'Ket
         ))}
       </div>
 
-      {(r.type === 'text' || r.type === 'system') ? (
+      {(r.type === 'text' || r.type === 'system' || r.type === 'missed_call') ? (
         <textarea value={r.content} onChange={e => onChange({ ...r, content: e.target.value })}
-          placeholder={r.type === 'system' ? 'Contoh: Stelle keluar dari group / Stelle offline / Gagal mengirim pesan' : textPlaceholder} rows={2}
+          placeholder={r.type === 'system' ? 'Contoh: Stelle keluar dari group / Stelle offline / Gagal mengirim pesan' : (r.type === 'missed_call' ? missedCallPlaceholder : textPlaceholder)} rows={2}
           style={{
-            width: '100%', background: r.type === 'system' ? 'rgba(255,255,255,0.085)' : 'rgba(255,255,255,0.06)',
-            border: r.type === 'system' ? '1px solid rgba(255,255,255,0.16)' : '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
-            padding: '8px 10px', color: '#f0ebe3', fontSize: 13,
+            width: '100%', background: r.type === 'system' ? 'rgba(255,255,255,0.085)' : (r.type === 'missed_call' ? 'rgba(216,74,66,0.10)' : 'rgba(255,255,255,0.06)'),
+            border: r.type === 'system' ? '1px solid rgba(255,255,255,0.16)' : (r.type === 'missed_call' ? '1px solid rgba(216,74,66,0.22)' : '1px solid rgba(255,255,255,0.1)'), borderRadius: 8,
+            padding: '8px 10px', color: r.type === 'missed_call' ? '#ffb2aa' : '#f0ebe3', fontSize: 13,
             resize: 'vertical', minHeight: 56, outline: 'none', lineHeight: 1.45,
             textAlign: r.type === 'system' ? 'center' : 'left',
           }} />
@@ -2644,6 +2971,53 @@ function SettingsPanel({ settings, onUpdate, onClose, onClearChat }) {
                 </span>
               </div>
 
+              <SectionTitle>Ukuran Chat</SectionTitle>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                <input type="range" min={11} max={24} value={local.appearance.chatFontSize || 14}
+                  onChange={e => update('appearance.chatFontSize', parseInt(e.target.value))}
+                  style={{ flex: 1 }} />
+                <span style={{ color: '#C9A574', fontSize: 13, fontWeight: 700, minWidth: 42 }}>
+                  {local.appearance.chatFontSize || 14}px
+                </span>
+              </div>
+              <div style={{ color: 'rgba(217,210,200,0.42)', fontSize: 11, lineHeight: 1.45, marginTop: 4 }}>
+                Bubble chat teks dan pesan panggilan bakal ikut ukuran ini.
+              </div>
+
+              <SectionTitle>Jam & Status Pesan</SectionTitle>
+              <Toggle label="Tampilkan jam pesan" value={!!local.messageMeta?.showTimestamp} onChange={v => update('messageMeta.showTimestamp', v)} />
+              <Toggle label="Tampilkan status user" value={!!local.messageMeta?.showReadReceipt} onChange={v => update('messageMeta.showReadReceipt', v)} />
+              {(local.messageMeta?.showTimestamp || local.messageMeta?.showReadReceipt) && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 6 }}>
+                  <div>
+                    <label style={{ display: 'block', color: 'rgba(217,210,200,0.62)', fontSize: 11, marginBottom: 5 }}>Format jam</label>
+                    <select
+                      value={local.messageMeta?.timeFormat || '24h'}
+                      onChange={e => update('messageMeta.timeFormat', e.target.value)}
+                      style={{ ...inputStyle, cursor: 'pointer' }}
+                    >
+                      <option value="24h">24 jam</option>
+                      <option value="12h">12 jam</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', color: 'rgba(217,210,200,0.62)', fontSize: 11, marginBottom: 5 }}>Status user</label>
+                    <select
+                      value={local.messageMeta?.receiptStyle || 'read'}
+                      onChange={e => update('messageMeta.receiptStyle', e.target.value)}
+                      style={{ ...inputStyle, cursor: 'pointer' }}
+                    >
+                      {RECEIPT_STYLES.map(item => (
+                        <option key={item.id} value={item.id}>{item.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+              <div style={{ color: 'rgba(217,210,200,0.42)', fontSize: 11, lineHeight: 1.45, marginTop: 4 }}>
+                Default-nya mati, jadi tampilan tetap kayak sekarang sampai toggle ini lu nyalain.
+              </div>
+
               <SectionTitle>Frame Rekam</SectionTitle>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 10 }}>
                 {FRAME_MODES.map(mode => (
@@ -2671,16 +3045,46 @@ function SettingsPanel({ settings, onUpdate, onClose, onClearChat }) {
               </div>
 
               <SectionTitle>Suara</SectionTitle>
-              <Toggle label="Efek Suara Saat Bot Balas" value={local.sound} onChange={v => update('sound', v)} />
+              <Toggle label="Efek Suara Chat" value={local.sound} onChange={v => update('sound', v)} />
               {local.sound && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: -2, marginBottom: 4 }}>
-                  <span style={{ color: 'rgba(217,210,200,0.62)', fontSize: 12, minWidth: 92 }}>Volume blub</span>
-                  <input type="range" min={0.5} max={3} step={0.1} value={local.soundVolume || 1.8}
-                    onChange={e => update('soundVolume', parseFloat(e.target.value))}
-                    style={{ flex: 1 }} />
-                  <span style={{ color: '#C9A574', fontSize: 13, fontWeight: 800, minWidth: 36 }}>
-                    {(local.soundVolume || 1.8).toFixed(1)}x
-                  </span>
+                <div>
+                  <div style={{ marginTop: -2, marginBottom: 11 }}>
+                    <label style={{ display: 'block', color: 'rgba(217,210,200,0.62)', fontSize: 12, marginBottom: 6 }}>Jenis efek suara</label>
+                    <select
+                      value={getSoundStyle(local.soundStyle)}
+                      onChange={e => update('soundStyle', e.target.value)}
+                      style={{
+                        width: '100%', background: 'rgba(255,255,255,0.07)',
+                        border: '1px solid rgba(255,255,255,0.13)', borderRadius: 9,
+                        padding: '8px 11px', color: '#f0ebe3', fontSize: 13, outline: 'none', cursor: 'pointer',
+                      }}
+                    >
+                      {SOUND_STYLES.map(style => (
+                        <option key={style.id} value={style.id}>{style.label} — {style.desc}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                    <span style={{ color: 'rgba(217,210,200,0.62)', fontSize: 12, minWidth: 82 }}>Volume</span>
+                    <input type="range" min={0.5} max={5} step={0.1} value={local.soundVolume || 2.6}
+                      onChange={e => update('soundVolume', parseFloat(e.target.value))}
+                      style={{ flex: 1 }} />
+                    <span style={{ color: '#C9A574', fontSize: 13, fontWeight: 800, minWidth: 36 }}>
+                      {(local.soundVolume || 2.6).toFixed(1)}x
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 2 }}>
+                    <button
+                      type="button"
+                      onClick={() => playChatSound(getSoundStyle(local.soundStyle), local.soundVolume || 2.6, 'bot')}
+                      style={smBtn('#C9A574', 'rgba(201,165,116,0.13)', 10)}
+                    >
+                      <Volume2 size={13} /> Tes suara
+                    </button>
+                  </div>
+                  <div style={{ color: 'rgba(217,210,200,0.42)', fontSize: 11, lineHeight: 1.45, marginTop: 6 }}>
+                    Suara bot dan user otomatis di scripted mode bakal ikut jenis + volume ini.
+                  </div>
                 </div>
               )}
             </div>
@@ -2692,6 +3096,32 @@ function SettingsPanel({ settings, onUpdate, onClose, onClearChat }) {
               <SectionTitle mt={0}>Teks Header</SectionTitle>
               <TInput label="Judul Header" value={local.header.title} onChange={v => update('header.title', v)} placeholder="Chats" />
               <TInput label="Subjudul (bisa dikosongkan)" value={local.header.subtitle} onChange={v => update('header.subtitle', v)} placeholder="MAY THIS JOURNEY LEAD TO STARWARD" />
+
+              <SectionTitle>Posisi Teks Header</SectionTitle>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+                {[
+                  { id: 'left', label: 'Kiri' },
+                  { id: 'center', label: 'Tengah' },
+                ].map(opt => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => update('header.align', opt.id)}
+                    style={{
+                      padding: '9px 10px',
+                      borderRadius: 12,
+                      border: `1px solid ${local.header.align === opt.id ? '#C9A574' : 'rgba(255,255,255,0.11)'}`,
+                      background: local.header.align === opt.id ? 'rgba(201,165,116,0.16)' : 'rgba(255,255,255,0.045)',
+                      color: local.header.align === opt.id ? '#C9A574' : '#d9d2c8',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      fontWeight: 800,
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
 
               <SectionTitle>Ukuran Header</SectionTitle>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -2812,6 +3242,23 @@ function SettingsPanel({ settings, onUpdate, onClose, onClearChat }) {
                   ))}
                 </div>
               )}
+
+              <SectionTitle>Panggilan</SectionTitle>
+              <TInput
+                label="Judul telepon tak terjawab"
+                value={local.missedCallText || ''}
+                onChange={v => update('missedCallText', v)}
+                placeholder="Telepon suara tak terjawab"
+              />
+              <TInput
+                label="Subjudul panggilan"
+                value={local.missedCallSubtext || ''}
+                onChange={v => update('missedCallSubtext', v)}
+                placeholder="Ketuk untuk menelepon balik"
+              />
+              <div style={{ color: 'rgba(217,210,200,0.42)', fontSize: 11, lineHeight: 1.45, marginTop: -4, marginBottom: 12 }}>
+                Teks ini dipakai tombol Telepon di menu lampiran. Di bot/scripted juga bisa pilih tipe Panggilan dan isi 2 baris langsung.
+              </div>
 
               <SectionTitle>Teks Tengah / Status</SectionTitle>
               <div style={{
@@ -3065,10 +3512,21 @@ function normalizeSettings(settings, rawOverride = null) {
   const bots = sourceBots.map((bot, i) => normalizeBot(bot, i === 0 ? 'Stelle' : `Bot ${i + 1}`))
   const firstBotId = bots[0]?.id || MAIN_BOT_ID
   const appearance = { ...DEFAULT_SETTINGS.appearance, ...(merged.appearance || {}) }
+  appearance.chatFontSize = Math.max(11, Math.min(24, Number(appearance.chatFontSize || DEFAULT_SETTINGS.appearance.chatFontSize)))
+  const messageMeta = { ...DEFAULT_SETTINGS.messageMeta, ...(merged.messageMeta || {}) }
+  messageMeta.showTimestamp = !!messageMeta.showTimestamp
+  messageMeta.showReadReceipt = !!messageMeta.showReadReceipt
+  messageMeta.timeFormat = messageMeta.timeFormat === '12h' ? '12h' : '24h'
+  messageMeta.receiptStyle = getReceiptStyle(messageMeta.receiptStyle)
   const header = { ...DEFAULT_SETTINGS.header, ...(merged.header || {}) }
   header.height = Math.max(46, Math.min(72, Number(header.height || DEFAULT_SETTINGS.header.height)))
+  header.align = header.align === 'center' ? 'center' : 'left'
   const scriptedChoiceLimit = Math.max(1, Math.min(3, Number(merged.scriptedChoiceLimit || DEFAULT_SETTINGS.scriptedChoiceLimit)))
-  const soundVolume = Math.max(0.4, Math.min(3, Number(merged.soundVolume || DEFAULT_SETTINGS.soundVolume)))
+  let soundVolume = Math.max(0.4, Math.min(5, Number(merged.soundVolume || DEFAULT_SETTINGS.soundVolume)))
+  const soundStyle = getSoundStyle(merged.soundStyle || DEFAULT_SETTINGS.soundStyle)
+  if (rawOverride && Number(rawOverride.settingsVersion || 0) < 16 && soundVolume <= 1.8) {
+    soundVolume = 2.6
+  }
   if (rawOverride && rawOverride.settingsVersion !== 13 && (!rawOverride.appearance || !rawOverride.appearance.avatarSize || rawOverride.appearance.avatarSize <= 46)) {
     appearance.avatarSize = 52
   }
@@ -3082,9 +3540,13 @@ function normalizeSettings(settings, rawOverride = null) {
   return {
     ...merged,
     appearance,
+    messageMeta,
     header,
     scriptedChoiceLimit,
     soundVolume,
+    soundStyle,
+    missedCallText: typeof merged.missedCallText === 'string' ? merged.missedCallText : DEFAULT_SETTINGS.missedCallText,
+    missedCallSubtext: typeof merged.missedCallSubtext === 'string' ? merged.missedCallSubtext : DEFAULT_SETTINGS.missedCallSubtext,
     bots,
     bot: bots[0],
     groupChat: merged.groupChat || bots.length > 1,
@@ -3172,7 +3634,7 @@ function ImageModal({ src, onClose }) {
 
 /* ── Default Settings ── */
 const DEFAULT_SETTINGS = {
-  settingsVersion: 14,
+  settingsVersion: 19,
   appearance: {
     chatBackground: '#E8E3D8',
     userBubbleColor: '#C9A574',
@@ -3180,9 +3642,16 @@ const DEFAULT_SETTINGS = {
     userTextColor: '#FFFFFF',
     botTextColor: '#1A1208',
     fontFamily: 'Inter',
+    chatFontSize: 14,
     avatarSize: 52,
     storyLayout: false,
     frameMode: 'full',
+  },
+  messageMeta: {
+    showTimestamp: false,
+    showReadReceipt: false,
+    timeFormat: '24h',
+    receiptStyle: 'read',
   },
   header: {
     title: 'Astral Express Family',
@@ -3194,6 +3663,7 @@ const DEFAULT_SETTINGS = {
     textColor: '#1A1208',
     subtitleColor: '#8B7050',
     height: 58,
+    align: 'left',
   },
   user: {
     name: 'Trailblazer',
@@ -3224,7 +3694,10 @@ const DEFAULT_SETTINGS = {
   scriptedChoiceLimit: 2,
   botStarts: false,
   sound: true,
-  soundVolume: 1.8,
+  soundStyle: 'hsr',
+  soundVolume: 2.6,
+  missedCallText: 'Telepon suara tak terjawab',
+  missedCallSubtext: 'Ketuk untuk menelepon balik',
   systemNotices: [
     { id: 'notice-offline', text: 'Stelle offline' },
     { id: 'notice-leave', text: 'Stelle keluar dari group' },
@@ -3237,34 +3710,89 @@ const DEFAULT_SETTINGS = {
   scriptedChoices: [],
 }
 
-/* ── Calm Blub Sound via Web Audio API ── */
-function playBlub(volume = 1) {
+/* ── Chat Sound Effects via Web Audio API ── */
+function playChatSound(style = 'hsr', volume = 1, actor = 'bot') {
   try {
-    const volumeBoost = Math.max(0.4, Math.min(3, Number(volume) || 1))
-    const ctx = new (window.AudioContext || window.webkitAudioContext)()
-    const makeBlub = (freq1, freq2, startT, dur, vol) => {
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      const filter = ctx.createBiquadFilter()
-      osc.connect(filter)
-      filter.connect(gain)
-      gain.connect(ctx.destination)
-      filter.type = 'lowpass'
-      filter.frequency.value = 600
-      osc.type = 'sine'
-      osc.frequency.setValueAtTime(freq1, startT)
-      osc.frequency.exponentialRampToValueAtTime(freq2, startT + dur * 0.7)
-      gain.gain.setValueAtTime(0, startT)
-      gain.gain.linearRampToValueAtTime(vol, startT + 0.012)
-      gain.gain.exponentialRampToValueAtTime(0.001, startT + dur)
-      osc.start(startT)
-      osc.stop(startT + dur)
-    }
+    const AudioCtx = window.AudioContext || window.webkitAudioContext
+    if (!AudioCtx) return
+
+    const volumeBoost = Math.max(0.4, Math.min(5, Number(volume) || 1))
+    const ctx = new AudioCtx()
+    const master = ctx.createGain()
+    const compressor = ctx.createDynamicsCompressor()
+    master.connect(compressor)
+    compressor.connect(ctx.destination)
+    master.gain.value = Math.min(0.95, 0.34 * volumeBoost)
+
     const t = ctx.currentTime
-    makeBlub(420, 200, t, 0.18, 0.07 * volumeBoost)
-    makeBlub(260, 130, t + 0.04, 0.16, 0.05 * volumeBoost)
-    setTimeout(() => { try { ctx.close() } catch (_) {} }, 700)
+    const chosen = getSoundStyle(style)
+    const actorLift = actor === 'user' ? 1.08 : 1
+
+    const tone = ({ freq = 440, to = null, start = 0, dur = 0.16, gain = 0.22, type = 'sine', filterFreq = 1500 }) => {
+      const osc = ctx.createOscillator()
+      const g = ctx.createGain()
+      const filter = ctx.createBiquadFilter()
+      osc.type = type
+      osc.frequency.setValueAtTime(freq * actorLift, t + start)
+      if (to) osc.frequency.exponentialRampToValueAtTime(Math.max(40, to * actorLift), t + start + dur * 0.72)
+      filter.type = 'lowpass'
+      filter.frequency.setValueAtTime(filterFreq, t + start)
+      osc.connect(filter)
+      filter.connect(g)
+      g.connect(master)
+      g.gain.setValueAtTime(0.0001, t + start)
+      g.gain.linearRampToValueAtTime(gain, t + start + 0.012)
+      g.gain.exponentialRampToValueAtTime(0.0001, t + start + dur)
+      osc.start(t + start)
+      osc.stop(t + start + dur + 0.02)
+    }
+
+    const noiseTick = ({ start = 0, dur = 0.055, gain = 0.16, filterFreq = 2600 }) => {
+      const bufferSize = Math.max(1, Math.floor(ctx.sampleRate * dur))
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
+      const data = buffer.getChannelData(0)
+      for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize)
+      const src = ctx.createBufferSource()
+      const g = ctx.createGain()
+      const filter = ctx.createBiquadFilter()
+      src.buffer = buffer
+      filter.type = 'bandpass'
+      filter.frequency.value = filterFreq
+      filter.Q.value = 1.8
+      src.connect(filter)
+      filter.connect(g)
+      g.connect(master)
+      g.gain.setValueAtTime(gain, t + start)
+      g.gain.exponentialRampToValueAtTime(0.0001, t + start + dur)
+      src.start(t + start)
+      src.stop(t + start + dur)
+    }
+
+    if (chosen === 'chat') {
+      tone({ freq: 520, to: 760, start: 0, dur: 0.075, gain: 0.26, type: 'triangle', filterFreq: 2400 })
+      tone({ freq: 820, to: 520, start: 0.035, dur: 0.12, gain: 0.16, type: 'sine', filterFreq: 2600 })
+      noiseTick({ start: 0.006, dur: 0.035, gain: 0.11, filterFreq: 3200 })
+    } else if (chosen === 'chime') {
+      tone({ freq: 740, to: 1110, start: 0, dur: 0.18, gain: 0.18, type: 'sine', filterFreq: 4200 })
+      tone({ freq: 1180, to: 930, start: 0.055, dur: 0.22, gain: 0.10, type: 'sine', filterFreq: 4800 })
+      tone({ freq: 540, to: 620, start: 0.018, dur: 0.14, gain: 0.08, type: 'triangle', filterFreq: 3200 })
+    } else if (chosen === 'blub') {
+      tone({ freq: 420, to: 200, start: 0, dur: 0.18, gain: 0.20, type: 'sine', filterFreq: 640 })
+      tone({ freq: 260, to: 130, start: 0.04, dur: 0.16, gain: 0.15, type: 'sine', filterFreq: 640 })
+    } else {
+      // HSR-ish soft UI notification: bright tap + airy tail, synthetic/original.
+      noiseTick({ start: 0, dur: 0.045, gain: 0.10, filterFreq: 4200 })
+      tone({ freq: actor === 'user' ? 640 : 560, to: actor === 'user' ? 980 : 820, start: 0, dur: 0.11, gain: 0.17, type: 'triangle', filterFreq: 3600 })
+      tone({ freq: actor === 'user' ? 990 : 880, to: actor === 'user' ? 760 : 680, start: 0.045, dur: 0.20, gain: 0.12, type: 'sine', filterFreq: 4300 })
+      tone({ freq: 310, to: 250, start: 0.015, dur: 0.16, gain: 0.07, type: 'sine', filterFreq: 1200 })
+    }
+
+    setTimeout(() => { try { ctx.close() } catch (_) {} }, 900)
   } catch (_) {}
+}
+
+function playBlub(volume = 1) {
+  playChatSound('blub', volume, 'bot')
 }
 
 /* ── Main Component ── */
@@ -3521,7 +4049,10 @@ export default function Home() {
 
       previousBotId = activeBot.id
 
-      if (settingsRef.current.sound) { await sleep(80); playBlub(settingsRef.current.soundVolume || 1.8) }
+      if (settingsRef.current.sound) {
+        await sleep(70)
+        playChatSound(settingsRef.current.soundStyle || 'hsr', settingsRef.current.soundVolume || 2.6, 'bot')
+      }
     }
     setIsTyping(false)
     if (settingsRef.current.chatMode === 'scripted') setScriptedChoicesReady(true)
@@ -3693,6 +4224,10 @@ export default function Home() {
         revealedAt: Date.now(),
       })
       await waitForPaint()
+      if (settingsRef.current.sound) {
+        await sleep(55)
+        playChatSound(settingsRef.current.soundStyle || 'hsr', settingsRef.current.soundVolume || 2.6, 'user')
+      }
     }
   }, [addMessage, updateMessage, waitForTypingOrSkip])
 
@@ -3741,18 +4276,23 @@ export default function Home() {
 
   /* Edit existing text message via hold tap/right click */
   const handleRequestEditMessage = useCallback((message) => {
-    if (!message || message.contentType !== 'text') return
+    if (!message || !['text', 'missed_call', 'missedCall'].includes(message.contentType)) return
     setEditingMessage(message)
   }, [])
 
-  const handleSaveEditedMessage = useCallback((messageId, nextText) => {
+  const handleSaveEditedMessage = useCallback((messageId, nextText, nextClock) => {
     const text = nextText?.trim()
     if (!messageId || !text) return
-    setMessages(prev => prev.map(msg => (
-      msg.id === messageId
-        ? { ...msg, content: text, editedAt: new Date() }
-        : msg
-    )))
+    setMessages(prev => prev.map(msg => {
+      if (msg.id !== messageId) return msg
+      const shouldUpdateClock = typeof nextClock === 'string' && nextClock.trim()
+      return {
+        ...msg,
+        content: text,
+        editedAt: new Date(),
+        timestamp: shouldUpdateClock ? applyClockToDate(msg.timestamp, nextClock.trim()) : msg.timestamp,
+      }
+    }))
     setEditingMessage(null)
   }, [])
 
