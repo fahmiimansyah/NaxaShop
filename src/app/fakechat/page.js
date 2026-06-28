@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   Check, FileText, Image as ImageIcon, Maximize2, MessageCircle, Minus, Music, Palette,
   MoreVertical, Paperclip, Pause, PencilLine, Play, Plus, Search, SendHorizontal, Settings,
-  Sparkles, Trash2, Upload, UserRound, Video, Volume2, VolumeX, X
+  Sparkles, Trash2, TriangleAlert, Upload, UserRound, Video, Volume2, VolumeX, X
 } from 'lucide-react'
 
 /* ── Avatar ── */
@@ -46,6 +46,10 @@ function Avatar({ name, src, size = 46 }) {
 function ChatHeader({ settings, onToggleSettings, onClearChat }) {
   const { header, appearance } = settings
   const font = `'${appearance.fontFamily}', sans-serif`
+  const headerHeight = Math.max(46, Math.min(72, Number(header.height || 58)))
+  const headerPadY = Math.max(6, Math.round(headerHeight * 0.13))
+  const titleMax = Math.max(18, Math.min(22, Math.round(headerHeight * 0.34)))
+  const subtitleSize = headerHeight <= 54 ? 8.5 : 9.5
   const [menuOpen, setMenuOpen] = useState(false)
 
   const closeAnd = (fn) => {
@@ -64,9 +68,9 @@ function ChatHeader({ settings, onToggleSettings, onClearChat }) {
         gap: 12,
         flexShrink: 0,
         zIndex: 30,
-        minHeight: 70,
-        paddingTop: 10,
-        paddingBottom: 10,
+        minHeight: headerHeight,
+        paddingTop: headerPadY,
+        paddingBottom: headerPadY,
         paddingLeft: 'max(12px, env(safe-area-inset-left))',
         paddingRight: 'max(12px, env(safe-area-inset-right))',
         position: 'relative',
@@ -77,7 +81,7 @@ function ChatHeader({ settings, onToggleSettings, onClearChat }) {
           style={{
             color: header.textColor,
             fontWeight: 800,
-            fontSize: 'clamp(18px, 5vw, 22px)',
+            fontSize: `clamp(16px, 4.3vw, ${titleMax}px)`,
             letterSpacing: '0.01em',
             fontFamily: font,
             lineHeight: 1.18,
@@ -92,10 +96,10 @@ function ChatHeader({ settings, onToggleSettings, onClearChat }) {
           <div
             style={{
               color: header.subtitleColor,
-              fontSize: 10,
-              letterSpacing: '0.14em',
+              fontSize: subtitleSize,
+              letterSpacing: '0.13em',
               textTransform: 'uppercase',
-              marginTop: 3,
+              marginTop: 2,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
@@ -127,7 +131,7 @@ function ChatHeader({ settings, onToggleSettings, onClearChat }) {
             style={{
               position: 'absolute',
               right: 'max(10px, env(safe-area-inset-right))',
-              top: 60,
+              top: Math.max(48, headerHeight - 2),
               zIndex: 50,
               width: 174,
               background: 'rgba(255,255,255,0.92)',
@@ -889,8 +893,9 @@ function VideoModal({ src, startTime = 0, autoPlay = false, initialMuted = false
 
 
 function MessageBubble({ message, settings, onImageClick, onEditRequest }) {
+  const isSystem = message.type === 'system' || message.contentType === 'system'
   const isUser = message.type === 'user'
-  const profile = isUser ? settings.user : getBotById(settings, message.senderId)
+  const profile = isSystem ? { name: '', showName: false, showAvatar: false } : (isUser ? settings.user : getBotById(settings, message.senderId))
   const { appearance } = settings
   const pressTimerRef = useRef(null)
   const didLongPressRef = useRef(false)
@@ -898,6 +903,59 @@ function MessageBubble({ message, settings, onImageClick, onEditRequest }) {
   const bubbleBg = isUser ? appearance.userBubbleColor : appearance.botBubbleColor
   const textColor = isUser ? appearance.userTextColor : appearance.botTextColor
   const font = `'${appearance.fontFamily}', sans-serif`
+
+  if (isSystem) {
+    return (
+      <motion.div
+        key={`system-${message.id}`}
+        variants={fadeVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        style={{
+          alignSelf: 'center',
+          width: '100%',
+          maxWidth: 'min(86vw, 560px)',
+          display: 'flex',
+          justifyContent: 'center',
+          padding: '14px 0 15px',
+          pointerEvents: 'none',
+          userSelect: 'none',
+        }}
+      >
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 9,
+            color: 'rgba(80,88,93,0.62)',
+            padding: '2px 6px',
+            fontSize: 'clamp(13px, 2.35vw, 17px)',
+            lineHeight: 1.25,
+            fontFamily: font,
+            fontWeight: 800,
+            letterSpacing: '0.005em',
+            textAlign: 'center',
+            textShadow: '0 1px 0 rgba(255,255,255,0.36)',
+            whiteSpace: 'pre-wrap',
+            overflowWrap: 'anywhere',
+          }}
+        >
+          <TriangleAlert
+            size={22}
+            strokeWidth={2.4}
+            style={{
+              flexShrink: 0,
+              opacity: 0.72,
+              filter: 'drop-shadow(0 1px 0 rgba(255,255,255,0.32))',
+            }}
+          />
+          <span>{message.content}</span>
+        </div>
+      </motion.div>
+    )
+  }
   const avatarSize = appearance.avatarSize || 52
   const showName = !!(profile.showName && profile.name)
   const showAvatar = profile.showAvatar !== false
@@ -1331,9 +1389,11 @@ function ChatInput({
   editingMessage,
   onSaveEdit,
   onCancelEdit,
+  onSendSystemNotice,
 }) {
   const [value, setValue] = useState('')
   const [attachOpen, setAttachOpen] = useState(false)
+  const [statusOpen, setStatusOpen] = useState(false)
   const textRef = useRef(null)
   const imageInputRef = useRef(null)
   const videoInputRef = useRef(null)
@@ -1348,6 +1408,7 @@ function ChatInput({
     if (!editingMessage) return
     setValue(editingMessage.content || '')
     setAttachOpen(false)
+    setStatusOpen(false)
     requestAnimationFrame(() => {
       if (!textRef.current) return
       textRef.current.focus()
@@ -1374,12 +1435,14 @@ function ChatInput({
     onSend(trimmed)
     resetTextarea()
     setAttachOpen(false)
+    setStatusOpen(false)
   }
 
   const handleCancel = () => {
     onCancelEdit?.()
     resetTextarea()
     setAttachOpen(false)
+    setStatusOpen(false)
   }
 
   const handleKey = (e) => {
@@ -1404,6 +1467,16 @@ function ChatInput({
     if (!content) return
     onSend({ contentType, content, fileName })
     setAttachOpen(false)
+    setStatusOpen(false)
+    resetTextarea()
+  }
+
+  const sendSystemNotice = (text) => {
+    const content = typeof text === 'string' ? text.trim() : ''
+    if (!content) return
+    onSendSystemNotice?.(content)
+    setAttachOpen(false)
+    setStatusOpen(false)
     resetTextarea()
   }
 
@@ -1468,8 +1541,9 @@ function ChatInput({
 
   if (chatMode === 'scripted' && !isEditing) {
     const hasScriptedChoices = scriptedChoices.length > 0
-    const visibleScriptedCount = Math.min(scriptedChoices.length, 2)
-    const slotHeight = visibleScriptedCount > 1 ? 92 : 44
+    const choiceLimit = Math.max(1, Math.min(3, Number(settings.scriptedChoiceLimit || 2)))
+    const visibleScriptedCount = Math.min(scriptedChoices.length, choiceLimit)
+    const slotHeight = visibleScriptedCount > 2 ? 138 : (visibleScriptedCount > 1 ? 92 : 44)
     const scriptedAreaStyle = {
       ...baseInputArea,
       borderTop: '0 solid transparent',
@@ -1519,7 +1593,7 @@ function ChatInput({
                     margin: '0 auto',
                   }}
                 >
-                  {scriptedChoices.slice(0, 2).map((choice, i) => (
+                  {scriptedChoices.slice(0, choiceLimit).map((choice, i) => (
                     <motion.button
                       key={choice.id}
                       initial={{ opacity: 0 }}
@@ -1647,7 +1721,52 @@ function ChatInput({
                 {mediaButton('Video', Video, () => videoInputRef.current?.click(), '#D4A5C4')}
                 {mediaButton('Musik', Music, () => audioInputRef.current?.click(), '#85C9A5')}
                 {mediaButton('Sticker', Sparkles, () => stickerInputRef.current?.click(), '#C9A574')}
+                {mediaButton('Teks Tengah', FileText, () => setStatusOpen(v => !v), '#9B8D7B')}
               </div>
+              <AnimatePresence>
+                {statusOpen && (
+                  <motion.div
+                    key="status-preset-list"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.16 }}
+                    style={{
+                      marginTop: 10,
+                      paddingTop: 10,
+                      borderTop: '1px solid rgba(70,45,20,0.09)',
+                      display: 'grid',
+                      gap: 7,
+                    }}
+                  >
+                    {(settings.systemNotices || []).filter(item => item && item.text?.trim()).length === 0 ? (
+                      <div style={{ color: 'rgba(47,36,24,0.52)', fontSize: 12, textAlign: 'center', padding: '6px 4px' }}>
+                        Tambah teks tengah dulu di Pengaturan → Chat.
+                      </div>
+                    ) : (settings.systemNotices || []).filter(item => item && item.text?.trim()).map(item => (
+                      <button
+                        key={item.id || item.text}
+                        type="button"
+                        onClick={() => sendSystemNotice(item.text)}
+                        style={{
+                          border: '1px solid rgba(70,45,20,0.08)',
+                          background: 'rgba(255,255,255,0.62)',
+                          color: '#352A1D',
+                          borderRadius: 999,
+                          padding: '8px 12px',
+                          fontSize: 12,
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          boxShadow: '0 5px 14px rgba(70,45,20,0.06)',
+                        }}
+                      >
+                        {item.text}
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           )}
         </AnimatePresence>
@@ -1774,6 +1893,7 @@ const TABS = [
 
 const REPLY_TYPES = [
   { type: 'text', label: 'Teks', Icon: MessageCircle },
+  { type: 'system', label: 'Teks Tengah', Icon: FileText },
   { type: 'image', label: 'Gambar', Icon: ImageIcon },
   { type: 'video', label: 'Video', Icon: Video },
   { type: 'audio', label: 'Musik', Icon: Music },
@@ -1953,7 +2073,7 @@ function ReplyEditor({ reply, onChange, label, bots = [], textPlaceholder = 'Ket
   return (
     <div style={{ marginBottom: 10 }}>
       <div style={{ color: 'rgba(217,210,200,0.5)', fontSize: 10, marginBottom: 6, letterSpacing: '0.05em' }}>{label}</div>
-      {botOptions.length > 1 && (
+      {botOptions.length > 1 && r.type !== 'system' && (
         <select
           value={r.botId || firstBotId}
           onChange={e => onChange({ ...r, botId: e.target.value })}
@@ -1982,14 +2102,15 @@ function ReplyEditor({ reply, onChange, label, bots = [], textPlaceholder = 'Ket
         ))}
       </div>
 
-      {r.type === 'text' ? (
+      {(r.type === 'text' || r.type === 'system') ? (
         <textarea value={r.content} onChange={e => onChange({ ...r, content: e.target.value })}
-          placeholder={textPlaceholder} rows={2}
+          placeholder={r.type === 'system' ? 'Contoh: Stelle keluar dari group / Stelle offline / Gagal mengirim pesan' : textPlaceholder} rows={2}
           style={{
-            width: '100%', background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
+            width: '100%', background: r.type === 'system' ? 'rgba(255,255,255,0.085)' : 'rgba(255,255,255,0.06)',
+            border: r.type === 'system' ? '1px solid rgba(255,255,255,0.16)' : '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
             padding: '8px 10px', color: '#f0ebe3', fontSize: 13,
             resize: 'vertical', minHeight: 56, outline: 'none', lineHeight: 1.45,
+            textAlign: r.type === 'system' ? 'center' : 'left',
           }} />
       ) : (
         <div>
@@ -2087,6 +2208,23 @@ function withUserScriptMessageList(choice, messages) {
 function getChoiceButtonText(choice, index = 0) {
   const raw = choice?.buttonText || choice?.userText || `Pilihan ${index + 1}`
   return typeof raw === 'string' && raw.trim() ? raw.trim() : `Pilihan ${index + 1}`
+}
+
+function makeSystemNotice(text = 'Stelle offline') {
+  return { id: uid(), text }
+}
+
+function normalizeSystemNotice(item, fallback = '') {
+  if (typeof item === 'string') return { id: uid(), text: item }
+  return {
+    id: item?.id || uid(),
+    text: typeof item?.text === 'string' ? item.text : fallback,
+  }
+}
+
+function getSystemNotices(settings) {
+  const list = Array.isArray(settings?.systemNotices) ? settings.systemNotices : DEFAULT_SETTINGS.systemNotices
+  return (list || []).map((item, i) => normalizeSystemNotice(item, DEFAULT_SETTINGS.systemNotices?.[i]?.text || ''))
 }
 
 function UserScriptMessageListEditor({ choice, onUpdate }) {
@@ -2364,6 +2502,13 @@ function SettingsPanel({ settings, onUpdate, onClose, onClearChat }) {
   const updateChoice = (id, upd) => setLocal(p => ({ ...p, scriptedChoices: p.scriptedChoices.map(c => c.id === id ? upd : c) }))
   const deleteChoice = (id) => setLocal(p => ({ ...p, scriptedChoices: p.scriptedChoices.filter(c => c.id !== id) }))
 
+  const addSystemNotice = () => setLocal(p => ({ ...p, systemNotices: [...getSystemNotices(p), makeSystemNotice('Stelle offline')] }))
+  const updateSystemNotice = (id, text) => setLocal(p => ({ ...p, systemNotices: getSystemNotices(p).map(item => item.id === id ? { ...item, text } : item) }))
+  const deleteSystemNotice = (id) => setLocal(p => {
+    const next = getSystemNotices(p).filter(item => item.id !== id)
+    return { ...p, systemNotices: next.length ? next : [makeSystemNotice('')] }
+  })
+
   const updateBot = (id, upd) => setLocal(p => {
     const bots = getBots(p).map(bot => bot.id === id ? normalizeBot(upd, bot.name) : bot)
     return { ...p, bots, bot: bots[0], groupChat: bots.length > 1 }
@@ -2526,6 +2671,17 @@ function SettingsPanel({ settings, onUpdate, onClose, onClearChat }) {
 
               <SectionTitle>Suara</SectionTitle>
               <Toggle label="Efek Suara Saat Bot Balas" value={local.sound} onChange={v => update('sound', v)} />
+              {local.sound && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: -2, marginBottom: 4 }}>
+                  <span style={{ color: 'rgba(217,210,200,0.62)', fontSize: 12, minWidth: 92 }}>Volume blub</span>
+                  <input type="range" min={0.5} max={3} step={0.1} value={local.soundVolume || 1.8}
+                    onChange={e => update('soundVolume', parseFloat(e.target.value))}
+                    style={{ flex: 1 }} />
+                  <span style={{ color: '#C9A574', fontSize: 13, fontWeight: 800, minWidth: 36 }}>
+                    {(local.soundVolume || 1.8).toFixed(1)}x
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
@@ -2535,6 +2691,16 @@ function SettingsPanel({ settings, onUpdate, onClose, onClearChat }) {
               <SectionTitle mt={0}>Teks Header</SectionTitle>
               <TInput label="Judul Header" value={local.header.title} onChange={v => update('header.title', v)} placeholder="Chats" />
               <TInput label="Subjudul (bisa dikosongkan)" value={local.header.subtitle} onChange={v => update('header.subtitle', v)} placeholder="MAY THIS JOURNEY LEAD TO STARWARD" />
+
+              <SectionTitle>Ukuran Header</SectionTitle>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <input type="range" min={46} max={72} value={local.header.height || 58}
+                  onChange={e => update('header.height', parseInt(e.target.value))}
+                  style={{ flex: 1 }} />
+                <span style={{ color: '#C9A574', fontSize: 13, fontWeight: 700, minWidth: 42 }}>
+                  {local.header.height || 58}px
+                </span>
+              </div>
 
               <SectionTitle>Warna Header</SectionTitle>
               <Toggle label="Samakan Background dengan Chat Area" value={followHeaderBg} onChange={v => update('header.followChatBackground', v)} />
@@ -2646,6 +2812,46 @@ function SettingsPanel({ settings, onUpdate, onClose, onClearChat }) {
                 </div>
               )}
 
+              <SectionTitle>Teks Tengah / Status</SectionTitle>
+              <div style={{
+                marginBottom: 16,
+                padding: '10px 12px',
+                borderRadius: 10,
+                background: 'rgba(255,255,255,0.045)',
+                border: '1px solid rgba(255,255,255,0.085)',
+              }}>
+                <div style={{ color: 'rgba(217,210,200,0.58)', fontSize: 11, lineHeight: 1.45, marginBottom: 10 }}>
+                  Buat teks kecil di tengah chat, misal “Stelle keluar dari group”, “Stelle offline”, atau “Gagal mengirim pesan”. Bisa dikirim dari menu lampiran, dan juga bisa dipakai di urutan bot/script.
+                </div>
+                {getSystemNotices(local).map((item, idx) => (
+                  <div key={item.id || idx} style={{ display: 'flex', gap: 7, alignItems: 'center', marginBottom: 8 }}>
+                    <input
+                      type="text"
+                      value={item.text || ''}
+                      onChange={e => updateSystemNotice(item.id, e.target.value)}
+                      placeholder="Contoh: Stelle offline"
+                      style={{
+                        flex: 1,
+                        background: 'rgba(255,255,255,0.07)',
+                        border: '1px solid rgba(255,255,255,0.13)',
+                        borderRadius: 999,
+                        padding: '8px 12px',
+                        color: '#f0ebe3',
+                        fontSize: 12,
+                        outline: 'none',
+                        textAlign: 'center',
+                      }}
+                    />
+                    <button onClick={() => deleteSystemNotice(item.id)} style={smBtn('#ff9999', 'rgba(255,80,80,0.10)', 999)} aria-label="Hapus teks tengah">
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
+                <button onClick={addSystemNotice} style={{ ...smBtn('#C9A574', 'rgba(201,165,116,0.14)', 10), width: '100%', padding: '8px 12px', fontWeight: 750 }}>
+                  <Plus size={13} /> Tambah Teks Tengah
+                </button>
+              </div>
+
               {local.chatMode === 'free' && (
                 <div style={{
                   marginBottom: 16,
@@ -2689,7 +2895,30 @@ function SettingsPanel({ settings, onUpdate, onClose, onClearChat }) {
                   fontSize: 11,
                   lineHeight: 1.45,
                 }}>
-                  Di scripted mode, template tampil maksimal 2 tombol, putih elegan, dan murni fade. Pesan user otomatis bisa banyak, bisa teks/gambar/video/audio/sticker, tapi isi pesan itu tidak tampil di tombol template.
+                  Di scripted mode, jumlah template tampil bisa diatur 1–3 tombol. Pesan user otomatis bisa banyak, bisa teks/gambar/video/audio/sticker, tapi isi pesan itu tidak tampil di tombol template.
+                </div>
+              )}
+
+              {local.chatMode === 'scripted' && (
+                <div style={{
+                  marginBottom: 16,
+                  padding: '10px 12px',
+                  borderRadius: 10,
+                  background: 'rgba(255,255,255,0.045)',
+                  border: '1px solid rgba(255,255,255,0.085)',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ color: 'rgba(217,210,200,0.62)', fontSize: 12, minWidth: 120 }}>Template tampil</span>
+                    <input type="range" min={1} max={3} value={local.scriptedChoiceLimit || 2}
+                      onChange={e => update('scriptedChoiceLimit', parseInt(e.target.value))}
+                      style={{ flex: 1 }} />
+                    <span style={{ color: '#C9A574', fontSize: 13, fontWeight: 800, minWidth: 42 }}>
+                      {local.scriptedChoiceLimit || 2}x
+                    </span>
+                  </div>
+                  <div style={{ color: 'rgba(217,210,200,0.38)', fontSize: 10, lineHeight: 1.4, marginTop: 6 }}>
+                    Pilih 1, 2, atau 3 template yang kelihatan di bawah chat. Sisanya tetap lanjut setelah pilihan dipakai.
+                  </div>
                 </div>
               )}
 
@@ -2728,7 +2957,7 @@ function SettingsPanel({ settings, onUpdate, onClose, onClearChat }) {
                       <span style={{ color: '#C9A574', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
                         Pilihan Script
                       </span>
-                      <div style={{ color: 'rgba(217,210,200,0.4)', fontSize: 10, marginTop: 2 }}>Template maksimal 2 tombol, muncul setelah bot chat, tombolnya putih elegan compact</div>
+                      <div style={{ color: 'rgba(217,210,200,0.4)', fontSize: 10, marginTop: 2 }}>Template bisa tampil 1–3 tombol, muncul setelah bot chat, tombolnya putih elegan compact</div>
                     </div>
                     <button onClick={addChoice} style={smBtn('#C9A574', 'rgba(201,165,116,0.15)')}><Plus size={13} /> Tambah</button>
                   </div>
@@ -2835,6 +3064,10 @@ function normalizeSettings(settings, rawOverride = null) {
   const bots = sourceBots.map((bot, i) => normalizeBot(bot, i === 0 ? 'Stelle' : `Bot ${i + 1}`))
   const firstBotId = bots[0]?.id || MAIN_BOT_ID
   const appearance = { ...DEFAULT_SETTINGS.appearance, ...(merged.appearance || {}) }
+  const header = { ...DEFAULT_SETTINGS.header, ...(merged.header || {}) }
+  header.height = Math.max(46, Math.min(72, Number(header.height || DEFAULT_SETTINGS.header.height)))
+  const scriptedChoiceLimit = Math.max(1, Math.min(3, Number(merged.scriptedChoiceLimit || DEFAULT_SETTINGS.scriptedChoiceLimit)))
+  const soundVolume = Math.max(0.4, Math.min(3, Number(merged.soundVolume || DEFAULT_SETTINGS.soundVolume)))
   if (rawOverride && rawOverride.settingsVersion !== 13 && (!rawOverride.appearance || !rawOverride.appearance.avatarSize || rawOverride.appearance.avatarSize <= 46)) {
     appearance.avatarSize = 52
   }
@@ -2848,10 +3081,14 @@ function normalizeSettings(settings, rawOverride = null) {
   return {
     ...merged,
     appearance,
+    header,
+    scriptedChoiceLimit,
+    soundVolume,
     bots,
     bot: bots[0],
     groupChat: merged.groupChat || bots.length > 1,
     starterMessages: (merged.starterMessages || []).map(fixReply),
+    systemNotices: getSystemNotices(merged).filter(item => item.text !== undefined),
     botResponses: (merged.botResponses || []).map(r => withReplyList(r, getReplyList(r).map(fixReply).filter(Boolean))),
     scriptedChoices: (merged.scriptedChoices || []).map(c => withUserScriptMessageList(withReplyList(c, getReplyList(c).map(fixReply).filter(Boolean)), getScriptedUserMessageList(c))),
   }
@@ -2934,7 +3171,7 @@ function ImageModal({ src, onClose }) {
 
 /* ── Default Settings ── */
 const DEFAULT_SETTINGS = {
-  settingsVersion: 13,
+  settingsVersion: 14,
   appearance: {
     chatBackground: '#E8E3D8',
     userBubbleColor: '#C9A574',
@@ -2955,6 +3192,7 @@ const DEFAULT_SETTINGS = {
     borderWidth: 1,
     textColor: '#1A1208',
     subtitleColor: '#8B7050',
+    height: 58,
   },
   user: {
     name: 'Trailblazer',
@@ -2982,8 +3220,15 @@ const DEFAULT_SETTINGS = {
   chatMode: 'free',
   freeModeUserBurstMax: 2,
   freeModeUserBurstDelay: 1150,
+  scriptedChoiceLimit: 2,
   botStarts: false,
   sound: true,
+  soundVolume: 1.8,
+  systemNotices: [
+    { id: 'notice-offline', text: 'Stelle offline' },
+    { id: 'notice-leave', text: 'Stelle keluar dari group' },
+    { id: 'notice-failed', text: 'Gagal mengirim pesan' },
+  ],
   starterMessages: [
     { id: 'starter-1', botId: MAIN_BOT_ID, type: 'text', content: 'Kamu udah bangun?' },
   ],
@@ -2992,8 +3237,9 @@ const DEFAULT_SETTINGS = {
 }
 
 /* ── Calm Blub Sound via Web Audio API ── */
-function playBlub() {
+function playBlub(volume = 1) {
   try {
+    const volumeBoost = Math.max(0.4, Math.min(3, Number(volume) || 1))
     const ctx = new (window.AudioContext || window.webkitAudioContext)()
     const makeBlub = (freq1, freq2, startT, dur, vol) => {
       const osc = ctx.createOscillator()
@@ -3014,8 +3260,8 @@ function playBlub() {
       osc.stop(startT + dur)
     }
     const t = ctx.currentTime
-    makeBlub(420, 200, t, 0.18, 0.07)
-    makeBlub(260, 130, t + 0.04, 0.16, 0.05)
+    makeBlub(420, 200, t, 0.18, 0.07 * volumeBoost)
+    makeBlub(260, 130, t + 0.04, 0.16, 0.05 * volumeBoost)
     setTimeout(() => { try { ctx.close() } catch (_) {} }, 700)
   } catch (_) {}
 }
@@ -3213,6 +3459,21 @@ export default function Home() {
       const contentType = reply.type || 'text'
       const textLength = typeof reply.content === 'string' ? reply.content.trim().length : 0
 
+      if (contentType === 'system') {
+        await sleep(i === 0 ? 360 : 520)
+        if (!isMountedRef.current) break
+        addMessage({
+          type: 'system',
+          senderId: 'system',
+          contentType: 'system',
+          content: reply.content.trim(),
+          revealedAt: Date.now(),
+        })
+        previousBotId = 'system'
+        await waitForPaint()
+        continue
+      }
+
       // V15: typing tetap placeholder di list. Dot-nya blink/pulse tanpa loncat,
       // typing default 2.6 detik, dan bisa di-skip dengan tap area chat.
       const preTypingDelay = i === 0 ? 420 : (isDifferentBotTurn ? 760 : 520)
@@ -3259,7 +3520,7 @@ export default function Home() {
 
       previousBotId = activeBot.id
 
-      if (settingsRef.current.sound) { await sleep(80); playBlub() }
+      if (settingsRef.current.sound) { await sleep(80); playBlub(settingsRef.current.soundVolume || 1.8) }
     }
     setIsTyping(false)
     if (settingsRef.current.chatMode === 'scripted') setScriptedChoicesReady(true)
@@ -3338,6 +3599,17 @@ export default function Home() {
 
     if (!msg.content?.trim()) return
 
+    if (msg.contentType === 'system') {
+      addMessage({
+        type: 'system',
+        senderId: 'system',
+        contentType: 'system',
+        content: msg.content.trim(),
+        revealedAt: Date.now(),
+      })
+      return
+    }
+
     addMessage({ type: 'user', ...msg })
 
     const active = settingsRef.current
@@ -3350,6 +3622,18 @@ export default function Home() {
     scheduleFreeBotReply()
   }, [addMessage, scheduleFreeBotReply])
 
+  const handleSendSystemNotice = useCallback((content) => {
+    const text = typeof content === 'string' ? content.trim() : ''
+    if (!text) return
+    addMessage({
+      type: 'system',
+      senderId: 'system',
+      contentType: 'system',
+      content: text,
+      revealedAt: Date.now(),
+    })
+  }, [addMessage])
+
   const sendScriptedUserMessages = useCallback(async (userMessages) => {
     const valid = (userMessages || []).filter(message => message && typeof message.content === 'string' && message.content.trim())
 
@@ -3360,6 +3644,20 @@ export default function Home() {
       const contentType = userMessage.type || 'text'
       const content = userMessage.content.trim()
       const isMedia = contentType !== 'text'
+
+      if (contentType === 'system') {
+        await sleep(i === 0 ? 420 : 620)
+        if (!isMountedRef.current) break
+        addMessage({
+          type: 'system',
+          senderId: 'system',
+          contentType: 'system',
+          content,
+          revealedAt: Date.now(),
+        })
+        await waitForPaint()
+        continue
+      }
 
       // Scripted user sekarang juga punya fase "ngetik/ngirim" dulu, biar gak pop mendadak.
       const beforeTypingDelay = i === 0 ? 240 : (isMedia ? 780 : 640)
@@ -3471,9 +3769,17 @@ export default function Home() {
   const hasTypingPlaceholder = messages.some(msg => msg.contentType === 'typing')
   const canShowScriptedChoices = settings.chatMode === 'scripted' && scriptedChoicesReady && !hasTypingPlaceholder
   const activeScriptedChoices = canShowScriptedChoices
-    ? (settings.scriptedChoices || []).filter(choice => !usedScriptedChoiceIds.includes(choice.id)).slice(0, 2)
+    ? (settings.scriptedChoices || []).filter(choice => !usedScriptedChoiceIds.includes(choice.id)).slice(0, Math.max(1, Math.min(3, Number(settings.scriptedChoiceLimit || 2))))
     : []
   const inputSettings = { ...settings, scriptedChoices: activeScriptedChoices, scriptedWaitingForBot: settings.chatMode === 'scripted' && !canShowScriptedChoices }
+
+  useLayoutEffect(() => {
+    if (settings.chatMode !== 'scripted' || activeScriptedChoices.length === 0) return
+    requestAnimationFrame(() => {
+      scrollToBottom()
+    })
+  }, [settings.chatMode, activeScriptedChoices.length, scrollToBottom])
+
   const frameMode = settings.appearance.frameMode || 'full'
   const frameConfig = getFrameModeConfig(frameMode)
   const isFramed = frameMode !== 'full'
@@ -3537,7 +3843,7 @@ export default function Home() {
         ref={messagesAreaRef}
         className="flex-1 min-h-0 overflow-y-auto overscroll-contain"
         onPointerDown={requestSkipTyping}
-        style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'stretch', gap: 14, overflowAnchor: 'none', paddingTop: 14, paddingBottom: 14, paddingLeft: 'max(12px, env(safe-area-inset-left))', paddingRight: 'max(12px, env(safe-area-inset-right))' }}
+        style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'stretch', gap: 14, overflowAnchor: 'none', paddingTop: 14, paddingBottom: activeScriptedChoices.length ? 28 : 14, paddingLeft: 'max(12px, env(safe-area-inset-left))', paddingRight: 'max(12px, env(safe-area-inset-right))' }}
       >
         {/* Empty state */}
         {messages.length === 0 && !isTyping && (
@@ -3585,6 +3891,7 @@ export default function Home() {
         editingMessage={editingMessage}
         onSaveEdit={handleSaveEditedMessage}
         onCancelEdit={handleCancelEdit}
+        onSendSystemNotice={handleSendSystemNotice}
       />
 
       <AnimatePresence>
