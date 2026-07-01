@@ -7,6 +7,7 @@ import { kirimEmailAdmin, kirimEmailTopupSukses } from '../../../lib/mailer';
 import { prosesVoucherMakasihOrderPertama } from '../../../lib/voucher';
 import { transaksiDigiflazz } from '../../../lib/digiflazz';
 import { cekStatusVipReseller, ambilVipResellerTrxIdDariResponse } from '../../../lib/vipreseller';
+import { cekStatusNetflazz, ambilStatusNetflazz, ambilNetflazzTrxIdDariResponse, netflazzSukses, netflazzGagal, netflazzPending } from '../../../lib/netflazz';
 import crypto from 'crypto';
 
 const EMAIL_CEO = 'fahmiimansyah28@gmail.com';
@@ -195,6 +196,60 @@ async function syncVipReseller(trx) {
 
   return {
     provider: 'vipreseller',
+    statusRaw,
+    statusNormal,
+    suksesFinal,
+    gagal,
+    masihProses,
+    data: hasil.data
+  };
+}
+
+async function syncNetflazz(trx) {
+  const responseSebelumnya = bacaJsonAman(trx.apigames_response);
+  const trxidSebelumnya = ambilNetflazzTrxIdDariResponse(responseSebelumnya);
+
+  if (!trxidSebelumnya) {
+    return {
+      provider: 'netflazz',
+      gagal: false,
+      suksesFinal: false,
+      masihProses: false,
+      butuhAdmin: true,
+      statusRaw: 'id transaksi Netflazz tidak ditemukan',
+      statusNormal: 'butuh_admin',
+      data: {
+        message:
+          'ID transaksi Netflazz belum tersimpan di response provider. Cek response order awal di catatan/admin sebelum sync status.'
+      }
+    };
+  }
+
+  const hasil = await cekStatusNetflazz({
+    refId: trx.order_id,
+    trxid: trxidSebelumnya
+  });
+
+  const statusRaw = ambilStatusNetflazz(hasil.data);
+  const statusNormal = normalisasiStatus(statusRaw);
+
+  const suksesFinal =
+    hasil.ok &&
+    (netflazzSukses(hasil.data) || statusSukses(statusRaw));
+
+  const gagal =
+    !hasil.ok ||
+    netflazzGagal(hasil.data) ||
+    statusGagal(statusRaw);
+
+  const masihProses =
+    hasil.ok &&
+    !suksesFinal &&
+    !gagal &&
+    (netflazzPending(hasil.data) || statusProses(statusRaw));
+
+  return {
+    provider: 'netflazz',
     statusRaw,
     statusNormal,
     suksesFinal,
@@ -576,6 +631,8 @@ export async function POST(request) {
       hasilProvider = await syncDigiflazz(trx);
     } else if (provider === 'vipreseller') {
       hasilProvider = await syncVipReseller(trx);
+    } else if (provider === 'netflazz') {
+      hasilProvider = await syncNetflazz(trx);
     } else if (provider === 'mock') {
       hasilProvider = await syncMock(trx);
     } else {

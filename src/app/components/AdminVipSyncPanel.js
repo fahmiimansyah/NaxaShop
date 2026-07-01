@@ -13,6 +13,7 @@ import {
 } from 'react-icons/fi';
 
 const defaultVipSyncPanelState = {
+  provider: 'vipreseller',
   filterGame: '',
   filterStatus: 'available',
   search: '',
@@ -67,6 +68,23 @@ function cariGameNaxa(item, daftarGame = []) {
   });
 }
 
+
+async function bacaJsonResponseAman(response, providerLabel) {
+  const raw = await response.text();
+
+  try {
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    const preview = raw
+      ? raw.replace(/\s+/g, ' ').slice(0, 180)
+      : '(response kosong)';
+
+    throw new Error(
+      `API ${providerLabel} balikin bukan JSON (${response.status}). Kemungkinan route error/404. Preview: ${preview}`
+    );
+  }
+}
+
 function labelWaktuSync(value) {
   if (!value) return '';
 
@@ -107,6 +125,7 @@ export default function AdminVipSyncPanel({
   };
 
   const {
+    provider,
     filterGame,
     filterStatus,
     search,
@@ -115,6 +134,11 @@ export default function AdminVipSyncPanel({
     error,
     lastSyncedAt
   } = state;
+
+  const providerAktif = normalisasi(provider) === 'netflazz' ? 'netflazz' : 'vipreseller';
+  const providerMeta = providerAktif === 'netflazz'
+    ? { label: 'Netflazz', badge: 'NETFLAZZ', accent: 'emerald', placeholder: 'Kosongin dulu / contoh: Free Fire', emptyHint: 'Kalau gagal, cek action daftar layanan Netflazz di ENV.' }
+    : { label: 'VIPReseller', badge: 'VIP', accent: 'purple', placeholder: 'Kosongin dulu / contoh: Mobile Legends', emptyHint: 'Kalau env VIP belum bener, nanti errornya muncul di atas.' };
 
   const produkPreview = hasil?.data || [];
   const lastSyncedLabel = labelWaktuSync(lastSyncedAt);
@@ -138,24 +162,29 @@ export default function AdminVipSyncPanel({
   };
 
   async function tarikProdukVip() {
+    const endpoint = providerAktif === 'netflazz'
+      ? '/api/admin/sync-provider/services'
+      : '/api/admin/sync-vipreseller/services';
+
     try {
       updateVipSyncState({ loading: true, error: '' });
 
-      const response = await fetch('/api/admin/sync-vipreseller/services', {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
+          provider: providerAktif,
           filter_game: filterGame,
           filter_status: filterStatus
         })
       });
 
-      const data = await response.json();
+      const data = await bacaJsonResponseAman(response, providerMeta.label);
 
       if (!response.ok || !data.sukses) {
-        throw new Error(data.pesan || 'Gagal tarik produk VIPReseller.');
+        throw new Error(data.pesan || `Gagal tarik produk ${providerMeta.label}.`);
       }
 
       updateVipSyncState({
@@ -166,7 +195,7 @@ export default function AdminVipSyncPanel({
       });
     } catch (err) {
       updateVipSyncState({
-        error: err.message || 'Gagal tarik produk VIPReseller.',
+        error: err.message || `Gagal tarik produk ${providerMeta.label}.`,
         loading: false
       });
     }
@@ -186,11 +215,11 @@ export default function AdminVipSyncPanel({
           <div className="max-w-2xl">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-purple-300/10 bg-white/[0.06] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-purple-200">
               <FiZap />
-              VIP Sync Center
+              Provider Sync Center
             </div>
 
             <h2 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
-              Tarik Produk VIPReseller
+              Tarik Produk {providerMeta.label}
             </h2>
 
             <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-400">
@@ -199,7 +228,7 @@ export default function AdminVipSyncPanel({
 
             {hasil && (
               <p className="mt-3 inline-flex rounded-full border border-emerald-400/15 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-black text-emerald-200">
-                Preview masih keinget walau pindah tab admin{lastSyncedLabel ? ` • sync ${lastSyncedLabel}` : ''}
+                Preview {providerMeta.label} masih keinget walau pindah tab admin{lastSyncedLabel ? ` • sync ${lastSyncedLabel}` : ''}
               </p>
             )}
           </div>
@@ -224,12 +253,26 @@ export default function AdminVipSyncPanel({
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-purple-950/35 transition hover:-translate-y-0.5 hover:from-purple-500 hover:to-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <FiRefreshCw className={loading ? 'animate-spin' : ''} />
-              {loading ? 'Lagi narik...' : hasil ? 'Refresh Produk' : 'Tarik Produk'}
+              {loading ? 'Lagi narik...' : hasil ? `Refresh ${providerMeta.label}` : `Tarik ${providerMeta.label}`}
             </button>
           </div>
         </div>
 
-        <div className="relative mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_190px]">
+        <div className="relative mt-5 grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)_190px]">
+          <div>
+            <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+              Provider
+            </label>
+            <select
+              value={providerAktif}
+              onChange={(e) => updateVipSyncState({ provider: e.target.value, hasil: null, error: '', filterStatus: e.target.value === 'vipreseller' ? 'available' : '' })}
+              className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm font-black text-white outline-none transition focus:border-purple-400/60 focus:bg-slate-950"
+            >
+              <option value="vipreseller">VIPReseller</option>
+              <option value="netflazz">Netflazz</option>
+            </select>
+          </div>
+
           <div>
             <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
               Filter Game Provider
@@ -237,7 +280,7 @@ export default function AdminVipSyncPanel({
             <input
               value={filterGame}
               onChange={(e) => updateVipSyncState({ filterGame: e.target.value })}
-              placeholder="Kosongin dulu / contoh: Mobile Legends"
+              placeholder={providerMeta.placeholder}
               className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm font-bold text-white outline-none transition placeholder:text-slate-600 focus:border-purple-400/60 focus:bg-slate-950"
             />
           </div>
@@ -251,9 +294,9 @@ export default function AdminVipSyncPanel({
               onChange={(e) => updateVipSyncState({ filterStatus: e.target.value })}
               className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm font-black text-white outline-none transition focus:border-purple-400/60 focus:bg-slate-950"
             >
-              <option value="available">Available</option>
-              <option value="empty">Empty</option>
               <option value="">Semua</option>
+              <option value="available">Aktif / Available</option>
+              <option value="empty">Gangguan / Empty</option>
             </select>
           </div>
         </div>
@@ -290,7 +333,7 @@ export default function AdminVipSyncPanel({
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Preview produk</p>
-            <h3 className="mt-1 text-xl font-black text-white">Etalase mentah VIP</h3>
+            <h3 className="mt-1 text-xl font-black text-white">Etalase mentah {providerMeta.label}</h3>
             <p className="mt-1 text-xs font-semibold text-slate-500">
               Klik “Pakai ke Form” buat ngisi form Tambah Produk otomatis. Preview ini disimpen di state admin utama, jadi gak ilang pas balik dari tab Produk.
             </p>
@@ -314,7 +357,7 @@ export default function AdminVipSyncPanel({
             </div>
             <p className="text-base font-black text-white">Belum ada produk ketarik</p>
             <p className="mt-1 max-w-sm text-sm font-semibold text-slate-500">
-              Klik tombol Tarik Produk dulu. Kalau env VIP belum bener, nanti errornya muncul di atas.
+              Klik tombol Tarik Produk dulu. {providerMeta.emptyHint}
             </p>
           </div>
         ) : produkTerfilter.length === 0 ? (
@@ -329,12 +372,12 @@ export default function AdminVipSyncPanel({
 
               return (
                 <div
-                  key={`${item.kode_produk_provider}-${item.no}`}
+                  key={`${item.provider || providerAktif}-${item.kode_produk_provider}-${item.no}`}
                   className="group rounded-2xl border border-white/10 bg-slate-950/55 p-4 transition hover:-translate-y-0.5 hover:border-purple-400/35 hover:bg-slate-950/80"
                 >
                   <div className="mb-3 flex flex-wrap items-center gap-2">
                     <span className="rounded-md border border-violet-500/20 bg-violet-500/10 px-2 py-1 text-[10px] font-black text-violet-300">
-                      VIP
+                      {providerMeta.badge}
                     </span>
                     <span className={`rounded-md border px-2 py-1 text-[10px] font-black ${badgeStatusClass(item.status_final)}`}>
                       {item.status_provider || item.status_final}

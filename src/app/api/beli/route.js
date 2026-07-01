@@ -77,7 +77,7 @@ const ATURAN_METODE_BAYAR = {
   indomaret: { biaya: 5000, minimal: 50000, comingSoon: true }
 };
 
-const PROVIDER_VALID = ['apigames', 'digiflazz', 'vipreseller', 'mock'];
+const PROVIDER_VALID = ['apigames', 'digiflazz', 'vipreseller', 'netflazz', 'mock'];
 
 function bersihinText(value) {
   return String(value || '').trim();

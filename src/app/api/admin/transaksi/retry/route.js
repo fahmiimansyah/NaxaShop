@@ -3,13 +3,14 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../auth/[...nextauth]/route';
 import crypto from 'crypto';
 import { orderVipReseller, ambilVipResellerTrxIdDariResponse } from '../../../../lib/vipreseller';
+import { orderNetflazz, ambilStatusNetflazz, ambilNetflazzTrxIdDariResponse, netflazzSukses, netflazzGagal, netflazzPending } from '../../../../lib/netflazz';
 import db from '../../../../lib/db';
 import { kirimEmailAdmin, kirimEmailTopupSukses } from '../../../../lib/mailer';
 import { prosesVoucherMakasihOrderPertama } from '../../../../lib/voucher';
 import { transaksiDigiflazz } from '../../../../lib/digiflazz';
 
 const EMAIL_CEO = 'fahmiimansyah28@gmail.com';
-const PROVIDER_VALID = ['apigames', 'digiflazz', 'vipreseller', 'mock'];
+const PROVIDER_VALID = ['apigames', 'digiflazz', 'vipreseller', 'netflazz', 'mock'];
 
 async function cekAdmin() {
   const session = await getServerSession(authOptions);
@@ -51,6 +52,10 @@ function ambilTrxidProviderTersimpan(trx) {
 
   if (provider === 'vipreseller') {
     return ambilVipResellerTrxIdDariResponse(trx?.apigames_response);
+  }
+
+  if (provider === 'netflazz') {
+    return ambilNetflazzTrxIdDariResponse(trx?.apigames_response);
   }
 
   return '';
@@ -339,6 +344,35 @@ async function tembakDigiflazz(trx) {
   };
 }
 
+async function tembakNetflazz(trx) {
+  const hasil = await orderNetflazz({
+    refId: trx.order_id,
+    kodeProduk: trx.kode_produk_provider || trx.kode_produk,
+    idPlayer: trx.id_player,
+    zonePlayer: trx.zone_player
+  });
+
+  const statusRaw = ambilStatusNetflazz(hasil.data);
+
+  return {
+    provider: 'netflazz',
+    gagal:
+      !hasil.ok ||
+      netflazzGagal(hasil.data) ||
+      statusProviderGagal(statusRaw) ||
+      statusProviderButuhAdmin(statusRaw),
+    suksesFinal:
+      netflazzSukses(hasil.data) ||
+      statusProviderSukses(statusRaw),
+    masihProses:
+      netflazzPending(hasil.data) ||
+      statusProviderMasihProses(statusRaw),
+    statusRaw,
+    statusNormal: normalisasiStatus(statusRaw),
+    data: hasil.data
+  };
+}
+
 async function tembakMock(trx) {
   return {
     provider: 'mock',
@@ -368,6 +402,10 @@ async function tembakProvider(trx) {
 
   if (provider === 'vipreseller') {
   return tembakVipReseller(trx);
+  }
+
+  if (provider === 'netflazz') {
+    return tembakNetflazz(trx);
   }
 
   if (provider === 'mock') {

@@ -6,7 +6,7 @@ import db from '../../../lib/db';
 const EMAIL_CEO = 'fahmiimansyah28@gmail.com';
 
 const STATUS_PRODUK_VALID = ['aktif', 'gangguan', 'nonaktif', 'coming_soon'];
-const PROVIDER_VALID = ['apigames', 'digiflazz', 'mock', 'vipreseller'];
+const PROVIDER_VALID = ['apigames', 'digiflazz', 'mock', 'vipreseller', 'netflazz'];
 
 async function cekAdmin() {
   const session = await getServerSession(authOptions);

@@ -168,10 +168,10 @@ function statusUtama(trx) {
     Icon: FaReceipt,
     title: 'Transaksi',
     desc: 'Status transaksi tersedia.',
-    color: 'text-gray-300',
-    bg: 'bg-gray-800',
-    border: 'border-gray-700',
-    badge: 'border-gray-700 bg-gray-800 text-gray-300',
+    color: 'text-slate-300',
+    bg: 'bg-white/[0.045]',
+    border: 'border-white/10',
+    badge: 'border-white/10 bg-white/[0.045] text-slate-300',
   };
 }
 
@@ -190,7 +190,7 @@ function warnaStatusBayar(statusBayar) {
     return 'border-red-500/20 bg-red-500/10 text-red-300';
   }
 
-  return 'border-gray-700 bg-gray-800 text-gray-400';
+  return 'border-white/10 bg-white/[0.045] text-slate-400';
 }
 
 function warnaStatusTopup(statusTopup) {
@@ -212,7 +212,7 @@ function warnaStatusTopup(statusTopup) {
     return 'border-orange-500/20 bg-orange-500/10 text-orange-300';
   }
 
-  return 'border-gray-700 bg-gray-800 text-gray-400';
+  return 'border-white/10 bg-white/[0.045] text-slate-400';
 }
 
 function labelStatus(value) {
@@ -247,7 +247,7 @@ function LoadingState() {
     <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-white">
       <div className="text-center">
         <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-blue-500/20 border-t-blue-400" />
-        <p className="font-black text-gray-400">
+        <p className="font-black text-slate-400">
           Mengambil riwayat transaksi...
         </p>
       </div>
@@ -259,8 +259,8 @@ function EmptyState({ filterAktif, keyword }) {
   const sedangCari = Boolean(keyword.trim());
 
   return (
-    <section className="rounded-[2rem] border border-gray-800 bg-gray-900 p-8 text-center shadow-xl">
-      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-800 text-2xl text-gray-400">
+    <section className="rounded-[2rem] border border-white/10 bg-slate-950/55 p-8 text-center shadow-xl">
+      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.045] text-2xl text-slate-400">
         <FaGamepad />
       </div>
 
@@ -272,7 +272,7 @@ function EmptyState({ filterAktif, keyword }) {
             : 'Belum ada transaksi'}
       </h2>
 
-      <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-gray-400">
+      <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-400">
         {sedangCari
           ? 'Coba pakai kata kunci lain, seperti Order ID, nama game, atau ID player.'
           : filterAktif === 'sukses'
@@ -291,7 +291,7 @@ function EmptyState({ filterAktif, keyword }) {
         {filterAktif !== 'semua' && (
           <a
             href="#filter-riwayat"
-            className="rounded-2xl border border-gray-700 bg-gray-800 px-5 py-3 text-sm font-black text-gray-300 transition hover:border-blue-500/40 hover:text-white"
+            className="rounded-2xl border border-white/10 bg-white/[0.045] px-5 py-3 text-sm font-black text-slate-300 transition hover:border-blue-500/40 hover:text-white"
           >
             Lihat Filter Lain
           </a>
@@ -421,14 +421,14 @@ export default function RiwayatTransaksiPage() {
   if (status === 'unauthenticated') {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-white">
-        <section className="w-full max-w-md rounded-[2rem] border border-gray-800 bg-gray-900 p-6 text-center shadow-2xl">
+        <section className="w-full max-w-md rounded-[2rem] border border-white/10 bg-slate-950/55 p-6 text-center shadow-2xl">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500/10 text-2xl text-blue-400">
             <FaReceipt />
           </div>
 
           <h1 className="text-2xl font-black">Masuk untuk melihat riwayat</h1>
 
-          <p className="mt-2 text-sm leading-relaxed text-gray-400">
+          <p className="mt-2 text-sm leading-relaxed text-slate-400">
             Riwayat transaksi hanya ditampilkan untuk akun terkait, supaya
             pesanan kamu tetap rapi dan tidak tercampur dengan akun lain.
           </p>
@@ -443,7 +443,7 @@ export default function RiwayatTransaksiPage() {
 
           <Link
             href="/lacak"
-            className="mt-3 block text-xs font-bold text-gray-500 hover:text-blue-400"
+            className="mt-3 block text-xs font-bold text-slate-500 hover:text-blue-400"
           >
             Mau cek tanpa login? Lacak Order
           </Link>
@@ -465,7 +465,7 @@ export default function RiwayatTransaksiPage() {
           </Link>
         </div>
 
-        <section className="mb-6 overflow-hidden rounded-[2rem] border border-gray-800 bg-gray-900 shadow-2xl">
+        <section className="mb-6 overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/55 shadow-2xl">
           <div className="relative p-5 sm:p-7">
             <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-blue-500/10 blur-[90px]" />
             <div className="pointer-events-none absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-blue-600/10 blur-[90px]" />
@@ -480,7 +480,7 @@ export default function RiwayatTransaksiPage() {
                   Riwayat Transaksi
                 </h1>
 
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-400">
+                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
                   Default halaman ini menampilkan transaksi yang selesai. Kamu
                   tetap bisa melihat semua status lewat filter di bawah.
                 </p>
@@ -494,8 +494,8 @@ export default function RiwayatTransaksiPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-gray-800 bg-slate-950 px-5 py-4">
-                  <p className="text-xs font-black uppercase text-gray-500">
+                <div className="rounded-2xl border border-white/10 bg-slate-950 px-5 py-4">
+                  <p className="text-xs font-black uppercase text-slate-500">
                     Semua
                   </p>
                   <p className="mt-1 text-3xl font-black text-blue-400">
@@ -503,8 +503,8 @@ export default function RiwayatTransaksiPage() {
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-gray-800 bg-slate-950 px-5 py-4">
-                  <p className="text-xs font-black uppercase text-gray-500">
+                <div className="rounded-2xl border border-white/10 bg-slate-950 px-5 py-4">
+                  <p className="text-xs font-black uppercase text-slate-500">
                     Selesai
                   </p>
                   <p className="mt-1 text-3xl font-black text-green-400">
@@ -519,7 +519,7 @@ export default function RiwayatTransaksiPage() {
 
         <section
           id="filter-riwayat"
-          className="mb-6 rounded-3xl border border-gray-800 bg-gray-900 p-4 shadow-xl"
+          className="mb-6 rounded-3xl border border-white/10 bg-slate-950/55 p-4 shadow-xl"
         >
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="relative flex-1">
@@ -528,10 +528,10 @@ export default function RiwayatTransaksiPage() {
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
                 placeholder="Cari Order ID, game, produk, ID player..."
-                className="w-full rounded-2xl border border-gray-700 bg-slate-950 px-5 py-4 pr-12 text-sm text-white outline-none transition placeholder:text-gray-600 focus:border-blue-500"
+                className="w-full rounded-2xl border border-white/10 bg-slate-950 px-5 py-4 pr-12 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-blue-500"
               />
 
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500">
                 <FaSearch />
               </div>
             </div>
@@ -558,7 +558,7 @@ export default function RiwayatTransaksiPage() {
                   className={`shrink-0 rounded-2xl border px-4 py-3 text-xs font-black transition ${
                     aktif
                       ? 'border-blue-400/50 bg-blue-600 text-white shadow-lg shadow-blue-950/30'
-                      : 'border-gray-800 bg-slate-950 text-gray-400 hover:border-blue-500/30 hover:text-white'
+                      : 'border-white/10 bg-slate-950 text-slate-400 hover:border-blue-500/30 hover:text-white'
                   }`}
                 >
                   {filter.label}
@@ -566,7 +566,7 @@ export default function RiwayatTransaksiPage() {
                     className={`ml-2 rounded-full px-2 py-0.5 text-[10px] ${
                       aktif
                         ? 'bg-white/15 text-white'
-                        : 'bg-gray-800 text-gray-500'
+                        : 'bg-white/[0.045] text-slate-500'
                     }`}
                   >
                     {total}
@@ -597,7 +597,7 @@ export default function RiwayatTransaksiPage() {
               return (
                 <article
                   key={trx.id}
-                  className="overflow-hidden rounded-[1.7rem] border border-gray-800 bg-gray-900 shadow-xl transition hover:border-blue-500/30"
+                  className="overflow-hidden rounded-[1.7rem] border border-white/10 bg-slate-950/55 shadow-xl transition hover:border-blue-500/30"
                 >
                   <div
                     className={`border-b p-4 ${statusInfo.border} ${statusInfo.bg}`}
@@ -614,7 +614,7 @@ export default function RiwayatTransaksiPage() {
                           <h2 className={`font-black ${statusInfo.color}`}>
                             {statusInfo.title}
                           </h2>
-                          <p className="text-xs text-gray-400">
+                          <p className="text-xs text-slate-400">
                             {statusInfo.desc}
                           </p>
                         </div>
@@ -651,13 +651,13 @@ export default function RiwayatTransaksiPage() {
                             Top-up: {labelStatus(topupNormal)}
                           </span>
 
-                          <span className="rounded-xl border border-gray-700 bg-gray-800 px-3 py-2 text-[11px] font-black text-gray-400">
+                          <span className="rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2 text-[11px] font-black text-slate-400">
                             {trx.payment_type || '-'}
                           </span>
                         </div>
 
                         <div className="flex gap-3">
-                          <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-gray-800 bg-slate-950">
+                          <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-slate-950">
                             {trx.gambar_game ? (
                               <img
                                 src={trx.gambar_game}
@@ -665,7 +665,7 @@ export default function RiwayatTransaksiPage() {
                                 className="h-full w-full object-cover"
                               />
                             ) : (
-                              <div className="flex h-full w-full items-center justify-center text-2xl text-gray-500">
+                              <div className="flex h-full w-full items-center justify-center text-2xl text-slate-500">
                                 <FaGamepad />
                               </div>
                             )}
@@ -678,7 +678,7 @@ export default function RiwayatTransaksiPage() {
                                 'Produk Top Up'}
                             </p>
 
-                            <p className="mt-1 text-sm text-gray-400">
+                            <p className="mt-1 text-sm text-slate-400">
                               {trx.nama_game || 'Game'}
                             </p>
 
@@ -689,10 +689,10 @@ export default function RiwayatTransaksiPage() {
                         </div>
                       </div>
 
-                      <div className="w-full rounded-2xl border border-gray-800 bg-slate-950 p-4 lg:w-[280px]">
+                      <div className="w-full rounded-2xl border border-white/10 bg-slate-950 p-4 lg:w-[280px]">
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="text-[10px] font-black uppercase tracking-wider text-gray-500">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">
                               Total Bayar
                             </p>
                             <p className="mt-1 text-xl font-black text-green-400">
@@ -703,7 +703,7 @@ export default function RiwayatTransaksiPage() {
                           <button
                             type="button"
                             onClick={() => copyOrderId(trx.order_id)}
-                            className="rounded-xl bg-gray-800 px-3 py-2 text-xs font-black text-gray-300 transition hover:bg-gray-700"
+                            className="rounded-xl bg-white/[0.045] px-3 py-2 text-xs font-black text-slate-300 transition hover:bg-slate-800"
                             aria-label="Salin Order ID"
                           >
                             <FaCopy />
@@ -718,7 +718,7 @@ export default function RiwayatTransaksiPage() {
 
                         <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
                           <div>
-                            <p className="font-black uppercase text-gray-500">
+                            <p className="font-black uppercase text-slate-500">
                               ID Player
                             </p>
                             <p className="mt-1 break-all font-bold text-white">
@@ -727,7 +727,7 @@ export default function RiwayatTransaksiPage() {
                           </div>
 
                           <div className="text-right">
-                            <p className="font-black uppercase text-gray-500">
+                            <p className="font-black uppercase text-slate-500">
                               Server
                             </p>
                             <p className="mt-1 break-all font-bold text-white">
@@ -736,7 +736,7 @@ export default function RiwayatTransaksiPage() {
                           </div>
                         </div>
 
-                        <p className="mt-4 border-t border-dashed border-gray-800 pt-3 text-[11px] font-bold text-gray-500">
+                        <p className="mt-4 border-t border-dashed border-white/10 pt-3 text-[11px] font-bold text-slate-500">
                           {formatTanggal(trx.created_at)}
                         </p>
                       </div>

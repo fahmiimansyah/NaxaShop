@@ -697,7 +697,7 @@ function AdminCompanionCard({ stats, onOpenOrders, onOpenVipSync }) {
             onClick={onOpenVipSync}
             className="rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-4 py-3 text-xs font-black text-white transition hover:-translate-y-0.5 hover:from-purple-500 hover:to-blue-500"
           >
-            Cek VIP Sync
+            Cek Provider Sync
           </button>
 
           <button
@@ -725,7 +725,7 @@ function AdminMascotDock({ tabAktif, stats, onOpenOrders, onOpenVipSync }) {
       ? 'Ada top-up gagal. Cek pelan-pelan, jangan asal retry.'
       : 'Mode order aktif. Yang bermasalah taruh paling atas.',
     produk: 'Mode produk. Cek kode provider, harga modal, dan profit dulu.',
-    'vip-sync': 'Tarik data provider, lalu pilih yang bener-bener mau dijual.',
+    'vip-sync': 'Tarik data produk VIPReseller / Netflazz, lalu pilih yang mau dijual.',
     game: 'Etalase game. Nama, server, dan kategori jangan ketuker.',
     promo: 'Mode promo. Bikin cakep, tapi jangan terlalu rame.',
     'metode-bayar': 'Payment control. Jangan aktifin metode yang belum siap.',
@@ -784,7 +784,7 @@ function AdminMascotDock({ tabAktif, stats, onOpenOrders, onOpenVipSync }) {
                 }}
                 className="rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-3 py-2.5 text-[11px] font-black text-white transition hover:from-purple-500 hover:to-blue-500"
               >
-                VIP Sync
+                Provider Sync
               </button>
 
               <button
@@ -844,6 +844,7 @@ export default function DashboardAdmin() {
   const [mobileAdminMenuOpen, setMobileAdminMenuOpen] = useState(false);
   const [mobileAdminSearchOpen, setMobileAdminSearchOpen] = useState(false);
   const [vipSyncState, setVipSyncState] = useState({
+    provider: 'vipreseller',
     filterGame: '',
     filterStatus: 'available',
     search: '',
@@ -1049,9 +1050,94 @@ const [filterRequestGame, setFilterRequestGame] = useState({
     });
   };
 
+  const ambilFieldProviderSync = (item, fields = []) => {
+    const sources = [item, item?.raw].filter(Boolean);
+
+    for (const source of sources) {
+      if (!source || typeof source !== 'object') continue;
+
+      const lowerKeyMap = Object.keys(source).reduce((acc, key) => {
+        acc[String(key).toLowerCase()] = key;
+        return acc;
+      }, {});
+
+      for (const field of fields) {
+        const exactKey = field;
+        const lowerKey = lowerKeyMap[String(field).toLowerCase()];
+        const key = Object.prototype.hasOwnProperty.call(source, exactKey) ? exactKey : lowerKey;
+
+        if (key && Object.prototype.hasOwnProperty.call(source, key)) {
+          const value = source[key];
+          if (value !== undefined && value !== null && String(value).trim() !== '') {
+            return value;
+          }
+        }
+      }
+    }
+
+    return '';
+  };
+
+  const ambilKodeProviderSync = (item) => {
+    const providerProduk = normalisasiProvider(item?.provider || 'vipreseller');
+
+    if (providerProduk === 'netflazz') {
+      return String(
+        ambilFieldProviderSync(item, [
+          'serviceid',
+          'service_id',
+          'serviceId',
+          'serviceID',
+          'id_layanan',
+          'idlayanan',
+          'id_produk',
+          'idproduk',
+          'product_id',
+          'produk_id',
+          'kode_layanan',
+          'kodelayanan',
+          'kode_produk',
+          'kodeproduk',
+          'kode',
+          'code',
+          'sku',
+          'id'
+        ]) || item?.kode_produk_provider || ''
+      ).trim();
+    }
+
+    return String(
+      item?.kode_produk_provider ||
+        ambilFieldProviderSync(item, ['code', 'kode_produk', 'kode', 'sku']) ||
+        ''
+    ).trim();
+  };
+
+  const ambilNamaProviderSync = (item) => {
+    return String(
+      item?.nama_produk_provider ||
+        ambilFieldProviderSync(item, [
+          'layanan',
+          'nama_layanan',
+          'nama_produk',
+          'produk',
+          'product',
+          'name',
+          'service_name',
+          'service',
+          'paket',
+          'nominal',
+          'nama'
+        ]) ||
+        ''
+    ).trim();
+  };
+
   const handlePakaiProdukVipKeForm = (item) => {
-    const gameCocok = cariGameDariNamaVip(`${item.game_provider || ''} ${item.nama_produk_provider || ''}`);
-    const kodeProvider = String(item.kode_produk_provider || '').trim();
+    const namaProvider = ambilNamaProviderSync(item);
+    const gameCocok = cariGameDariNamaVip(`${item.game_provider || ''} ${namaProvider}`);
+    const kodeProvider = ambilKodeProviderSync(item);
+    const providerProduk = normalisasiProvider(item.provider || 'vipreseller');
 
     setModeEditProduk(false);
     setProdukEditId(null);
@@ -1059,12 +1145,12 @@ const [filterRequestGame, setFilterRequestGame] = useState({
     setFormProduk({
       game_id: gameCocok?.id ? String(gameCocok.id) : '',
       kode_produk: kodeProvider,
-      nama_produk: item.nama_produk_provider || '',
+      nama_produk: namaProvider || kodeProvider,
       harga: String(item.harga_jual || ''),
       harga_coret: '',
       harga_modal: String(item.harga_modal || 0),
       status_produk: item.status_final || 'aktif',
-      provider: 'vipreseller',
+      provider: providerProduk || 'vipreseller',
       kode_produk_provider: kodeProvider
     });
 
@@ -1181,7 +1267,8 @@ const labelProvider = (provider) => {
   if (p === 'digiflazz') return 'Digiflazz';
   if (p === 'apigames') return 'APIGames';
   if (p === 'mock') return 'Mock Provider';
-  if (p === 'vipreseller') return 'Vip Reseller'
+  if (p === 'vipreseller') return 'VIP Reseller';
+  if (p === 'netflazz') return 'Netflazz';
 
   return 'Provider';
 };
@@ -1198,6 +1285,9 @@ const warnaProvider = (provider) => {
   }
   if (p === 'vipreseller') {
   return 'bg-violet-500/10 text-violet-400 border-violet-500/20';
+}
+  if (p === 'netflazz') {
+  return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
 }
   if (p === 'mock') {
     return 'bg-gray-500/10 text-gray-300 border-gray-500/20';
@@ -2113,6 +2203,7 @@ const handleRetryTopup = async (trx) => {
     process.env.NODE_ENV !== 'production';
   const daftarProviderRetry = [
     'vipreseller',
+    'netflazz',
     'apigames',
     'digiflazz',
     ...(mockRetryDiizinkan ? ['mock'] : [])
@@ -3290,7 +3381,7 @@ const handleHapusRequestGame = async (item) => {
     { id: 'statistik', label: 'Dashboard', desc: 'Radar utama', Icon: FiBarChart2 },
     { id: 'transaksi', label: 'Orders', desc: 'Problem-first', Icon: FiShoppingBag },
     { id: 'produk', label: 'Products', desc: 'Nominal & provider', Icon: FiBox },
-    { id: 'vip-sync', label: 'VIP Sync', desc: 'Tarik provider', Icon: FiRefreshCw },
+    { id: 'vip-sync', label: 'Provider Sync', desc: 'VIP + Netflazz', Icon: FiRefreshCw },
     { id: 'game', label: 'Games', desc: 'Etalase game', Icon: FiGrid },
     { id: 'promo', label: 'Promo', desc: 'Banner toko', Icon: FiImage },
     { id: 'metode-bayar', label: 'Payment', desc: 'Metode bayar', Icon: FiCreditCard },
@@ -5175,6 +5266,7 @@ const handleHapusRequestGame = async (item) => {
     <option value="digiflazz">Digiflazz</option>
     <option value="mock">Mock / Simulasi</option>
     <option value="vipreseller">VIP Reseller</option>
+    <option value="netflazz">Netflazz</option>
   </select>
 </div>
 
@@ -5237,7 +5329,7 @@ const handleHapusRequestGame = async (item) => {
   <input
     type="text"
     required
-    placeholder="Contoh Digiflazz: test | APIGames: UPMBL5"
+    placeholder="Contoh Netflazz/Digiflazz: ML5 | APIGames: UPMBL5"
     value={formProduk.kode_produk_provider}
     onChange={(e) =>
       setFormProduk((prev) => ({

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import db from '../../lib/db';
 import { orderVipReseller } from '../../lib/vipreseller';
+import { orderNetflazz, ambilStatusNetflazz, netflazzSukses, netflazzGagal, netflazzPending } from '../../lib/netflazz';
 import { kirimEmailAdmin, kirimEmailTopupSukses } from '../../lib/mailer';
 import { prosesVoucherMakasihOrderPertama } from '../../lib/voucher';
 import { transaksiDigiflazz } from '../../lib/digiflazz';
@@ -361,6 +362,35 @@ async function tembakMock(trx) {
   };
 }
 
+async function tembakNetflazz(trx) {
+  const hasil = await orderNetflazz({
+    refId: trx.order_id,
+    kodeProduk: trx.kode_produk_provider || trx.kode_produk,
+    idPlayer: trx.id_player,
+    zonePlayer: trx.zone_player
+  });
+
+  const statusRaw = ambilStatusNetflazz(hasil.data);
+
+  return {
+    provider: 'netflazz',
+    gagal:
+      !hasil.ok ||
+      netflazzGagal(hasil.data) ||
+      statusProviderGagal(statusRaw) ||
+      statusProviderButuhAdmin(statusRaw),
+    suksesFinal:
+      netflazzSukses(hasil.data) ||
+      statusProviderSukses(statusRaw),
+    masihProses:
+      netflazzPending(hasil.data) ||
+      statusProviderMasihProses(statusRaw),
+    statusRaw,
+    statusNormal: normalisasiStatus(statusRaw),
+    data: hasil.data
+  };
+}
+
 async function tembakProvider(trx) {
   const provider = normalisasiProvider(trx.provider);
 
@@ -372,12 +402,16 @@ async function tembakProvider(trx) {
     return tembakDigiflazz(trx);
   }
 
-  if (provider === 'mock') {
-    return tembakMock(trx);
+  if (provider === 'vipreseller') {
+    return tembakVipReseller(trx);
   }
 
-  if (provider === 'vipreseller') {
-  return tembakVipReseller(trx);
+  if (provider === 'netflazz') {
+    return tembakNetflazz(trx);
+  }
+
+  if (provider === 'mock') {
+    return tembakMock(trx);
   }
 
   throw new Error(`Provider tidak dikenali: ${provider}`);
